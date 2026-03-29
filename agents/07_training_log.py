@@ -148,10 +148,16 @@ def summarize_with_claude(transcript: str) -> dict:
             f.write(prompt)
             tmp_path = f.name
 
-        # chcp 65001 設 UTF-8 code page；type 讀檔再 pipe 給 claude
-        cmd = f'chcp 65001 > nul && type "{tmp_path}" | claude -p --output-format text'
+        # PowerShell 以 UTF-8 讀檔後 pipe 給 claude，避免 cmd cp950 編碼問題
+        ps_cmd = (
+            "$OutputEncoding = [Console]::InputEncoding = "
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+            f"Get-Content '{tmp_path}' -Encoding UTF8 -Raw | "
+            "claude -p --output-format text"
+        )
         result = subprocess.run(
-            cmd, shell=True, capture_output=True, timeout=90
+            ["powershell", "-NoProfile", "-Command", ps_cmd],
+            capture_output=True, timeout=90
         )
         stdout = result.stdout.decode("utf-8", errors="replace")
         stderr = result.stderr.decode("utf-8", errors="replace")
