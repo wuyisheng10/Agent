@@ -12,7 +12,10 @@ File: C:/Users/user/claude AI_Agent/agents/07_training_log.py
 import os
 import json
 import re
+import html
+import shutil
 import subprocess
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -140,67 +143,202 @@ SUMMARY_PROMPT_TPL = """你是安麗事業「群雁國際團隊」的會議記�
 
 【輸出格式】
 只輸出一個 JSON 物件，不加任何說明、標題或 markdown。
-每欄盡量完整詳細（200 字以上），讓讀者不需看逐字稿也能完全理解當天的培訓精華：
+這份內容會直接做成網頁完整版，所以每欄都要完整、具體、可獨立閱讀。
+請寫成「像可直接分享的整理稿」的風格，而不是一整段散文。
+每一欄都盡量用以下格式：
+1. 先用阿拉伯數字分點，例如 1. 2. 3.
+2. 每一點先有一句短標或結論句
+3. 若有延伸說明，再換行補充 1 到 3 句
+4. 若有細項，可用 • 開頭條列
+5. 各點之間保留空行，讓網頁閱讀起來清楚，風格接近：
+   1.
+   每天先給自己正向的設定很重要
+   出門前先把狀態調對，先相信今天會有好事發生。
+
+   2.
+   狀態比技巧更重要
+   一個人有沒有目標、有沒有希望，別人一感受就知道。
+   • 有目標
+   • 有希望
+   • 有行動
+
+每欄至少 4 點，沒有 300 字限制；以完整呈現脈絡、例子、行動與目標為優先：
 {{"感恩":"（完整內容）","悟到":"（完整內容）","學到":"（完整內容）","做到":"（完整內容）","目標":"（完整內容）"}}"""
+
+SUMMARY_KEYS = (
+    "\u611f\u6069",
+    "\u609f\u5230",
+    "\u5b78\u5230",
+    "\u505a\u5230",
+    "\u76ee\u6a19",
+)
+
+SUMMARY_SCHEMA = {
+    "type": "object",
+    "properties": {key: {"type": "string"} for key in SUMMARY_KEYS},
+    "required": list(SUMMARY_KEYS),
+    "additionalProperties": False,
+}
+
+MAX_TRANSCRIPT_FOR_SUMMARY = 12000
+
+
+def _strip_cli_noise(raw: str) -> str:
+    ansi = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
+    return ansi.sub("", (raw or "")).strip()
+
+
+def _normalize_summary_dict(data: dict) -> dict:
+    if all(key in data for key in SUMMARY_KEYS):
+        return {key: str(data[key]).strip() for key in SUMMARY_KEYS}
+
+    for value in data.values():
+        if isinstance(value, dict):
+            try:
+                return _normalize_summary_dict(value)
+            except ValueError:
+                continue
+        if isinstance(value, str) and "{" in value and "}" in value:
+            try:
+                return _parse_json_output(value)
+            except Exception:
+                continue
+
+    raise ValueError("JSON 缺少必要欄位")
+
 
 def _parse_json_output(raw: str) -> dict:
     """從 CLI 輸出中解析 JSON 物件"""
-    cleaned = re.sub(r"```json|```", "", raw).strip()
-    match = re.search(r"\{.*?\}", cleaned, re.DOTALL)
-    if not match:
-        raise ValueError(f"無法解析 JSON：{cleaned[:300]}")
-    data = json.loads(match.group())
-    required = {"感恩", "悟到", "學到", "做到", "目標"}
-    if not required.issubset(data.keys()):
-        raise ValueError(f"JSON 缺少欄位：{required - data.keys()}")
-    return data
+    cleaned = re.sub(r"```json|```", "", _strip_cli_noise(raw))
+    decoder = json.JSONDecoder()
+
+    try:
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, dict):
+            return _normalize_summary_dict(parsed)
+    except Exception:
+        pass
+
+    for idx, ch in enumerate(cleaned):
+        if ch != "{":
+            continue
+        try:
+            parsed, _ = decoder.raw_decode(cleaned[idx:])
+        except Exception:
+            continue
+        if isinstance(parsed, dict):
+            try:
+                return _normalize_summary_dict(parsed)
+            except ValueError:
+                continue
+
+    raise ValueError(f"無法解析 JSON：{cleaned[:300]}")
+
+
+def _run_cli(args: list[str], input_text: str | None = None,
+             timeout: int = 120, output_path: str | None = None) -> str:
+    result = subprocess.run(
+        args,
+        input=input_text,
+        capture_output=True,
+        timeout=timeout,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    stdout = _strip_cli_noise(result.stdout)
+    stderr = _strip_cli_noise(result.stderr)
+    if result.returncode != 0:
+        raise RuntimeError(stderr or stdout or f"CLI exited with {result.returncode}")
+
+    if output_path and os.path.exists(output_path):
+        with open(output_path, encoding="utf-8") as f:
+            saved = _strip_cli_noise(f.read())
+        if saved:
+            return saved
+    return stdout
+
+
+def _resolve_npm_node_cli(script_rel: str) -> list[str]:
+    appdata = Path(os.getenv("APPDATA", r"C:\Users\user\AppData\Roaming"))
+    node_exe = shutil.which("node") or r"C:\Program Files\nodejs\node.exe"
+    script_path = appdata / "npm" / "node_modules" / Path(script_rel)
+    return [node_exe, str(script_path)]
+
+
+def _summary_prompt(transcript: str) -> str:
+    return SUMMARY_PROMPT_TPL.format(
+        transcript=transcript[:MAX_TRANSCRIPT_FOR_SUMMARY]
+    )
 
 def summarize_with_codex(transcript: str) -> dict:
     """
     【主力】Codex CLI — prompt 直接作為命令列引數（避免 shell/pipe 編碼問題）
     Windows npm 全域套件入口為 codex.cmd；自動偵測可用指令。
     """
-    import shutil
-    prompt = SUMMARY_PROMPT_TPL.format(transcript=transcript[:3000])
+    prompt = _summary_prompt(transcript)
     log("使用 Codex CLI 整理五部分總結...")
-    # Windows npm 安裝的 CLI 實際入口是 .cmd
-    exe = (shutil.which("codex") or
-           shutil.which("codex.cmd") or
-           "codex.cmd")
-    # --full-auto：非互動模式（不需要 TTY）
+    exe = _resolve_npm_node_cli(r"@openai\codex\bin\codex.js")
+    schema_path = None
+    output_path = None
     try:
-        result = subprocess.run(
-            [exe, "--full-auto", prompt],
-            capture_output=True,
-            timeout=120
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", encoding="utf-8", delete=False
+        ) as f:
+            json.dump(SUMMARY_SCHEMA, f, ensure_ascii=False)
+            schema_path = f.name
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", encoding="utf-8", delete=False
+        ) as f:
+            output_path = f.name
+
+        stdout = _run_cli(
+            [
+                *exe,
+                "exec",
+                "--skip-git-repo-check",
+                "--sandbox",
+                "read-only",
+                "--color",
+                "never",
+                "--output-schema",
+                schema_path,
+                "--output-last-message",
+                output_path,
+                prompt,
+            ],
+            output_path=output_path,
         )
-        stdout = result.stdout.decode("utf-8", errors="replace")
-        stderr = result.stderr.decode("utf-8", errors="replace")
-        if result.returncode != 0:
-            raise RuntimeError(stderr or stdout)
         return _parse_json_output(stdout)
     except Exception as e:
         log(f"Codex CLI 失敗：{e}")
         raise
+    finally:
+        for path in (schema_path, output_path):
+            if path:
+                try:
+                    os.unlink(path)
+                except Exception:
+                    pass
 
 def summarize_with_gemini(transcript: str) -> dict:
     """【二級備援】Gemini CLI — 支援 --prompt 直接引數模式"""
-    import shutil
-    prompt = SUMMARY_PROMPT_TPL.format(transcript=transcript[:3000])
+    prompt = _summary_prompt(transcript)
     log("使用 Gemini CLI 整理五部分總結（二級備援）...")
-    exe = (shutil.which("gemini") or
-           shutil.which("gemini.cmd") or
-           "gemini.cmd")
+    exe = _resolve_npm_node_cli(r"@google\gemini-cli\dist\index.js")
     try:
-        result = subprocess.run(
-            [exe, "--prompt", prompt],
-            capture_output=True,
-            timeout=120
+        stdout = _run_cli(
+            [
+                *exe,
+                "--prompt",
+                prompt,
+                "--output-format",
+                "json",
+                "--approval-mode",
+                "yolo",
+            ]
         )
-        stdout = result.stdout.decode("utf-8", errors="replace")
-        stderr = result.stderr.decode("utf-8", errors="replace")
-        if result.returncode != 0:
-            raise RuntimeError(stderr or stdout)
         return _parse_json_output(stdout)
     except Exception as e:
         log(f"Gemini CLI 失敗：{e}")
@@ -208,61 +346,25 @@ def summarize_with_gemini(transcript: str) -> dict:
 
 def summarize_with_claude(transcript: str) -> dict:
     """
-    Claude CLI — 將中文逐字稿 base64 編碼為純 ASCII 後傳給 CLI，
-    繞過 gRPC ByteString 只允許 0-255 的限制。
-    Claude 會自行解碼後輸出繁體中文 JSON。
+    Claude CLI 非互動模式，直接要求輸出符合 JSON Schema 的結果。
     """
-    import shutil, base64 as _b64
     log("使用 Claude CLI 整理五部分總結...")
-
-    # 逐字稿 base64 編碼（全 ASCII，避免 gRPC ByteString 錯誤）
-    transcript_b64 = _b64.b64encode(
-        transcript[:4000].encode("utf-8")
-    ).decode("ascii")
-
-    # ⚠️ Prompt 必須 100% ASCII（所有非 ASCII 字元用 \\uXXXX 表示）
-    # JSON keys: \u611f\u6069=感恩 \u609f\u5230=悟到 \u5b78\u5230=學到
-    #            \u505a\u5230=做到 \u76ee\u6a19=目標
-    prompt = (
-        "You are an Amway Geese Team (Qun-Yan) training meeting summarizer.\n"
-        "Team values: mutual support, gratitude to leaders, share knowledge, "
-        "positive attitude, pursue dreams, honor the team.\n\n"
-        "A Traditional Chinese meeting transcript is base64-encoded below.\n"
-        "Decode it, understand the content, then write a 5-part summary.\n\n"
-        "BASE64 TRANSCRIPT:\n"
-        f"{transcript_b64}\n\n"
-        "OUTPUT RULES:\n"
-        "1. Output ONLY a valid JSON object. No markdown, no explanation.\n"
-        "2. Use exactly these 5 keys (unicode escapes): "
-        '"\\u611f\\u6069","\\u609f\\u5230","\\u5b78\\u5230",'
-        '"\\u505a\\u5230","\\u76ee\\u6a19"\n'
-        "3. Each value: Traditional Chinese, first-person voice, 100-200 chars.\n"
-        "4. \\u611f\\u6069 = gratitude for teachers/teammates in this meeting\n"
-        "5. \\u609f\\u5230 = deepest insight connected to Amway business\n"
-        "6. \\u5b78\\u5230 = specific method/skill to teach teammates\n"
-        "7. \\u505a\\u5230 = one concrete action to do TODAY (not a plan)\n"
-        "8. \\u76ee\\u6a19 = measurable goal to achieve THIS WEEK\n\n"
-        "JSON:"
-    )
-    # 確認 prompt 全為 ASCII（debug 用）
-    non_ascii = [c for c in prompt if ord(c) > 127]
-    if non_ascii:
-        raise RuntimeError(f"Prompt 含非 ASCII 字元: {non_ascii[:5]}")
-
-    exe = (shutil.which("claude") or
-           shutil.which("claude.cmd") or
-           "claude.cmd")
+    exe = _resolve_npm_node_cli(r"@anthropic-ai\claude-code\cli.js")
+    prompt = _summary_prompt(transcript)
     try:
-        result = subprocess.run(
-            [exe, "-p", prompt],
-            capture_output=True,
-            timeout=120
+        stdout = _run_cli(
+            [
+                *exe,
+                "-p",
+                "--output-format",
+                "json",
+                "--permission-mode",
+                "dontAsk",
+                "--json-schema",
+                json.dumps(SUMMARY_SCHEMA, ensure_ascii=False),
+                prompt,
+            ]
         )
-        ansi = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
-        stdout = ansi.sub("", result.stdout.decode("utf-8", errors="replace"))
-        stderr = ansi.sub("", result.stderr.decode("utf-8", errors="replace"))
-        if result.returncode != 0:
-            raise RuntimeError((stderr or stdout)[:300])
         return _parse_json_output(stdout)
     except Exception as e:
         log(f"Claude CLI 失敗：{e}")
@@ -350,37 +452,121 @@ def save_summary(summary: dict, date_str: str, extra: dict = None) -> str:
     return key
 
 
+def get_summary_url(date_str: str) -> str:
+    base = os.getenv("NGROK_URL", "").strip().rstrip("/")
+    if not base:
+        return ""
+    return f"{base}/summary/{date_str}"
+
+
+def list_archived_images(date_str: str) -> list[str]:
+    img_dir = get_date_dir(date_str) / "images"
+    if not img_dir.exists():
+        return []
+    return sorted(
+        [p.name for p in img_dir.iterdir() if p.is_file()],
+        key=str.lower,
+    )
+
+
 # ============================================================
 # 📤 格式化總結訊息
 # ============================================================
 
 def format_summary_message(key: str, summary: dict, date_str: str, url: str = "") -> str:
     """
-    LINE 精簡版訊息（全文約 300 字）。
-    從完整 summary 各欄取首句作為摘要，完整內容見 HTML。
+    LINE 精簡版訊息。
+    先產出完整五部分內容，再從完整內容壓成約 500 字的導讀。
     """
-    def first_sentence(text: str, limit: int = 45) -> str:
-        """取第一句（到第一個句號/。/！/？），超過 limit 截斷"""
+    def compress(text: str, limit: int = 24) -> str:
         text = (text or "").strip()
-        for stop in ["。", "！", "？", ".", "!", "?"]:
+        for stop in ["。", "！", "？", "\n", ".", "!", "?"]:
             idx = text.find(stop)
             if 0 < idx < limit:
                 return text[:idx + 1]
         return text[:limit] + "…" if len(text) > limit else text
 
     d = f"{date_str[:4]}/{date_str[4:6]}/{date_str[6:]}"
-    return (
+    msg = (
         f"📚 培訓記錄 {d}\n"
         f"🔑 {key}\n"
         f"{'─'*20}\n"
-        f"🙏 {first_sentence(summary.get('感恩',''))}\n"
-        f"💡 {first_sentence(summary.get('悟到',''))}\n"
-        f"📖 {first_sentence(summary.get('學到',''))}\n"
-        f"✅ {first_sentence(summary.get('做到',''))}\n"
-        f"🎯 {first_sentence(summary.get('目標',''))}\n"
+        f"🙏 感恩：{compress(summary.get('感恩',''))}\n"
+        f"💡 悟到：{compress(summary.get('悟到',''))}\n"
+        f"📖 學到：{compress(summary.get('學到',''))}\n"
+        f"✅ 做到：{compress(summary.get('做到',''))}\n"
+        f"🎯 目標：{compress(summary.get('目標',''))}\n"
         f"{'─'*20}\n"
-        f"點連結查看完整記錄 ↑"
+        + (f"完整內容：{url}" if url else "點連結查看五部分完整內容 ↑")
     )
+    return msg[:500] + "…" if len(msg) > 500 else msg
+
+
+def _render_summary_html(content: str) -> str:
+    lines = (content or "").splitlines()
+    parts = []
+    in_list = False
+
+    for raw in lines:
+        line = raw.rstrip()
+        stripped = line.strip()
+
+        if not stripped:
+            if in_list:
+                parts.append("</ul>")
+                in_list = False
+            parts.append('<div class="gap"></div>')
+            continue
+
+        escaped = html.escape(stripped)
+        if stripped.startswith("•"):
+            if not in_list:
+                parts.append('<ul class="bullet-list">')
+                in_list = True
+            parts.append(f"<li>{html.escape(stripped[1:].strip())}</li>")
+            continue
+
+        if in_list:
+            parts.append("</ul>")
+            in_list = False
+
+        if re.match(r"^\d+\.$", stripped):
+            parts.append(f'<div class="point-num">{escaped}</div>')
+        elif re.match(r"^\d+\.\s*", stripped):
+            parts.append(f'<div class="point-title">{escaped}</div>')
+        else:
+            parts.append(f'<p class="para">{escaped}</p>')
+
+    if in_list:
+        parts.append("</ul>")
+
+    return "".join(parts)
+
+
+def _render_image_gallery(date_str: str) -> str:
+    images = list_archived_images(date_str)
+    if not images:
+        return ""
+
+    cards = []
+    for name in images:
+        src = f"/summary/{date_str}/images/{name}"
+        label = html.escape(name)
+        cards.append(
+            f'<a class="img-card" href="{src}" target="_blank" rel="noreferrer">'
+            f'<img src="{src}" alt="{label}">'
+            f'<div class="img-name">{label}</div>'
+            f'</a>'
+        )
+    return (
+        '<div class="card">'
+        '<div class="sec">🖼️ 會議流程圖 / 圖片紀錄</div>'
+        '<div class="gallery">'
+        + "".join(cards) +
+        '</div>'
+        '</div>'
+    )
+
 
 def format_summary_html(key: str, summary: dict, date_str: str) -> str:
     """產生行動裝置友善的 HTML 總結頁面"""
@@ -389,7 +575,7 @@ def format_summary_html(key: str, summary: dict, date_str: str) -> str:
         return (
             f'<div class="card">'
             f'<div class="sec">{icon} {title}</div>'
-            f'<div class="body">{content}</div>'
+            f'<div class="body">{_render_summary_html(content)}</div>'
             f'</div>'
         )
     return f"""<!DOCTYPE html>
@@ -409,7 +595,18 @@ def format_summary_html(key: str, summary: dict, date_str: str) -> str:
   .card{{background:#fff;border-radius:12px;padding:16px;margin:10px 0;
          box-shadow:0 2px 8px rgba(0,0,0,.07)}}
   .sec{{font-weight:700;color:#444;margin-bottom:8px;font-size:1em}}
-  .body{{line-height:1.7;color:#555;font-size:.95em}}
+  .body{{line-height:1.85;color:#555;font-size:.98em}}
+  .point-num{{font-weight:800;color:#1a73e8;margin-top:10px}}
+  .point-title{{font-weight:700;color:#222;margin:4px 0 6px}}
+  .para{{margin:0 0 8px 0}}
+  .gap{{height:8px}}
+  .bullet-list{{margin:4px 0 10px 20px;padding:0}}
+  .bullet-list li{{margin:4px 0}}
+  .gallery{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}}
+  .img-card{{display:block;background:#f8fbff;border:1px solid #dbe7ff;border-radius:10px;
+             overflow:hidden;text-decoration:none;color:#1f2d3d}}
+  .img-card img{{display:block;width:100%;height:160px;object-fit:cover;background:#eef4ff}}
+  .img-name{{padding:10px;font-size:.85em;word-break:break-all}}
 </style>
 </head>
 <body>
@@ -421,6 +618,7 @@ def format_summary_html(key: str, summary: dict, date_str: str) -> str:
 {row('📖','學到', summary.get('學到',''))}
 {row('✅','做到', summary.get('做到',''))}
 {row('🎯','目標', summary.get('目標',''))}
+{_render_image_gallery(date_str)}
 </body>
 </html>"""
 
@@ -441,7 +639,12 @@ def get_summary_by_key(key: str) -> str | None:
         return None
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
-    return format_summary_message(key, data["summary"], date_str)
+    return format_summary_message(
+        key,
+        data["summary"],
+        date_str,
+        url=get_summary_url(date_str),
+    )
 
 
 # ============================================================

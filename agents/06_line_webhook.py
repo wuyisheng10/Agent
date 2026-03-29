@@ -15,7 +15,7 @@ import threading
 import requests
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, request, abort
+from flask import Flask, request, abort, send_from_directory
 from dotenv import load_dotenv
 import importlib.util as _ilu
 import sys as _sys
@@ -24,6 +24,16 @@ def _load_training():
     spec = _ilu.spec_from_file_location(
         "training_log",
         str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "07_training_log.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _load_calendar():
+    spec = _ilu.spec_from_file_location(
+        "calendar_manager",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "08_calendar_manager.py")
     )
     m = _ilu.module_from_spec(spec)
     spec.loader.exec_module(m)
@@ -74,6 +84,22 @@ HELP_TEXT = """\
 ══════════════════════
 完整記錄網頁版：
 """ + (NGROK_URL + "/summary/YYYYMMDD" if NGROK_URL else "（尚未設定 NGROK_URL）")
+
+HELP_TEXT += """
+
+🗓️ 行事曆
+  查詢行事曆
+  查詢過往行事曆
+  查詢行事曆 YYYY-MM-DD
+  查詢行事曆 YYYY-MM-DD 到 YYYY-MM-DD
+  查詢全部行事曆
+  新增行事曆 YYYY-MM-DD [HH:MM] 標題 | 備註
+  修改行事曆 EVT-xxxx YYYY-MM-DD [HH:MM] 標題 | 備註
+  刪除行事曆 EVT-xxxx
+
+📷 行事曆圖片
+  若上傳的是行事曆，會自動整理今天之後的活動。
+"""
 
 app = Flask(__name__)
 
@@ -208,9 +234,19 @@ def handle_image_message(event: dict):
     r = requests.get(url, headers=headers, timeout=15)
     if r.status_code == 200:
         tl = _load_training()
-        filename = f"image_{msg_id}.jpg"
-        tl.archive_image(r.content, filename, date_str)
-        reply_message(reply_token, f"📸 圖片已歸檔（{date_str}）\n傳送逐字稿後輸入「整理」即可產生總結")
+        cal = _load_calendar()
+        try:
+            result = cal.process_calendar_image(r.content, msg_id)
+        except Exception as e:
+            log(f"  行事曆整理失敗：{repr(e)}")
+            result = {"is_calendar": False}
+
+        if result.get("is_calendar"):
+            reply_message(reply_token, result["message"])
+        else:
+            filename = f"image_{msg_id}.jpg"
+            tl.archive_image(r.content, filename, date_str)
+            reply_message(reply_token, f"📸 圖片已歸檔（{date_str}）\n若這是行事曆，請上傳更清楚的整張截圖。")
     else:
         reply_message(reply_token, "⚠️ 圖片下載失敗，請重試")
 
@@ -225,8 +261,14 @@ def handle_training_command(user_msg: str, reply_token: str,
       [長文字 >100字]     → 視為逐字稿直接整理
     """
     tl = _load_training()
+    cal = _load_calendar()
     msg = user_msg.strip()
     push_target = group_id or user_id   # 優先推送回群組
+
+    cal_result = cal.handle_calendar_command(msg)
+    if cal_result:
+        reply_message(reply_token, cal_result)
+        return True
 
     # 1. Key 查詢（立即回覆）
     if msg.upper().startswith("MTG-"):
@@ -371,6 +413,15 @@ def view_summary(date_str):
     with open(path, encoding="utf-8") as f:
         content = f.read()
     return content, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/summary/<date_str>/images/<path:filename>", methods=["GET"])
+def view_summary_image(date_str, filename):
+    tl = _load_training()
+    img_dir = tl.get_date_dir(date_str) / "images"
+    if not img_dir.exists():
+        return f"<h2>找不到 {date_str} 的圖片資料夾</h2>", 404
+    return send_from_directory(str(img_dir), filename)
 
 
 # ============================================================
