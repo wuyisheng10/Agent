@@ -22,17 +22,8 @@ BASE_DIR      = Path(r"C:\Users\user\claude AI_Agent")
 INPUT_DIR     = BASE_DIR / "output" / "prospects_raw"
 OUTPUT_DIR    = BASE_DIR / "output" / "prospects_scored"
 LOG_FILE      = BASE_DIR / "logs" / "agent_log.txt"
-CONFIG        = BASE_DIR / "config" / "settings.json"
 CODEX_FALLBACK_LIMIT = 2
 codex_fallback_count = 0
-
-def load_bypass_urls() -> set:
-    try:
-        with open(CONFIG, encoding="utf-8") as f:
-            cfg = json.load(f)
-        return set(cfg.get("bypass_urls", []))
-    except:
-        return set()
 
 def log(msg: str):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -103,40 +94,19 @@ def extract_json_payload(text: str) -> dict:
     return json.loads(match.group())
 
 def run_gemini_cli(prompt_text: str) -> dict:
-    log("  [Gemini] 開始呼叫 Gemini CLI")
-    log(f"  [Gemini] 指令：cmd /c gemini --prompt <prompt>")
-    log(f"  [Gemini] Prompt 前80字：{prompt_text[:80].replace(chr(10), ' ')}")
-
+    log("  使用 Gemini CLI 進行分析")
     result = subprocess.run(
         ["cmd", "/c", "gemini", "--prompt", prompt_text],
         capture_output=True,
         text=True,
         encoding="utf-8",
-        timeout=30
+        timeout=10
     )
-
-    log(f"  [Gemini] returncode：{result.returncode}")
-
-    stdout = result.stdout.strip()
-    stderr = result.stderr.strip()
-
-    if stdout:
-        log(f"  [Gemini] stdout（前200字）：{stdout[:200]}")
-    else:
-        log("  [Gemini] stdout：（空）")
-
-    if stderr:
-        log(f"  [Gemini] stderr（前200字）：{stderr[:200]}")
-    else:
-        log("  [Gemini] stderr：（空）")
-
     if result.returncode != 0:
-        err = stderr or stdout or "gemini CLI 回傳非零"
-        log(f"  [Gemini] 失敗，錯誤：{err[:200]}")
+        err = result.stderr.strip() or result.stdout.strip() or "gemini CLI 回傳非零"
         raise RuntimeError(err)
-
-    log("  [Gemini] 分析完成，解析 JSON")
-    return extract_json_payload(stdout)
+    log("  Gemini CLI 分析完成")
+    return extract_json_payload(result.stdout)
 
 def run_claude_cli(prompt_text: str) -> dict:
     log("  使用 Claude CLI 進行分析")
@@ -241,13 +211,8 @@ def ai_analyze(p: dict) -> dict:
 
 def score_all(prospects: list) -> dict:
     high, mid, low = [], [], []
-    bypass_urls = load_bypass_urls()
 
     for i, p in enumerate(prospects, 1):
-        url = p.get("連結", "")
-        if url in bypass_urls:
-            log(f"  [{i}/{len(prospects)}] ⏭️ 已略過（bypass）：{url}")
-            continue
         log(f"  [{i}/{len(prospects)}] {p.get('標題','')[:40]}")
 
         rule, detail = rule_score(p)
@@ -261,29 +226,40 @@ def score_all(prospects: list) -> dict:
             "AI加分": 0
         }
 
-        total = rule + ai.get("AI加分", 0)
-        record = {
+        final = rule + ai.get("AI加分", 0)
+        tier  = "高潛力" if final >= 70 else ("中潛力" if final >= 40 else "低潛力")
+
+        scored = {
             **p,
-            "規則分": rule,
-            "規則明細": detail,
-            "AI分析": ai,
-            "最終分數": total,
-            "話術類型": ai.get("推薦話術類型", "上班族副業"),
-            "需求分析": ai.get("需求分析", ""),
-            "注意事項": ai.get("注意事項", ""),
-            "最佳接觸時機": ai.get("最佳接觸時機", "觀察1個月"),
-            "潛力等級": "高" if total >= 60 else ("中" if total >= 40 else "低"),
+            "規則分數":   rule,
+            "AI加分":     ai.get("AI加分", 0),
+            "最終分數":   final,
+            "分類":       tier,
+            "話術類型":   ai.get("推薦話術類型", ""),
+            "需求分析":   ai.get("需求分析", ""),
+            "接觸時機":   ai.get("最佳接觸時機", ""),
+            "注意事項":   ai.get("注意事項", ""),
+            "評分明細":   detail,
         }
 
-        if total >= 60:
-            high.append(record)
-        elif total >= 40:
-            mid.append(record)
-        else:
-            low.append(record)
+        if tier == "高潛力":    high.append(scored)
+        elif tier == "中潛力":  mid.append(scored)
+        else:                    low.append(scored)
 
-    log(f"  高潛力：{len(high)} 人 / 中潛力：{len(mid)} 人 / 低潛力：{len(low)} 人")
-    return {"高潛力名單": high, "中潛力名單": mid, "低潛力名單": low}
+    return {
+        "generated_at":  datetime.now().isoformat(),
+        "status":        "scored",           # C# Watcher 監看此欄位
+        "next_step":     "messaging",
+        "統計": {
+            "總計":   len(prospects),
+            "高潛力": len(high),
+            "中潛力": len(mid),
+            "低潛力": len(low),
+        },
+        "高潛力名單": high,
+        "中潛力名單": mid,
+        "低潛力名單": low,
+    }
 
 
 # ============================================================
@@ -296,30 +272,16 @@ def load_latest_raw() -> list:
         log("⚠️ 找不到原始資料，請先執行 01_scraper.py")
         return []
     latest = files[-1]
+    log(f"📂 讀取：{latest.name}")
     with open(latest, encoding="utf-8") as f:
-        data = json.load(f).get("data", [])
-    log(f"📂 讀取原始資料：{latest.name}（{len(data)} 筆）")
-    return data
-
+        return json.load(f).get("data", [])
 
 def save_json(result: dict) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M")
     path = OUTPUT_DIR / f"prospects_scored_{ts}.json"
-    payload = {
-        "generated_at": datetime.now().isoformat(),
-        "status": "scored",
-        "next_step": "messaging",
-        "統計": {
-            "總計": sum(len(v) for v in result.values()),
-            "高潛力": len(result["高潛力名單"]),
-            "中潛力": len(result["中潛力名單"]),
-            "低潛力": len(result["低潛力名單"]),
-        },
-        **result,
-    }
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+        json.dump(result, f, ensure_ascii=False, indent=2)
     log(f"✅ 評分結果 → {path}")
     return path
 
@@ -336,10 +298,13 @@ def main():
     if not prospects:
         return
 
-    log(f"📋 開始評分：{len(prospects)} 筆")
+    log(f"📊 開始評分 {len(prospects)} 筆...")
     result = score_all(prospects)
-    path = save_json(result)
 
+    s = result["統計"]
+    log(f"  高潛力：{s['高潛力']} | 中潛力：{s['中潛力']} | 低潛力：{s['低潛力']}")
+
+    path = save_json(result)
     log(f"🏁 評分完成 → {path}")
     log("=" * 50)
     return str(path)
