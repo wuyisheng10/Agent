@@ -109,19 +109,29 @@ def archive_image(image_data: bytes, filename: str, date_str: str = None) -> Pat
 # 🤖 五部分總結（Claude CLI）
 # ============================================================
 
-SUMMARY_PROMPT_TPL = """你是安麗事業的培訓記錄整理助理。
-請將以下會議逐字稿整理成五個部分，以純JSON格式回覆（不加markdown）：
+SUMMARY_PROMPT_TPL = """你是安麗事業「群雁團隊」的培訓記錄整理助理。
+
+【群雁團隊文化核心】
+群雁精神源自大雁南飛的智慧：
+- 互助共飛：夥伴輪流領頭，分擔壓力，相互支援
+- 感恩領導：感謝每一位帶領過自己的領導人與夥伴
+- 分享傳承：將所學分享給下一位，讓團隊一起成長
+- 積極正向：用鼓勵代替批評，用行動代替抱怨
+- 堅持夢想：不論遇到什麼困難，都朝著夢想持續前進
+- 榮耀歸團隊：個人的成功是團隊共同努力的結果
+
+請將以下會議逐字稿，以群雁文化精神整理成五個部分，以純JSON格式回覆（不加markdown）：
 
 逐字稿：
 {transcript}
 
 回覆格式：
 {{
-  "感恩": "感謝的人事物（100字內）",
-  "悟到": "本次會議的領悟與洞見（150字內）",
-  "學到": "具體學到的知識或技巧（150字內）",
-  "做到": "已落實或計畫落實的行動（100字內）",
-  "目標": "設定的短中長期目標（100字內）"
+  "感恩": "以群雁感恩精神，感謝本次會議中的人事物（100字內）",
+  "悟到": "從群雁互助角度，本次會議的領悟與洞見（150字內）",
+  "學到": "可以傳承給夥伴的具體知識或技巧（150字內）",
+  "做到": "承諾落實的具體行動，為團隊做出貢獻（100字內）",
+  "目標": "個人與團隊共同前進的短中長期目標（100字內）"
 }}"""
 
 def summarize_with_claude(transcript: str) -> dict:
@@ -236,10 +246,11 @@ def get_summary_by_key(key: str) -> str | None:
 # 🚀 主流程：處理逐字稿
 # ============================================================
 
-def process_transcript(transcript: str, date_str: str = None) -> tuple[str, str]:
+def process_transcript(transcript: str, date_str: str = None, force: bool = False) -> tuple[str, str]:
     """
     處理逐字稿，回傳 (key, 格式化訊息)
-    若當天已整理過，回傳已存在的記錄
+    force=True：強制重新整理並覆蓋舊記錄
+    force=False：若當天已整理過則直接回傳舊記錄
     """
     ensure_dirs()
     if not date_str:
@@ -247,11 +258,14 @@ def process_transcript(transcript: str, date_str: str = None) -> tuple[str, str]
 
     key = f"MTG-{date_str}"
 
-    # 已整理過 → 直接回傳
-    if already_processed(date_str):
+    # 已整理過且非強制 → 直接回傳
+    if already_processed(date_str) and not force:
         log(f"{date_str} 已整理過，略過重複處理")
         msg = get_summary_by_key(key)
         return key, (msg or "已有整理記錄，輸入 Key 查詢")
+
+    if force:
+        log(f"{date_str} 強制重新整理，覆蓋舊記錄")
 
     # 歸檔逐字稿
     archive_transcript(transcript, date_str)

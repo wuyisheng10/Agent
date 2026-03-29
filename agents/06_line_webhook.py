@@ -184,7 +184,21 @@ def handle_training_command(user_msg: str, reply_token: str):
             reply_message(reply_token, f"❌ 找不到記錄：{msg}\n請確認 Key 是否正確")
         return True
 
-    # 2. 整理指令
+    # 2. 再次整理（強制覆蓋）
+    if msg.startswith("再次整理"):
+        date_str = msg.replace("再次整理", "").strip() or datetime.now().strftime("%Y%m%d")
+        transcript_path = tl.get_date_dir(date_str) / "transcript.txt"
+        if not transcript_path.exists():
+            reply_message(reply_token, f"⚠️ 找不到 {date_str} 的逐字稿\n請先傳送逐字稿文字")
+            return True
+        with open(transcript_path, encoding="utf-8") as f:
+            transcript = f.read()
+        reply_message(reply_token, "⏳ 重新整理中（覆蓋舊記錄），請稍候...")
+        key, summary_msg = tl.process_transcript(transcript, date_str, force=True)
+        reply_message(reply_token, summary_msg)
+        return True
+
+    # 3. 整理指令
     if msg.startswith("整理"):
         date_str = msg.replace("整理", "").strip() or datetime.now().strftime("%Y%m%d")
         transcript_path = tl.get_date_dir(date_str) / "transcript.txt"
@@ -194,14 +208,14 @@ def handle_training_command(user_msg: str, reply_token: str):
         with open(transcript_path, encoding="utf-8") as f:
             transcript = f.read()
         reply_message(reply_token, "⏳ 整理中，請稍候...")
-        key, summary_msg = tl.process_transcript(transcript, date_str)
+        key, summary_msg = tl.process_transcript(transcript, date_str, force=False)
         reply_message(reply_token, summary_msg)
         return True
 
-    # 3. 長文字視為逐字稿（>100字）
+    # 4. 長文字視為逐字稿（>100字）
     if len(msg) > 100:
         reply_message(reply_token, "⏳ 偵測到逐字稿，整理中...")
-        key, summary_msg = tl.process_transcript(msg)
+        key, summary_msg = tl.process_transcript(msg, force=False)
         reply_message(reply_token, summary_msg)
         return True
 
