@@ -158,13 +158,18 @@ def _parse_json_output(raw: str) -> dict:
 def summarize_with_codex(transcript: str) -> dict:
     """
     【主力】Codex CLI — prompt 直接作為命令列引數（避免 shell/pipe 編碼問題）
-    Codex 用法：codex [OPTIONS] [PROMPT]，不支援 -q
+    Windows npm 全域套件入口為 codex.cmd；自動偵測可用指令。
     """
+    import shutil
     prompt = SUMMARY_PROMPT_TPL.format(transcript=transcript[:3000])
     log("使用 Codex CLI 整理五部分總結...")
+    # Windows npm 安裝的 CLI 實際入口是 .cmd
+    exe = (shutil.which("codex") or
+           shutil.which("codex.cmd") or
+           "codex.cmd")
     try:
         result = subprocess.run(
-            ["codex", prompt],          # 直接傳 prompt，不經 shell / pipe
+            [exe, prompt],
             capture_output=True,
             timeout=120
         )
