@@ -207,8 +207,30 @@ def summarize_with_gemini(transcript: str) -> dict:
         raise
 
 def summarize_with_claude(transcript: str) -> dict:
-    """【三級備援】Claude CLI（已知 Windows 中文 stdin 有 ByteString 問題，保留供日後修復）"""
-    raise NotImplementedError("Claude CLI Windows 中文編碼尚未解決，跳過")
+    """
+    Claude CLI — prompt 直接作為命令列引數（不用 pipe/stdin，避免 ByteString 問題）
+    用法：claude -p "prompt"
+    """
+    import shutil
+    prompt = SUMMARY_PROMPT_TPL.format(transcript=transcript[:3000])
+    log("使用 Claude CLI 整理五部分總結...")
+    exe = (shutil.which("claude") or
+           shutil.which("claude.cmd") or
+           "claude.cmd")
+    try:
+        result = subprocess.run(
+            [exe, "-p", prompt],   # 直接傳引數，不經 pipe/stdin
+            capture_output=True,
+            timeout=120
+        )
+        stdout = result.stdout.decode("utf-8", errors="replace")
+        stderr = result.stderr.decode("utf-8", errors="replace")
+        if result.returncode != 0:
+            raise RuntimeError(stderr or stdout)
+        return _parse_json_output(stdout)
+    except Exception as e:
+        log(f"Claude CLI 失敗：{e}")
+        raise
 
 def rule_based_summary(transcript: str) -> dict:
     """
@@ -414,9 +436,10 @@ def process_transcript(transcript: str, date_str: str = None, force: bool = Fals
     # 歸檔逐字稿
     archive_transcript(transcript, date_str)
 
-    # 整理五部分：Codex → Gemini → 規則式
+    # 整理五部分：Claude → Codex → Gemini → 規則式
     summary = None
     for fn, name in [
+        (summarize_with_claude, "Claude"),
         (summarize_with_codex,  "Codex"),
         (summarize_with_gemini, "Gemini"),
     ]:
