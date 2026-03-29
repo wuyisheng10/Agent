@@ -42,7 +42,7 @@ LINE_PUSH     = "https://api.line.me/v2/bot/message/push"
 NGROK_URL     = os.getenv("NGROK_URL", "").rstrip("/")
 
 # 觸發詞設定（訊息必須以此開頭才會被處理）
-TRIGGER_WORDS = ["小幫手", "@Yisheng", "/yisheng"]
+TRIGGER_WORDS = ["小幫手", "@Yisheng助理", "@Yisheng", "/yisheng"]
 
 HELP_TEXT = """\
 📋 Yisheng 助理 — 可用指令
