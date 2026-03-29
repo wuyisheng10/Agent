@@ -15,5 +15,29 @@
   "bypass_urls": [
     "https://guide.1111.com.tw/article/trend-analysis/side_hustle",
     "https://ecstore.careernotetw.com/824/"
+  ],
+  "bypass_domains": [
+    "1111.com.tw",
+    "104.com.tw",
+    "yes123.com.tw",
+    "518.com.tw",
+    "careernotetw.com",
+    "104learning.com.tw",
+    "manpower.com.tw",
+    "udn.com",
+    "ettoday.net",
+    "ltn.com.tw",
+    "chinatimes.com",
+    "storm.mg",
+    "businesstoday.com.tw",
+    "money.udn.com",
+    "shopee.tw",
+    "pchome.com.tw",
+    "momo.com.tw",
+    "books.com.tw",
+    "youtube.com",
+    "facebook.com",
+    "instagram.com",
+    "wiki"
   ]
 }

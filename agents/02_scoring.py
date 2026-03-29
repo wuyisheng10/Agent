@@ -14,6 +14,7 @@ import tempfile
 import psutil
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 # ============================================================
 # ⚙️ 路徑設定
@@ -27,13 +28,23 @@ CONFIG        = BASE_DIR / "config" / "settings.json"
 CODEX_FALLBACK_LIMIT = 2
 codex_fallback_count = 0
 
-def load_bypass_urls() -> set:
+def load_bypass_config() -> tuple[set, set]:
+    """回傳 (bypass_urls, bypass_domains)"""
     try:
         with open(CONFIG, encoding="utf-8") as f:
             cfg = json.load(f)
-        return set(cfg.get("bypass_urls", []))
+        return set(cfg.get("bypass_urls", [])), set(cfg.get("bypass_domains", []))
     except:
-        return set()
+        return set(), set()
+
+def is_bypassed(url: str, bypass_urls: set, bypass_domains: set) -> bool:
+    if url in bypass_urls:
+        return True
+    try:
+        host = urlparse(url).hostname or ""
+        return any(host == d or host.endswith("." + d) for d in bypass_domains)
+    except:
+        return False
 
 def log(msg: str):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -255,11 +266,11 @@ def ai_analyze(p: dict) -> dict:
 
 def score_all(prospects: list) -> dict:
     high, mid, low = [], [], []
-    bypass_urls = load_bypass_urls()
+    bypass_urls, bypass_domains = load_bypass_config()
 
     for i, p in enumerate(prospects, 1):
         url = p.get("連結", "")
-        if url in bypass_urls:
+        if is_bypassed(url, bypass_urls, bypass_domains):
             log(f"  [{i}/{len(prospects)}] ⏭️ 已略過（bypass）：{url}")
             continue
         log(f"  [{i}/{len(prospects)}] {p.get('標題','')[:40]}")
