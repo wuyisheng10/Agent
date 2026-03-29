@@ -39,6 +39,16 @@ def _load_calendar():
     spec.loader.exec_module(m)
     return m
 
+
+def _load_partner():
+    spec = _ilu.spec_from_file_location(
+        "partner_engagement",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "09_partner_engagement.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
 load_dotenv(dotenv_path=r"C:\Users\user\claude AI_Agent\.env")
 
 BASE_DIR      = Path(r"C:\Users\user\claude AI_Agent")
@@ -99,6 +109,21 @@ HELP_TEXT += """
 
 📷 行事曆圖片
   若上傳的是行事曆，會自動整理今天之後的活動。
+"""
+
+HELP_TEXT += """
+
+🤝 夥伴經營
+  新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註
+  更新夥伴 姓名 | 層級 | 近況 | 下次跟進日期 | 聯絡資訊 | 備註 | 類型 | 編號 | 合夥人 | 推薦人 | 到期日 | 年月 | 一年內新上獎銜 | 首次獎金% | 現金抵用券 | 購物積點 | 優惠券 | 本月購貨 | 上月購貨 | 前2月購貨 | 前3月購貨
+  邀約夥伴 姓名 | 活動名稱 | 下次跟進日期 | 備註
+  跟進夥伴 姓名 | 狀態 | 下次跟進日期 | 備註
+  激勵夥伴 姓名
+  查詢夥伴
+  查詢待跟進夥伴
+  查詢夥伴 姓名
+  刪除夥伴 姓名
+  匯入夥伴名單
 """
 
 app = Flask(__name__)
@@ -262,12 +287,18 @@ def handle_training_command(user_msg: str, reply_token: str,
     """
     tl = _load_training()
     cal = _load_calendar()
+    partner = _load_partner()
     msg = user_msg.strip()
     push_target = group_id or user_id   # 優先推送回群組
 
     cal_result = cal.handle_calendar_command(msg)
     if cal_result:
         reply_message(reply_token, cal_result)
+        return True
+
+    partner_result = partner.handle_partner_command(msg)
+    if partner_result:
+        reply_message(reply_token, partner_result)
         return True
 
     # 1. Key 查詢（立即回覆）
