@@ -11,6 +11,7 @@ import glob
 import re
 import subprocess
 import tempfile
+import psutil
 from datetime import datetime
 from pathlib import Path
 
@@ -95,6 +96,16 @@ def build_ai_prompt(p: dict) -> str:
         '"AI加分":0到20的整數}'
     )
 
+def check_cpu(cli_name: str):
+    """CPU > 60% 拋出例外；50~60% 僅警告 log。"""
+    cpu = psutil.cpu_percent(interval=1)
+    if cpu > 60:
+        msg = f"  [{cli_name}] CPU {cpu:.0f}% > 60%，略過本次呼叫"
+        log(msg)
+        raise RuntimeError(msg)
+    if cpu > 50:
+        log(f"  [{cli_name}] ⚠️ CPU {cpu:.0f}% > 50%，繼續執行但請注意負載")
+
 def extract_json_payload(text: str) -> dict:
     cleaned = re.sub(r"```json|```", "", text).strip()
     match = re.search(r"\{.*\}", cleaned, re.DOTALL)
@@ -103,6 +114,7 @@ def extract_json_payload(text: str) -> dict:
     return json.loads(match.group())
 
 def run_gemini_cli(prompt_text: str) -> dict:
+    check_cpu("Gemini")
     log("  [Gemini] 開始呼叫 Gemini CLI")
     log(f"  [Gemini] 指令：cmd /c gemini --prompt <prompt>")
     log(f"  [Gemini] Prompt 前80字：{prompt_text[:80].replace(chr(10), ' ')}")
@@ -139,6 +151,7 @@ def run_gemini_cli(prompt_text: str) -> dict:
     return extract_json_payload(stdout)
 
 def run_claude_cli(prompt_text: str) -> dict:
+    check_cpu("Claude")
     log("  使用 Claude CLI 進行分析")
     result = subprocess.run(
         ["cmd", "/c", "claude", "-p", "--output-format", "text"],
@@ -155,6 +168,7 @@ def run_claude_cli(prompt_text: str) -> dict:
     return extract_json_payload(result.stdout)
 
 def run_codex_cli(prompt_text: str) -> dict:
+    check_cpu("Codex")
     response_path = None
     try:
         log("  使用 Codex CLI 進行分析")
