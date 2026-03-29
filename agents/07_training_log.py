@@ -227,19 +227,24 @@ def save_summary(summary: dict, date_str: str, extra: dict = None) -> str:
 # ============================================================
 
 def format_summary_message(key: str, summary: dict, date_str: str, url: str = "") -> str:
-    url_line = f"\n🌐 網頁版：{url}/summary/{date_str}" if url else ""
+    """精簡版 LINE 訊息（約 300 字），完整內容見 HTML 網頁"""
+    def trim(text: str, limit: int) -> str:
+        text = (text or "").strip()
+        return text[:limit] + "…" if len(text) > limit else text
+
+    d = f"{date_str[:4]}/{date_str[4:6]}/{date_str[6:]}"
+    url_line = f"\n🌐 {url}/summary/{date_str}" if url else ""
     return (
-        f"📚 培訓記錄總結\n"
-        f"📅 日期：{date_str[:4]}/{date_str[4:6]}/{date_str[6:]}\n"
-        f"🔑 Key：{key}{url_line}\n"
-        f"{'─'*30}\n"
-        f"🙏 感恩\n{summary.get('感恩','')}\n\n"
-        f"💡 悟到\n{summary.get('悟到','')}\n\n"
-        f"📖 學到\n{summary.get('學到','')}\n\n"
-        f"✅ 做到\n{summary.get('做到','')}\n\n"
-        f"🎯 目標\n{summary.get('目標','')}\n"
-        f"{'─'*30}\n"
-        f"輸入「{key}」可再次查詢此記錄"
+        f"📚 培訓記錄 {d}\n"
+        f"🔑 {key}{url_line}\n"
+        f"{'─'*20}\n"
+        f"🙏 {trim(summary.get('感恩',''), 40)}\n"
+        f"💡 {trim(summary.get('悟到',''), 50)}\n"
+        f"📖 {trim(summary.get('學到',''), 50)}\n"
+        f"✅ {trim(summary.get('做到',''), 40)}\n"
+        f"🎯 {trim(summary.get('目標',''), 40)}\n"
+        f"{'─'*20}\n"
+        f"點連結查看完整記錄 ↑"
     )
 
 def format_summary_html(key: str, summary: dict, date_str: str) -> str:
