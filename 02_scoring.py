@@ -1,0 +1,314 @@
+"""
+Agent 2: AI Scoring Agent
+File: C:/Users/user/claude AI_Agent/agents/02_scoring.py
+Input: C:/Users/user/claude AI_Agent/output/prospects_raw/*.json
+Output: C:/Users/user/claude AI_Agent/output/prospects_scored/YYYYMMDD_HHMM.json
+"""
+
+import os
+import json
+import glob
+import re
+import subprocess
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+# ============================================================
+# ⚙️ 路徑設定
+# ============================================================
+
+BASE_DIR      = Path(r"C:\Users\user\claude AI_Agent")
+INPUT_DIR     = BASE_DIR / "output" / "prospects_raw"
+OUTPUT_DIR    = BASE_DIR / "output" / "prospects_scored"
+LOG_FILE      = BASE_DIR / "logs" / "agent_log.txt"
+CODEX_FALLBACK_LIMIT = 2
+codex_fallback_count = 0
+
+def log(msg: str):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{ts}] [SCORING] {msg}"
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        safe_line = line.encode("cp950", errors="replace").decode("cp950")
+        print(safe_line)
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+
+# ============================================================
+# 📐 規則式評分（快速，不消耗 API）
+# ============================================================
+
+CRITERIA = {
+    "有副業需求":       {"分數": 30, "kw": ["副業","兼職","想賺","被動收入","斜槓","創業"]},
+    "對健康產品有興趣":  {"分數": 25, "kw": ["健康","保健","養生","減肥","瘦身","保養","營養"]},
+    "社群互動活躍":     {"分數": 25, "kw": []},   # 由留言數/收藏數判斷
+    "地區符合":         {"分數": 20, "kw": ["台灣","台北","台中","高雄","新北","桃園","台南"]},
+}
+
+def rule_score(p: dict) -> tuple[int, dict]:
+    text = f"{p.get('標題','')} {p.get('摘要','')}".lower()
+    score = 0
+    detail = {}
+    for name, cfg in CRITERIA.items():
+        kws = cfg["kw"]
+        pts = cfg["分數"]
+        if name == "社群互動活躍":
+            # 留言 > 20 或 收藏 > 50 視為活躍
+            active = p.get("留言數", 0) > 20 or p.get("收藏數", 0) > 50
+            earned = pts if active else 0
+        else:
+            earned = pts if (kws and any(k in text for k in kws)) else 0
+        score += earned
+        detail[name] = earned
+    return score, detail
+
+
+# ============================================================
+# 🤖 Claude AI 深度分析
+# ============================================================
+
+def build_ai_prompt(p: dict) -> str:
+    return (
+        "你是安麗事業的資深業務顧問，請分析這位潛在客戶並以純JSON回覆（不加說明或markdown）：\n\n"
+        f"資料：\n"
+        f"- 標題：{p.get('標題','')}\n"
+        f"- 摘要：{p.get('摘要','')}\n"
+        f"- 留言數：{p.get('留言數',0)}\n"
+        f"- 收藏數：{p.get('收藏數',0)}\n\n"
+        "回覆格式：\n"
+        '{"需求分析":"50字內說明此人的核心需求",'
+        '"推薦話術類型":"上班族副業 | 全職媽媽 | 健康意識族群 | 社群達人 | 創業斜槓族",'
+        '"最佳接觸時機":"立即 | 觀察1週 | 觀察1個月",'
+        '"注意事項":"30字內",'
+        '"AI加分":0到20的整數}'
+    )
+
+def extract_json_payload(text: str) -> dict:
+    cleaned = re.sub(r"```json|```", "", text).strip()
+    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if not match:
+        raise ValueError(f"No JSON found: {cleaned[:120]}")
+    return json.loads(match.group())
+
+def run_gemini_cli(prompt_text: str) -> dict:
+    log("  使用 Gemini CLI 進行分析")
+    result = subprocess.run(
+        ["cmd", "/c", "gemini", "--prompt", prompt_text],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=10
+    )
+    if result.returncode != 0:
+        err = result.stderr.strip() or result.stdout.strip() or "gemini CLI 回傳非零"
+        raise RuntimeError(err)
+    log("  Gemini CLI 分析完成")
+    return extract_json_payload(result.stdout)
+
+def run_claude_cli(prompt_text: str) -> dict:
+    log("  使用 Claude CLI 進行分析")
+    result = subprocess.run(
+        ["cmd", "/c", "claude", "-p", "--output-format", "text"],
+        input=prompt_text,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=60
+    )
+    if result.returncode != 0:
+        err = result.stderr.strip() or result.stdout.strip() or "claude CLI 回傳非零"
+        raise RuntimeError(err)
+    log("  Claude CLI 分析完成")
+    return extract_json_payload(result.stdout)
+
+def run_codex_cli(prompt_text: str) -> dict:
+    response_path = None
+    try:
+        log("  使用 Codex CLI 進行分析")
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".txt",
+            delete=False, dir=str(BASE_DIR / "logs")
+        ) as f:
+            response_path = f.name
+
+        result = subprocess.run(
+            [
+                "cmd", "/c", "codex", "exec",
+                "--skip-git-repo-check",
+                "--sandbox", "read-only",
+                "--color", "never",
+                "-C", str(BASE_DIR),
+                "-o", response_path,
+                "-"
+            ],
+            input=prompt_text,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=90
+        )
+        if result.returncode != 0:
+            err = result.stderr.strip() or result.stdout.strip() or "codex CLI 回傳非零"
+            raise RuntimeError(err)
+
+        output_text = ""
+        if response_path and os.path.exists(response_path):
+            with open(response_path, "r", encoding="utf-8") as f:
+                output_text = f.read().strip()
+        if not output_text:
+            output_text = result.stdout.strip()
+        log("  Codex CLI 分析完成")
+        return extract_json_payload(output_text)
+    finally:
+        if response_path and os.path.exists(response_path):
+            try:
+                os.unlink(response_path)
+            except:
+                pass
+
+def default_ai_result(reason: str) -> dict:
+    return {
+        "需求分析": reason,
+        "推薦話術類型": "上班族副業",
+        "最佳接觸時機": "觀察1週",
+        "注意事項": "請人工確認",
+        "AI加分": 0
+    }
+
+def ai_analyze(p: dict) -> dict:
+    global codex_fallback_count
+    prompt_text = build_ai_prompt(p)
+
+    try:
+        return run_gemini_cli(prompt_text)
+    except Exception as gemini_error:
+        log(f"  Gemini CLI分析失敗：{gemini_error}")
+
+    try:
+        return run_claude_cli(prompt_text)
+    except Exception as claude_error:
+        log(f"  Claude AI分析失敗：{claude_error}")
+
+    if codex_fallback_count >= CODEX_FALLBACK_LIMIT:
+        log(f"  Codex CLI 備援已達上限 {CODEX_FALLBACK_LIMIT} 筆，後續改用預設結果")
+        return default_ai_result("Gemini 與 Claude 失敗，Codex 備援已達上限")
+
+    codex_fallback_count += 1
+    try:
+        log(f"  Gemini 與 Claude 失敗，改用 Codex CLI 備援分析（第 {codex_fallback_count}/{CODEX_FALLBACK_LIMIT} 筆）")
+        return run_codex_cli(prompt_text)
+    except Exception as codex_error:
+        log(f"  Codex CLI分析失敗：{codex_error}")
+        return default_ai_result("AI分析失敗，請人工確認")
+
+
+# ============================================================
+# 🏆 完整評分流程
+# ============================================================
+
+def score_all(prospects: list) -> dict:
+    high, mid, low = [], [], []
+
+    for i, p in enumerate(prospects, 1):
+        log(f"  [{i}/{len(prospects)}] {p.get('標題','')[:40]}")
+
+        rule, detail = rule_score(p)
+
+        # 只有規則分 >= 40 才呼叫 AI（省費用）
+        ai = ai_analyze(p) if rule >= 40 else {
+            "需求分析": "規則分過低，跳過AI分析",
+            "推薦話術類型": "上班族副業",
+            "最佳接觸時機": "觀察1個月",
+            "注意事項": "",
+            "AI加分": 0
+        }
+
+        final = rule + ai.get("AI加分", 0)
+        tier  = "高潛力" if final >= 70 else ("中潛力" if final >= 40 else "低潛力")
+
+        scored = {
+            **p,
+            "規則分數":   rule,
+            "AI加分":     ai.get("AI加分", 0),
+            "最終分數":   final,
+            "分類":       tier,
+            "話術類型":   ai.get("推薦話術類型", ""),
+            "需求分析":   ai.get("需求分析", ""),
+            "接觸時機":   ai.get("最佳接觸時機", ""),
+            "注意事項":   ai.get("注意事項", ""),
+            "評分明細":   detail,
+        }
+
+        if tier == "高潛力":    high.append(scored)
+        elif tier == "中潛力":  mid.append(scored)
+        else:                    low.append(scored)
+
+    return {
+        "generated_at":  datetime.now().isoformat(),
+        "status":        "scored",           # C# Watcher 監看此欄位
+        "next_step":     "messaging",
+        "統計": {
+            "總計":   len(prospects),
+            "高潛力": len(high),
+            "中潛力": len(mid),
+            "低潛力": len(low),
+        },
+        "高潛力名單": high,
+        "中潛力名單": mid,
+        "低潛力名單": low,
+    }
+
+
+# ============================================================
+# 💾 儲存
+# ============================================================
+
+def load_latest_raw() -> list:
+    files = sorted(INPUT_DIR.glob("prospects_raw_*.json"))
+    if not files:
+        log("⚠️ 找不到原始資料，請先執行 01_scraper.py")
+        return []
+    latest = files[-1]
+    log(f"📂 讀取：{latest.name}")
+    with open(latest, encoding="utf-8") as f:
+        return json.load(f).get("data", [])
+
+def save_json(result: dict) -> Path:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M")
+    path = OUTPUT_DIR / f"prospects_scored_{ts}.json"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    log(f"✅ 評分結果 → {path}")
+    return path
+
+
+# ============================================================
+# 🚀 主程式
+# ============================================================
+
+def main():
+    log("=" * 50)
+    log("🚀 評分Agent 啟動")
+
+    prospects = load_latest_raw()
+    if not prospects:
+        return
+
+    log(f"📊 開始評分 {len(prospects)} 筆...")
+    result = score_all(prospects)
+
+    s = result["統計"]
+    log(f"  高潛力：{s['高潛力']} | 中潛力：{s['中潛力']} | 低潛力：{s['低潛力']}")
+
+    path = save_json(result)
+    log(f"🏁 評分完成 → {path}")
+    log("=" * 50)
+    return str(path)
+
+
+if __name__ == "__main__":
+    main()

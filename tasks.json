@@ -1,0 +1,85 @@
+{
+  // VS Code tasks.json
+  // 路徑：C:\Users\user\claude AI_Agent\.vscode\tasks.json
+  // 在 VS Code 中按 Ctrl+Shift+B 執行任務
+  "version": "2.0.0",
+  "tasks": [
+
+    // ---- 完整流程（一鍵執行）----
+    {
+      "label": "🚀 執行完整 AI Agent 流程",
+      "type": "shell",
+      "command": "python",
+      "args": ["${workspaceFolder}\\agents\\04_crew_main.py", "--mode", "pipeline"],
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "panel": "new", "reveal": "always" },
+      "problemMatcher": []
+    },
+
+    // ---- 單步執行 ----
+    {
+      "label": "1️⃣ 爬蟲Agent（找潛在客戶）",
+      "type": "shell",
+      "command": "python",
+      "args": ["${workspaceFolder}\\agents\\01_scraper.py"],
+      "presentation": { "panel": "new" },
+      "problemMatcher": []
+    },
+    {
+      "label": "2️⃣ 評分Agent（AI篩選）",
+      "type": "shell",
+      "command": "python",
+      "args": ["${workspaceFolder}\\agents\\02_scoring.py"],
+      "presentation": { "panel": "new" },
+      "problemMatcher": []
+    },
+    {
+      "label": "3️⃣ 邀約Agent（生成訊息）",
+      "type": "shell",
+      "command": "python",
+      "args": ["${workspaceFolder}\\agents\\03_templates.py"],
+      "presentation": { "panel": "new" },
+      "problemMatcher": []
+    },
+
+    // ---- CrewAI 多Agent模式 ----
+    {
+      "label": "🤖 CrewAI 多Agent協作模式",
+      "type": "shell",
+      "command": "python",
+      "args": ["${workspaceFolder}\\agents\\04_crew_main.py", "--mode", "crew"],
+      "presentation": { "panel": "new" },
+      "problemMatcher": []
+    },
+
+    // ---- C# Watcher ----
+    {
+      "label": "📡 啟動 C# 監看系統",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["run", "--project", "${workspaceFolder}\\monitor"],
+      "presentation": { "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    },
+
+    // ---- Claude Code CLI ----
+    {
+      "label": "🧠 Claude Code CLI 模式",
+      "type": "shell",
+      "command": "claude",
+      "args": ["--print", "分析最新的評分結果並給出改善建議"],
+      "presentation": { "panel": "new" },
+      "problemMatcher": []
+    },
+
+    // ---- 安裝套件 ----
+    {
+      "label": "⚙️ 安裝所有套件",
+      "type": "shell",
+      "command": "pip",
+      "args": ["install", "crewai", "crewai-tools", "anthropic", "requests", "python-dotenv", "langchain-anthropic"],
+      "presentation": { "panel": "new" },
+      "problemMatcher": []
+    }
+  ]
+}
