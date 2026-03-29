@@ -16,6 +16,17 @@ from datetime import datetime
 from pathlib import Path
 from flask import Flask, request, abort
 from dotenv import load_dotenv
+import importlib.util as _ilu
+import sys as _sys
+
+def _load_training():
+    spec = _ilu.spec_from_file_location(
+        "training_log",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "07_training_log.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
 
 load_dotenv(dotenv_path=r"C:\Users\user\claude AI_Agent\.env")
 
@@ -126,9 +137,69 @@ def reply_message(reply_token: str, message: str):
 # 📡 Webhook 路由
 # ============================================================
 
+def handle_image_message(event: dict):
+    """接收圖片 → 下載並歸檔"""
+    msg_id      = event["message"]["id"]
+    reply_token = event["replyToken"]
+    date_str    = datetime.now().strftime("%Y%m%d")
+
+    url = f"https://api-data.line.me/v2/bot/message/{msg_id}/content"
+    headers = {"Authorization": f"Bearer {LINE_TOKEN}"}
+    r = requests.get(url, headers=headers, timeout=15)
+    if r.status_code == 200:
+        tl = _load_training()
+        filename = f"image_{msg_id}.jpg"
+        tl.archive_image(r.content, filename, date_str)
+        reply_message(reply_token, f"📸 圖片已歸檔（{date_str}）\n傳送逐字稿後輸入「整理」即可產生總結")
+    else:
+        reply_message(reply_token, "⚠️ 圖片下載失敗，請重試")
+
+
+def handle_training_command(user_msg: str, reply_token: str):
+    """
+    培訓記錄指令判斷：
+      整理 / 整理YYYYMMDD → 產生當日或指定日期總結
+      MTG-YYYYMMDD        → 查詢已有總結
+      [長文字]            → 視為逐字稿直接整理
+    """
+    tl = _load_training()
+    msg = user_msg.strip()
+
+    # 1. Key 查詢
+    if msg.upper().startswith("MTG-"):
+        result = tl.get_summary_by_key(msg)
+        if result:
+            reply_message(reply_token, result)
+        else:
+            reply_message(reply_token, f"❌ 找不到記錄：{msg}\n請確認 Key 是否正確")
+        return True
+
+    # 2. 整理指令
+    if msg.startswith("整理"):
+        date_str = msg.replace("整理", "").strip() or datetime.now().strftime("%Y%m%d")
+        transcript_path = tl.get_date_dir(date_str) / "transcript.txt"
+        if not transcript_path.exists():
+            reply_message(reply_token, f"⚠️ 找不到 {date_str} 的逐字稿\n請先傳送逐字稿文字")
+            return True
+        with open(transcript_path, encoding="utf-8") as f:
+            transcript = f.read()
+        reply_message(reply_token, "⏳ 整理中，請稍候...")
+        key, summary_msg = tl.process_transcript(transcript, date_str)
+        reply_message(reply_token, summary_msg)
+        return True
+
+    # 3. 長文字視為逐字稿（>100字）
+    if len(msg) > 100:
+        reply_message(reply_token, "⏳ 偵測到逐字稿，整理中...")
+        key, summary_msg = tl.process_transcript(msg)
+        reply_message(reply_token, summary_msg)
+        return True
+
+    return False
+
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    # 驗證簽章
     signature = request.headers.get("X-Line-Signature", "")
     body = request.get_data()
 
@@ -136,29 +207,37 @@ def webhook():
         log("❌ 簽章驗證失敗")
         abort(400)
 
-    data = request.json
+    data   = request.json
     events = data.get("events", [])
 
     for event in events:
         if event.get("type") != "message":
             continue
-        if event.get("message", {}).get("type") != "text":
+
+        msg_type    = event.get("message", {}).get("type", "")
+        reply_token = event["replyToken"]
+
+        # 圖片訊息
+        if msg_type == "image":
+            log("🖼️ 收到圖片")
+            handle_image_message(event)
             continue
 
-        user_id     = event["source"]["userId"]
-        reply_token = event["replyToken"]
-        user_msg    = event["message"]["text"]
+        if msg_type != "text":
+            continue
 
-        log(f"📨 收到回覆 from {user_id[:8]}：{user_msg[:50]}")
+        user_id  = event["source"]["userId"]
+        user_msg = event["message"]["text"]
+        log(f"📨 收到訊息 from {user_id[:8]}：{user_msg[:50]}")
 
-        # AI 分析意圖
+        # 培訓記錄指令優先
+        if handle_training_command(user_msg, reply_token):
+            continue
+
+        # 一般意圖回覆
         intent = analyze_intent(user_msg)
         log(f"  意圖：{intent['意圖']} | 情緒：{intent['情緒']} | 行動：{intent['建議行動']}")
-
-        # 根據行動更新狀態
         update_status(user_id, intent)
-
-        # 自動回覆
         reply_message(reply_token, intent["建議回覆"])
 
     return "OK"
