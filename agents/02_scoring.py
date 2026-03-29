@@ -155,15 +155,15 @@ def estimate_tokens(text: str) -> int:
     return chinese + max(1, others // 4)
 
 def check_token_budget(cli_name: str):
-    """剩餘 token 為 0% 時拋出例外，否則 log 顯示剩餘 %。"""
+    """剩餘 token < 50% 時拋出例外，否則 log 顯示剩餘 %。"""
     budgets = load_token_budgets()
     usage = load_token_usage()
     budget = budgets.get(cli_name, 50000)
     used = usage.get(cli_name, 0)
     remaining_pct = max(0.0, (budget - used) / budget * 100)
     log(f"  [{cli_name}] Token 剩餘：{remaining_pct:.1f}% ({budget - used:,}/{budget:,})")
-    if remaining_pct <= 0:
-        msg = f"  [{cli_name}] Token 已耗盡（0%），略過本次呼叫"
+    if remaining_pct < 50:
+        msg = f"  [{cli_name}] Token 剩餘 {remaining_pct:.1f}% < 50%，略過本次呼叫"
         log(msg)
         raise RuntimeError(msg)
 
