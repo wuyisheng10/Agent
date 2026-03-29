@@ -147,18 +147,18 @@ def reply_message(reply_token: str, message: str):
         log(f"  ⚠️ Reply 失敗：{r.status_code} {r.text[:80]}")
 
 def push_message(user_id: str, message: str):
-    """Push API：不受 reply token 限制，用於長時間處理後回傳結果"""
+    """Push API：不受 reply token 限制，自動分割超過 4900 字的訊息"""
+    MAX = 4900
+    chunks = [message[i:i+MAX] for i in range(0, len(message), MAX)]
+    messages = [{"type": "text", "text": c} for c in chunks[:5]]  # LINE 最多 5 則
     headers = {
         "Content-Type":  "application/json",
         "Authorization": f"Bearer {LINE_TOKEN}"
     }
-    payload = {
-        "to": user_id,
-        "messages": [{"type": "text", "text": message}]
-    }
+    payload = {"to": user_id, "messages": messages}
     r = requests.post(LINE_PUSH, headers=headers, json=payload, timeout=10)
     if r.status_code != 200:
-        log(f"  ⚠️ Push 失敗：{r.status_code} {r.text[:80]}")
+        log(f"  ⚠️ Push 失敗：{r.status_code} {r.text[:120]}")
 
 
 # ============================================================
