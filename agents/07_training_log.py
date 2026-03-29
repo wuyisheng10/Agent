@@ -167,9 +167,10 @@ def summarize_with_codex(transcript: str) -> dict:
     exe = (shutil.which("codex") or
            shutil.which("codex.cmd") or
            "codex.cmd")
+    # --full-auto：非互動模式（不需要 TTY）
     try:
         result = subprocess.run(
-            [exe, prompt],
+            [exe, "--full-auto", prompt],
             capture_output=True,
             timeout=120
         )
@@ -182,8 +183,31 @@ def summarize_with_codex(transcript: str) -> dict:
         log(f"Codex CLI 失敗：{e}")
         raise
 
+def summarize_with_gemini(transcript: str) -> dict:
+    """【二級備援】Gemini CLI — 支援 --prompt 直接引數模式"""
+    import shutil
+    prompt = SUMMARY_PROMPT_TPL.format(transcript=transcript[:3000])
+    log("使用 Gemini CLI 整理五部分總結（二級備援）...")
+    exe = (shutil.which("gemini") or
+           shutil.which("gemini.cmd") or
+           "gemini.cmd")
+    try:
+        result = subprocess.run(
+            [exe, "--prompt", prompt],
+            capture_output=True,
+            timeout=120
+        )
+        stdout = result.stdout.decode("utf-8", errors="replace")
+        stderr = result.stderr.decode("utf-8", errors="replace")
+        if result.returncode != 0:
+            raise RuntimeError(stderr or stdout)
+        return _parse_json_output(stdout)
+    except Exception as e:
+        log(f"Gemini CLI 失敗：{e}")
+        raise
+
 def summarize_with_claude(transcript: str) -> dict:
-    """【備援】Claude CLI（已知 Windows 中文 stdin 有 ByteString 問題，保留供日後修復）"""
+    """【三級備援】Claude CLI（已知 Windows 中文 stdin 有 ByteString 問題，保留供日後修復）"""
     raise NotImplementedError("Claude CLI Windows 中文編碼尚未解決，跳過")
 
 def rule_based_summary(transcript: str) -> dict:
@@ -390,12 +414,20 @@ def process_transcript(transcript: str, date_str: str = None, force: bool = Fals
     # 歸檔逐字稿
     archive_transcript(transcript, date_str)
 
-    # 整理五部分：Codex CLI → 規則式備援
-    try:
-        summary = summarize_with_codex(transcript)
-        log("Codex CLI 整理成功")
-    except Exception as e:
-        log(f"Codex CLI 失敗（{e}），使用規則式摘要")
+    # 整理五部分：Codex → Gemini → 規則式
+    summary = None
+    for fn, name in [
+        (summarize_with_codex,  "Codex"),
+        (summarize_with_gemini, "Gemini"),
+    ]:
+        try:
+            summary = fn(transcript)
+            log(f"{name} CLI 整理成功")
+            break
+        except Exception as e:
+            log(f"{name} CLI 失敗（{e}），嘗試下一個...")
+    if summary is None:
+        log("所有 CLI 失敗，使用規則式摘要")
         summary = rule_based_summary(transcript)
 
     # 儲存
