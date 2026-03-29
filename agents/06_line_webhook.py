@@ -184,15 +184,36 @@ def handle_training_command(user_msg: str, reply_token: str):
             reply_message(reply_token, f"❌ 找不到記錄：{msg}\n請確認 Key 是否正確")
         return True
 
+    def _parse_cmd(prefix: str) -> tuple[str | None, str | None]:
+        """
+        解析整理指令，回傳 (date_str, inline_transcript)
+        - 「整理」           → (today, None) 讀歸檔
+        - 「整理 20260329」  → (20260329, None) 讀歸檔
+        - 「整理\n逐字稿...」→ (today, 逐字稿) 直接處理
+        """
+        rest = msg[len(prefix):].strip()
+        if not rest:
+            return datetime.now().strftime("%Y%m%d"), None
+        # 8位數字 → 日期
+        import re as _re
+        if _re.fullmatch(r"\d{8}", rest):
+            return rest, None
+        # 其餘視為內嵌逐字稿
+        return datetime.now().strftime("%Y%m%d"), rest
+
     # 2. 再次整理（強制覆蓋）
     if msg.startswith("再次整理"):
-        date_str = msg.replace("再次整理", "").strip() or datetime.now().strftime("%Y%m%d")
-        transcript_path = tl.get_date_dir(date_str) / "transcript.txt"
-        if not transcript_path.exists():
-            reply_message(reply_token, f"⚠️ 找不到 {date_str} 的逐字稿\n請先傳送逐字稿文字")
-            return True
-        with open(transcript_path, encoding="utf-8") as f:
-            transcript = f.read()
+        date_str, inline = _parse_cmd("再次整理")
+        if inline:
+            tl.archive_transcript(inline, date_str)
+            transcript = inline
+        else:
+            transcript_path = tl.get_date_dir(date_str) / "transcript.txt"
+            if not transcript_path.exists():
+                reply_message(reply_token, f"⚠️ 找不到 {date_str} 的逐字稿\n請先傳送逐字稿文字")
+                return True
+            with open(transcript_path, encoding="utf-8") as f:
+                transcript = f.read()
         reply_message(reply_token, "⏳ 重新整理中（覆蓋舊記錄），請稍候...")
         key, summary_msg = tl.process_transcript(transcript, date_str, force=True)
         reply_message(reply_token, summary_msg)
@@ -200,13 +221,17 @@ def handle_training_command(user_msg: str, reply_token: str):
 
     # 3. 整理指令
     if msg.startswith("整理"):
-        date_str = msg.replace("整理", "").strip() or datetime.now().strftime("%Y%m%d")
-        transcript_path = tl.get_date_dir(date_str) / "transcript.txt"
-        if not transcript_path.exists():
-            reply_message(reply_token, f"⚠️ 找不到 {date_str} 的逐字稿\n請先傳送逐字稿文字")
-            return True
-        with open(transcript_path, encoding="utf-8") as f:
-            transcript = f.read()
+        date_str, inline = _parse_cmd("整理")
+        if inline:
+            tl.archive_transcript(inline, date_str)
+            transcript = inline
+        else:
+            transcript_path = tl.get_date_dir(date_str) / "transcript.txt"
+            if not transcript_path.exists():
+                reply_message(reply_token, f"⚠️ 找不到 {date_str} 的逐字稿\n請先傳送逐字稿文字")
+                return True
+            with open(transcript_path, encoding="utf-8") as f:
+                transcript = f.read()
         reply_message(reply_token, "⏳ 整理中，請稍候...")
         key, summary_msg = tl.process_transcript(transcript, date_str, force=False)
         reply_message(reply_token, summary_msg)
