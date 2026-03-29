@@ -220,21 +220,34 @@ def summarize_with_claude(transcript: str) -> dict:
         transcript[:4000].encode("utf-8")
     ).decode("ascii")
 
-    # Prompt 全部用英文 + ASCII，只有 JSON key 是中文（由 Claude 輸出）
+    # ⚠️ Prompt 必須 100% ASCII（所有非 ASCII 字元用 \\uXXXX 表示）
+    # JSON keys: \u611f\u6069=感恩 \u609f\u5230=悟到 \u5b78\u5230=學到
+    #            \u505a\u5230=做到 \u76ee\u6a19=目標
     prompt = (
-        "You are an Amway 'Geese Team' (Qun-Yan) training meeting summarizer.\n"
-        "Team culture: Mutual support, Gratitude to leaders, Share knowledge, "
-        "Positive attitude, Pursue dreams, Honor the team.\n\n"
-        "The meeting transcript is base64-encoded below. "
-        "Decode it, then write a 5-part summary in Traditional Chinese.\n\n"
-        f"Base64 transcript:\n{transcript_b64}\n\n"
-        "Rules:\n"
-        "- Output ONLY one JSON object, no markdown, no explanation\n"
-        "- Each field 100-200 Traditional Chinese characters, first-person voice\n"
-        '- Keys must be exactly: \u611f\u6069 \u609f\u5230 \u5b78\u5230 \u505a\u5230 \u76ee\u6a19\n'
-        '- Format: {"\\u611f\\u6069":"...","\\u609f\\u5230":"...","\\u5b78\\u5230":"...","\\u505a\\u5230":"...","\\u76ee\\u6a19":"..."}\n'
-        "\nOutput the JSON now:"
+        "You are an Amway Geese Team (Qun-Yan) training meeting summarizer.\n"
+        "Team values: mutual support, gratitude to leaders, share knowledge, "
+        "positive attitude, pursue dreams, honor the team.\n\n"
+        "A Traditional Chinese meeting transcript is base64-encoded below.\n"
+        "Decode it, understand the content, then write a 5-part summary.\n\n"
+        "BASE64 TRANSCRIPT:\n"
+        f"{transcript_b64}\n\n"
+        "OUTPUT RULES:\n"
+        "1. Output ONLY a valid JSON object. No markdown, no explanation.\n"
+        "2. Use exactly these 5 keys (unicode escapes): "
+        '"\\u611f\\u6069","\\u609f\\u5230","\\u5b78\\u5230",'
+        '"\\u505a\\u5230","\\u76ee\\u6a19"\n'
+        "3. Each value: Traditional Chinese, first-person voice, 100-200 chars.\n"
+        "4. \\u611f\\u6069 = gratitude for teachers/teammates in this meeting\n"
+        "5. \\u609f\\u5230 = deepest insight connected to Amway business\n"
+        "6. \\u5b78\\u5230 = specific method/skill to teach teammates\n"
+        "7. \\u505a\\u5230 = one concrete action to do TODAY (not a plan)\n"
+        "8. \\u76ee\\u6a19 = measurable goal to achieve THIS WEEK\n\n"
+        "JSON:"
     )
+    # 確認 prompt 全為 ASCII（debug 用）
+    non_ascii = [c for c in prompt if ord(c) > 127]
+    if non_ascii:
+        raise RuntimeError(f"Prompt 含非 ASCII 字元: {non_ascii[:5]}")
 
     exe = (shutil.which("claude") or
            shutil.which("claude.cmd") or
@@ -245,10 +258,11 @@ def summarize_with_claude(transcript: str) -> dict:
             capture_output=True,
             timeout=120
         )
-        stdout = result.stdout.decode("utf-8", errors="replace")
-        stderr = result.stderr.decode("utf-8", errors="replace")
+        ansi = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
+        stdout = ansi.sub("", result.stdout.decode("utf-8", errors="replace"))
+        stderr = ansi.sub("", result.stderr.decode("utf-8", errors="replace"))
         if result.returncode != 0:
-            raise RuntimeError(stderr or stdout)
+            raise RuntimeError((stderr or stdout)[:300])
         return _parse_json_output(stdout)
     except Exception as e:
         log(f"Claude CLI 失敗：{e}")
