@@ -38,7 +38,17 @@ LINE_TOKEN    = os.getenv("LINE_CHANNEL_TOKEN", "")
 LINE_SECRET   = os.getenv("LINE_CHANNEL_SECRET", "")
 LINE_REPLY    = "https://api.line.me/v2/bot/message/reply"
 
+# 觸發詞設定（訊息必須以此開頭才會被處理）
+TRIGGER_WORDS = ["小幫手", "@Yisheng", "/yisheng"]
+
 app = Flask(__name__)
+
+def extract_trigger(msg: str) -> str | None:
+    """若訊息以觸發詞開頭，回傳去掉觸發詞後的內容；否則回傳 None"""
+    for tw in TRIGGER_WORDS:
+        if msg.startswith(tw):
+            return msg[len(tw):].strip()
+    return None
 
 def log(msg: str):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -230,12 +240,20 @@ def webhook():
         user_msg = event["message"]["text"]
         log(f"📨 收到訊息 from {user_id[:8]}：{user_msg[:50]}")
 
+        # 觸發詞檢查
+        content = extract_trigger(user_msg)
+        if content is None:
+            log("  略過（無觸發詞）")
+            continue
+
+        log(f"  觸發詞符合，內容：{content[:40]}")
+
         # 培訓記錄指令優先
-        if handle_training_command(user_msg, reply_token):
+        if handle_training_command(content, reply_token):
             continue
 
         # 一般意圖回覆
-        intent = analyze_intent(user_msg)
+        intent = analyze_intent(content)
         log(f"  意圖：{intent['意圖']} | 情緒：{intent['情緒']} | 行動：{intent['建議行動']}")
         update_status(user_id, intent)
         reply_message(reply_token, intent["建議回覆"])
