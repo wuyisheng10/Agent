@@ -11,9 +11,5 @@
   "line_bot": {
     "enabled": false,
     "channel_token": "待申請後填入"
-  },
-  "bypass_urls": [
-    "https://guide.1111.com.tw/article/trend-analysis/side_hustle",
-    "https://ecstore.careernotetw.com/824/"
-  ]
+  }
 }

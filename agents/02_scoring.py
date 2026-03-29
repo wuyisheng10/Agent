@@ -22,17 +22,8 @@ BASE_DIR      = Path(r"C:\Users\user\claude AI_Agent")
 INPUT_DIR     = BASE_DIR / "output" / "prospects_raw"
 OUTPUT_DIR    = BASE_DIR / "output" / "prospects_scored"
 LOG_FILE      = BASE_DIR / "logs" / "agent_log.txt"
-CONFIG        = BASE_DIR / "config" / "settings.json"
 CODEX_FALLBACK_LIMIT = 2
 codex_fallback_count = 0
-
-def load_bypass_urls() -> set:
-    try:
-        with open(CONFIG, encoding="utf-8") as f:
-            cfg = json.load(f)
-        return set(cfg.get("bypass_urls", []))
-    except:
-        return set()
 
 def log(msg: str):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -241,13 +232,8 @@ def ai_analyze(p: dict) -> dict:
 
 def score_all(prospects: list) -> dict:
     high, mid, low = [], [], []
-    bypass_urls = load_bypass_urls()
 
     for i, p in enumerate(prospects, 1):
-        url = p.get("連結", "")
-        if url in bypass_urls:
-            log(f"  [{i}/{len(prospects)}] ⏭️ 已略過（bypass）：{url}")
-            continue
         log(f"  [{i}/{len(prospects)}] {p.get('標題','')[:40]}")
 
         rule, detail = rule_score(p)
