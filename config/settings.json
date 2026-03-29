@@ -1,0 +1,19 @@
+{
+  "output_dir": "C:\\Users\\user\\claude AI_Agent\\output",
+  "log_file": "C:\\Users\\user\\claude AI_Agent\\logs\\agent_log.txt",
+  "daily_limit": 100,
+  "keywords": ["副業推薦","兼職機會","在家工作","斜槓收入","媽媽副業","被動收入","健康產品推薦"],
+  "regions": ["台灣","台北","台中","高雄","新北","桃園","台南"],
+  "scoring_threshold": {
+    "high": 70,
+    "mid": 40
+  },
+  "line_bot": {
+    "enabled": false,
+    "channel_token": "待申請後填入"
+  },
+  "bypass_urls": [
+    "https://guide.1111.com.tw/article/trend-analysis/side_hustle",
+    "https://ecstore.careernotetw.com/824/"
+  ]
+}

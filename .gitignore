@@ -1,0 +1,21 @@
+# 環境變數（含金鑰，絕對不能提交）
+.env
+
+# Python 快取
+__pycache__/
+*.pyc
+*.pyo
+
+# 輸出資料（動態產生，不納入版控）
+output/
+logs/
+
+# .NET 建置產物
+monitor/bin/
+monitor/obj/
+
+# VS Code
+.vscode/
+
+# Claude 本地設定
+.claude/settings.local.json
