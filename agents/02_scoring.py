@@ -14,6 +14,7 @@ import tempfile
 import psutil
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 # ============================================================
 # ⚙️ 路徑設定
@@ -27,13 +28,23 @@ CONFIG        = BASE_DIR / "config" / "settings.json"
 CODEX_FALLBACK_LIMIT = 2
 codex_fallback_count = 0
 
-def load_bypass_urls() -> set:
+def load_bypass_config() -> tuple[set, set]:
+    """回傳 (bypass_urls, bypass_domains)"""
     try:
         with open(CONFIG, encoding="utf-8") as f:
             cfg = json.load(f)
-        return set(cfg.get("bypass_urls", []))
+        return set(cfg.get("bypass_urls", [])), set(cfg.get("bypass_domains", []))
     except:
-        return set()
+        return set(), set()
+
+def is_bypassed(url: str, bypass_urls: set, bypass_domains: set) -> bool:
+    if url in bypass_urls:
+        return True
+    try:
+        host = urlparse(url).hostname or ""
+        return any(host == d or host.endswith("." + d) for d in bypass_domains)
+    except:
+        return False
 
 def log(msg: str):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -106,6 +117,68 @@ def check_cpu(cli_name: str):
     if cpu > 50:
         log(f"  [{cli_name}] ⚠️ CPU {cpu:.0f}% > 50%，繼續執行但請注意負載")
 
+
+# ============================================================
+# 🪙 Token 用量追蹤
+# ============================================================
+
+TOKEN_LOG_TPL = str(BASE_DIR / "logs" / "token_usage_{}.json")
+
+def _token_log_path() -> Path:
+    return Path(TOKEN_LOG_TPL.format(datetime.now().strftime("%Y%m%d")))
+
+def load_token_usage() -> dict:
+    p = _token_log_path()
+    if p.exists():
+        with open(p, encoding="utf-8") as f:
+            return json.load(f)
+    return {"Gemini": 0, "Claude": 0, "Codex": 0}
+
+def save_token_usage(usage: dict):
+    p = _token_log_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(usage, f, ensure_ascii=False, indent=2)
+
+def load_token_budgets() -> dict:
+    try:
+        with open(CONFIG, encoding="utf-8") as f:
+            cfg = json.load(f)
+        return cfg.get("token_budgets", {"Gemini": 100000, "Claude": 50000, "Codex": 50000})
+    except:
+        return {"Gemini": 100000, "Claude": 50000, "Codex": 50000}
+
+def estimate_tokens(text: str) -> int:
+    """粗估 token 數：中文每字 1 token，其他每 4 字元 1 token。"""
+    chinese = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+    others = len(text) - chinese
+    return chinese + max(1, others // 4)
+
+def check_token_budget(cli_name: str):
+    """剩餘 token < 50% 時拋出例外，否則 log 顯示剩餘 %。"""
+    budgets = load_token_budgets()
+    usage = load_token_usage()
+    budget = budgets.get(cli_name, 50000)
+    used = usage.get(cli_name, 0)
+    remaining_pct = max(0.0, (budget - used) / budget * 100)
+    log(f"  [{cli_name}] Token 剩餘：{remaining_pct:.1f}% ({budget - used:,}/{budget:,})")
+    if remaining_pct < 50:
+        msg = f"  [{cli_name}] Token 剩餘 {remaining_pct:.1f}% < 50%，略過本次呼叫"
+        log(msg)
+        raise RuntimeError(msg)
+
+def record_token_usage(cli_name: str, prompt_text: str, response_text: str):
+    """呼叫後累計用量並寫入 log。"""
+    used = estimate_tokens(prompt_text) + estimate_tokens(response_text)
+    usage = load_token_usage()
+    usage[cli_name] = usage.get(cli_name, 0) + used
+    save_token_usage(usage)
+    budgets = load_token_budgets()
+    budget = budgets.get(cli_name, 50000)
+    remaining_pct = max(0.0, (budget - usage[cli_name]) / budget * 100)
+    log(f"  [{cli_name}] 本次 {used:,} tokens，今日累計 {usage[cli_name]:,}，剩餘 {remaining_pct:.1f}%")
+
+
 def extract_json_payload(text: str) -> dict:
     cleaned = re.sub(r"```json|```", "", text).strip()
     match = re.search(r"\{.*\}", cleaned, re.DOTALL)
@@ -115,6 +188,7 @@ def extract_json_payload(text: str) -> dict:
 
 def run_gemini_cli(prompt_text: str) -> dict:
     check_cpu("Gemini")
+    check_token_budget("Gemini")
     log("  [Gemini] 開始呼叫 Gemini CLI")
     log(f"  [Gemini] 指令：cmd /c gemini --prompt <prompt>")
     log(f"  [Gemini] Prompt 前80字：{prompt_text[:80].replace(chr(10), ' ')}")
@@ -148,10 +222,12 @@ def run_gemini_cli(prompt_text: str) -> dict:
         raise RuntimeError(err)
 
     log("  [Gemini] 分析完成，解析 JSON")
+    record_token_usage("Gemini", prompt_text, stdout)
     return extract_json_payload(stdout)
 
 def run_claude_cli(prompt_text: str) -> dict:
     check_cpu("Claude")
+    check_token_budget("Claude")
     log("  使用 Claude CLI 進行分析")
     result = subprocess.run(
         ["cmd", "/c", "claude", "-p", "--output-format", "text"],
@@ -165,10 +241,12 @@ def run_claude_cli(prompt_text: str) -> dict:
         err = result.stderr.strip() or result.stdout.strip() or "claude CLI 回傳非零"
         raise RuntimeError(err)
     log("  Claude CLI 分析完成")
+    record_token_usage("Claude", prompt_text, result.stdout)
     return extract_json_payload(result.stdout)
 
 def run_codex_cli(prompt_text: str) -> dict:
     check_cpu("Codex")
+    check_token_budget("Codex")
     response_path = None
     try:
         log("  使用 Codex CLI 進行分析")
@@ -205,6 +283,7 @@ def run_codex_cli(prompt_text: str) -> dict:
         if not output_text:
             output_text = result.stdout.strip()
         log("  Codex CLI 分析完成")
+        record_token_usage("Codex", prompt_text, output_text)
         return extract_json_payload(output_text)
     finally:
         if response_path and os.path.exists(response_path):
@@ -255,11 +334,11 @@ def ai_analyze(p: dict) -> dict:
 
 def score_all(prospects: list) -> dict:
     high, mid, low = [], [], []
-    bypass_urls = load_bypass_urls()
+    bypass_urls, bypass_domains = load_bypass_config()
 
     for i, p in enumerate(prospects, 1):
         url = p.get("連結", "")
-        if url in bypass_urls:
+        if is_bypassed(url, bypass_urls, bypass_domains):
             log(f"  [{i}/{len(prospects)}] ⏭️ 已略過（bypass）：{url}")
             continue
         log(f"  [{i}/{len(prospects)}] {p.get('標題','')[:40]}")
