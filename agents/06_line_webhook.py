@@ -44,6 +44,37 @@ NGROK_URL     = os.getenv("NGROK_URL", "").rstrip("/")
 # 觸發詞設定（訊息必須以此開頭才會被處理）
 TRIGGER_WORDS = ["小幫手", "@Yisheng", "/yisheng"]
 
+HELP_TEXT = """\
+📋 Yisheng 助理 — 可用指令
+觸發詞：小幫手 / @Yisheng / /yisheng
+══════════════════════
+📚 培訓記錄
+  整理
+    → 整理今天已歸檔的逐字稿
+  整理 YYYYMMDD
+    → 整理指定日期的逐字稿
+  整理 [逐字稿內容]
+    → 直接附上逐字稿一起整理
+  再次整理
+    → 強制覆蓋重新整理今天記錄
+  再次整理 [逐字稿]
+    → 強制覆蓋並重新整理
+
+🔍 查詢記錄
+  MTG-YYYYMMDD
+    → 查詢指定日期的培訓總結
+    範例：MTG-20260329
+
+📷 傳送圖片
+  → 自動歸檔至今日培訓資料夾
+
+❓ 說明
+  查詢 / 指令 / help / ?
+    → 顯示此說明
+══════════════════════
+完整記錄網頁版：
+""" + (NGROK_URL + "/summary/YYYYMMDD" if NGROK_URL else "（尚未設定 NGROK_URL）")
+
 app = Flask(__name__)
 
 def extract_trigger(msg: str) -> str | None:
@@ -306,6 +337,11 @@ def webhook():
             continue
 
         log(f"  觸發詞符合，內容：{content[:40]}")
+
+        # 查詢指令 — 回傳所有可用指令說明
+        if content.strip() in ("查詢", "指令", "help", "?", "？"):
+            reply_message(reply_token, HELP_TEXT)
+            continue
 
         # 培訓記錄指令優先
         group_id = event.get("source", {}).get("groupId", "")
