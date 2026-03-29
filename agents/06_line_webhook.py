@@ -219,7 +219,8 @@ def handle_training_command(user_msg: str, reply_token: str,
         """背景執行整理，完成後 Push 到群組（不使用 reply token）"""
         try:
             key, summary_msg = tl.process_transcript(transcript, date_str, force=force)
-            push_message(push_target, summary_msg)
+            url_prefix = f"🌐 {NGROK_URL}/summary/{date_str}\n{'─'*20}\n" if NGROK_URL else ""
+            push_message(push_target, url_prefix + summary_msg)
         except Exception as e:
             log(f"背景整理失敗：{e}")
             push_message(push_target, f"❌ 整理失敗，請重試\n{str(e)[:80]}")
