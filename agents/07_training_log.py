@@ -208,18 +208,40 @@ def summarize_with_gemini(transcript: str) -> dict:
 
 def summarize_with_claude(transcript: str) -> dict:
     """
-    Claude CLI — prompt 直接作為命令列引數（不用 pipe/stdin，避免 ByteString 問題）
-    用法：claude -p "prompt"
+    Claude CLI — 將中文逐字稿 base64 編碼為純 ASCII 後傳給 CLI，
+    繞過 gRPC ByteString 只允許 0-255 的限制。
+    Claude 會自行解碼後輸出繁體中文 JSON。
     """
-    import shutil
-    prompt = SUMMARY_PROMPT_TPL.format(transcript=transcript[:3000])
+    import shutil, base64 as _b64
     log("使用 Claude CLI 整理五部分總結...")
+
+    # 逐字稿 base64 編碼（全 ASCII，避免 gRPC ByteString 錯誤）
+    transcript_b64 = _b64.b64encode(
+        transcript[:4000].encode("utf-8")
+    ).decode("ascii")
+
+    # Prompt 全部用英文 + ASCII，只有 JSON key 是中文（由 Claude 輸出）
+    prompt = (
+        "You are an Amway 'Geese Team' (Qun-Yan) training meeting summarizer.\n"
+        "Team culture: Mutual support, Gratitude to leaders, Share knowledge, "
+        "Positive attitude, Pursue dreams, Honor the team.\n\n"
+        "The meeting transcript is base64-encoded below. "
+        "Decode it, then write a 5-part summary in Traditional Chinese.\n\n"
+        f"Base64 transcript:\n{transcript_b64}\n\n"
+        "Rules:\n"
+        "- Output ONLY one JSON object, no markdown, no explanation\n"
+        "- Each field 100-200 Traditional Chinese characters, first-person voice\n"
+        '- Keys must be exactly: \u611f\u6069 \u609f\u5230 \u5b78\u5230 \u505a\u5230 \u76ee\u6a19\n'
+        '- Format: {"\\u611f\\u6069":"...","\\u609f\\u5230":"...","\\u5b78\\u5230":"...","\\u505a\\u5230":"...","\\u76ee\\u6a19":"..."}\n'
+        "\nOutput the JSON now:"
+    )
+
     exe = (shutil.which("claude") or
            shutil.which("claude.cmd") or
            "claude.cmd")
     try:
         result = subprocess.run(
-            [exe, "-p", prompt],   # 直接傳引數，不經 pipe/stdin
+            [exe, "-p", prompt],
             capture_output=True,
             timeout=120
         )
