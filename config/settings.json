@@ -16,6 +16,11 @@
     "https://guide.1111.com.tw/article/trend-analysis/side_hustle",
     "https://ecstore.careernotetw.com/824/"
   ],
+  "token_budgets": {
+    "Gemini": 100000,
+    "Claude": 50000,
+    "Codex": 50000
+  },
   "bypass_domains": [
     "1111.com.tw",
     "104.com.tw",
