@@ -11,6 +11,7 @@ import json
 import hmac
 import hashlib
 import base64
+import threading
 import requests
 from datetime import datetime
 from pathlib import Path
@@ -183,19 +184,22 @@ def handle_image_message(event: dict):
         reply_message(reply_token, "⚠️ 圖片下載失敗，請重試")
 
 
-def handle_training_command(user_msg: str, reply_token: str, user_id: str = ""):
+def handle_training_command(user_msg: str, reply_token: str,
+                            user_id: str = "", group_id: str = ""):
     """
     培訓記錄指令判斷：
-      整理 / 整理YYYYMMDD → 產生當日或指定日期總結
-      MTG-YYYYMMDD        → 查詢已有總結
-      [長文字]            → 視為逐字稿直接整理
+      整理 / 整理YYYYMMDD → 產生當日或指定日期總結（背景執行，Push 到群組）
+      再次整理            → 強制覆蓋重新整理
+      MTG-YYYYMMDD        → 查詢已有總結（立即 Reply）
+      [長文字 >100字]     → 視為逐字稿直接整理
     """
     tl = _load_training()
     msg = user_msg.strip()
+    push_target = group_id or user_id   # 優先推送回群組
 
-    # 1. Key 查詢
+    # 1. Key 查詢（立即回覆）
     if msg.upper().startswith("MTG-"):
-        result = tl.get_summary_by_key(msg)
+        result = tl.get_summary_by_key(msg.upper())
         if result:
             reply_message(reply_token, result)
         else:
@@ -203,32 +207,24 @@ def handle_training_command(user_msg: str, reply_token: str, user_id: str = ""):
         return True
 
     def _parse_cmd(prefix: str) -> tuple[str | None, str | None]:
-        """
-        解析整理指令，回傳 (date_str, inline_transcript)
-        - 「整理」           → (today, None) 讀歸檔
-        - 「整理 20260329」  → (20260329, None) 讀歸檔
-        - 「整理\n逐字稿...」→ (today, 逐字稿) 直接處理
-        """
         rest = msg[len(prefix):].strip()
         if not rest:
             return datetime.now().strftime("%Y%m%d"), None
-        # 8位數字 → 日期
         import re as _re
         if _re.fullmatch(r"\d{8}", rest):
             return rest, None
-        # 其餘視為內嵌逐字稿
         return datetime.now().strftime("%Y%m%d"), rest
 
-    def _push_result(key: str, summary_msg: str, date_str: str):
-        """整理完成後用 Push API 發送（Reply token 已在 ack 時消耗）"""
-        url_line = f"\n\n🌐 網頁版：{NGROK_URL}/summary/{date_str}" if NGROK_URL else ""
-        full_msg = summary_msg + url_line
-        if user_id:
-            push_message(user_id, full_msg)
-        else:
-            log("  ⚠️ 無 user_id，無法 Push 結果")
+    def _bg_process(transcript: str, date_str: str, force: bool):
+        """背景執行整理，完成後 Push 到群組（不使用 reply token）"""
+        try:
+            key, summary_msg = tl.process_transcript(transcript, date_str, force=force)
+            push_message(push_target, summary_msg)
+        except Exception as e:
+            log(f"背景整理失敗：{e}")
+            push_message(push_target, f"❌ 整理失敗，請重試\n{str(e)[:80]}")
 
-    # 2. 再次整理（強制覆蓋）
+    # 2. 再次整理（強制覆蓋，背景執行）
     if msg.startswith("再次整理"):
         date_str, inline = _parse_cmd("再次整理")
         if inline:
@@ -237,16 +233,14 @@ def handle_training_command(user_msg: str, reply_token: str, user_id: str = ""):
         else:
             transcript_path = tl.get_date_dir(date_str) / "transcript.txt"
             if not transcript_path.exists():
-                reply_message(reply_token, f"⚠️ 找不到 {date_str} 的逐字稿\n請先傳送逐字稿文字")
+                reply_message(reply_token, f"⚠️ 找不到 {date_str} 的逐字稿")
                 return True
             with open(transcript_path, encoding="utf-8") as f:
                 transcript = f.read()
-        reply_message(reply_token, "⏳ 重新整理中（覆蓋舊記錄），請稍候...")
-        key, summary_msg = tl.process_transcript(transcript, date_str, force=True)
-        _push_result(key, summary_msg, date_str)
+        threading.Thread(target=_bg_process, args=(transcript, date_str, True), daemon=True).start()
         return True
 
-    # 3. 整理指令
+    # 3. 整理指令（背景執行）
     if msg.startswith("整理"):
         date_str, inline = _parse_cmd("整理")
         if inline:
@@ -255,21 +249,18 @@ def handle_training_command(user_msg: str, reply_token: str, user_id: str = ""):
         else:
             transcript_path = tl.get_date_dir(date_str) / "transcript.txt"
             if not transcript_path.exists():
-                reply_message(reply_token, f"⚠️ 找不到 {date_str} 的逐字稿\n請先傳送逐字稿文字")
+                reply_message(reply_token, f"⚠️ 找不到 {date_str} 的逐字稿")
                 return True
             with open(transcript_path, encoding="utf-8") as f:
                 transcript = f.read()
-        reply_message(reply_token, "⏳ 整理中，請稍候...")
-        key, summary_msg = tl.process_transcript(transcript, date_str, force=False)
-        _push_result(key, summary_msg, date_str)
+        threading.Thread(target=_bg_process, args=(transcript, date_str, False), daemon=True).start()
         return True
 
-    # 4. 長文字視為逐字稿（>100字）
+    # 4. 長文字視為逐字稿（>100字，背景執行）
     if len(msg) > 100:
-        reply_message(reply_token, "⏳ 偵測到逐字稿，整理中...")
         date_str = datetime.now().strftime("%Y%m%d")
-        key, summary_msg = tl.process_transcript(msg, date_str, force=False)
-        _push_result(key, summary_msg, date_str)
+        tl.archive_transcript(msg, date_str)
+        threading.Thread(target=_bg_process, args=(msg, date_str, False), daemon=True).start()
         return True
 
     return False
@@ -316,7 +307,8 @@ def webhook():
         log(f"  觸發詞符合，內容：{content[:40]}")
 
         # 培訓記錄指令優先
-        if handle_training_command(content, reply_token, user_id):
+        group_id = event.get("source", {}).get("groupId", "")
+        if handle_training_command(content, reply_token, user_id, group_id):
             continue
 
         # 一般意圖回覆

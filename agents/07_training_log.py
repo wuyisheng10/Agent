@@ -106,77 +106,89 @@ def archive_image(image_data: bytes, filename: str, date_str: str = None) -> Pat
 
 
 # ============================================================
-# 🤖 五部分總結（Claude CLI）
+# 🤖 五部分總結（Codex CLI 主力）
 # ============================================================
 
-SUMMARY_PROMPT_TPL = """你是安麗事業「群雁團隊」的培訓記錄整理助理。
+SUMMARY_PROMPT_TPL = """你是安麗事業「群雁團隊」培訓記錄整理師。
 
-【群雁團隊文化核心】
-群雁精神源自大雁南飛的智慧：
-- 互助共飛：夥伴輪流領頭，分擔壓力，相互支援
-- 感恩領導：感謝每一位帶領過自己的領導人與夥伴
-- 分享傳承：將所學分享給下一位，讓團隊一起成長
-- 積極正向：用鼓勵代替批評，用行動代替抱怨
-- 堅持夢想：不論遇到什麼困難，都朝著夢想持續前進
-- 榮耀歸團隊：個人的成功是團隊共同努力的結果
+【群雁團隊文化】互助共飛｜感恩領導｜分享傳承｜積極正向｜堅持夢想｜榮耀歸團隊
 
-請將以下會議逐字稿，以群雁文化精神整理成五個部分，以純JSON格式回覆（不加markdown）：
+【任務】閱讀以下培訓逐字稿，以群雁文化精神，整理為五個面向的學習總結。
 
-逐字稿：
+【逐字稿】
 {transcript}
 
-回覆格式：
-{{
-  "感恩": "以群雁感恩精神，感謝本次會議中的人事物（100字內）",
-  "悟到": "從群雁互助角度，本次會議的領悟與洞見（150字內）",
-  "學到": "可以傳承給夥伴的具體知識或技巧（150字內）",
-  "做到": "承諾落實的具體行動，為團隊做出貢獻（100字內）",
-  "目標": "個人與團隊共同前進的短中長期目標（100字內）"
-}}"""
+【嚴格輸出規則】
+1. 只輸出一個 JSON 物件，不加任何說明、標題、markdown
+2. 每個欄位 50-100 字，用第一人稱書寫
+3. 感恩：感謝老師、領導人或分享夥伴的具體貢獻
+4. 悟到：最深刻的體會或啟發（連結群雁精神）
+5. 學到：可立即傳承給夥伴的知識或技巧
+6. 做到：今天就執行的一個具體承諾行動
+7. 目標：本週可衡量的具體目標
 
-def summarize_with_claude(transcript: str) -> dict:
-    """用 Claude CLI 產生五部分總結（temp file 避免 Windows stdin 中文編碼問題）"""
+{{"感恩":"...","悟到":"...","學到":"...","做到":"...","目標":"..."}}"""
+
+def _run_cli_with_prompt(cli_cmd: str, prompt: str, timeout: int = 90) -> str:
+    """共用：將 prompt 寫入 temp file，用 PowerShell UTF-8 pipe 給指定 CLI"""
     import tempfile
-    prompt = SUMMARY_PROMPT_TPL.format(transcript=transcript[:3000])
-    log("使用 Claude CLI 整理五部分總結...")
     tmp_path = None
     try:
-        # 寫入 UTF-8 temp 檔，繞過 Windows cmd stdin 編碼限制
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".txt", encoding="utf-8", delete=False
         ) as f:
             f.write(prompt)
             tmp_path = f.name
-
-        # PowerShell 以 UTF-8 讀檔後 pipe 給 claude，避免 cmd cp950 編碼問題
         ps_cmd = (
             "$OutputEncoding = [Console]::InputEncoding = "
             "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-            f"Get-Content '{tmp_path}' -Encoding UTF8 -Raw | "
-            "claude -p --output-format text"
+            f"Get-Content '{tmp_path}' -Encoding UTF8 -Raw | {cli_cmd}"
         )
         result = subprocess.run(
             ["powershell", "-NoProfile", "-Command", ps_cmd],
-            capture_output=True, timeout=90
+            capture_output=True, timeout=timeout
         )
         stdout = result.stdout.decode("utf-8", errors="replace")
         stderr = result.stderr.decode("utf-8", errors="replace")
         if result.returncode != 0:
             raise RuntimeError(stderr or stdout)
-        cleaned = re.sub(r"```json|```", "", stdout).strip()
-        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-        if not match:
-            raise ValueError(f"無法解析 JSON，原始輸出：{cleaned[:200]}")
-        return json.loads(match.group())
-    except Exception as e:
-        log(f"Claude CLI 失敗：{e}，使用規則式摘要")
-        return rule_based_summary(transcript)
+        return stdout
     finally:
         if tmp_path:
             try:
                 os.unlink(tmp_path)
             except Exception:
                 pass
+
+def _parse_json_output(raw: str) -> dict:
+    """從 CLI 輸出中解析 JSON 物件"""
+    cleaned = re.sub(r"```json|```", "", raw).strip()
+    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if not match:
+        raise ValueError(f"無法解析 JSON：{cleaned[:200]}")
+    return json.loads(match.group())
+
+def summarize_with_codex(transcript: str) -> dict:
+    """【主力】Codex CLI 整理五部分總結"""
+    prompt = SUMMARY_PROMPT_TPL.format(transcript=transcript[:3000])
+    log("使用 Codex CLI 整理五部分總結...")
+    try:
+        raw = _run_cli_with_prompt("codex -q", prompt, timeout=90)
+        return _parse_json_output(raw)
+    except Exception as e:
+        log(f"Codex CLI 失敗：{e}")
+        raise
+
+def summarize_with_claude(transcript: str) -> dict:
+    """【備援】Claude CLI 整理五部分總結"""
+    prompt = SUMMARY_PROMPT_TPL.format(transcript=transcript[:3000])
+    log("使用 Claude CLI 整理五部分總結（備援）...")
+    try:
+        raw = _run_cli_with_prompt("claude -p --output-format text", prompt, timeout=90)
+        return _parse_json_output(raw)
+    except Exception as e:
+        log(f"Claude CLI 失敗：{e}")
+        raise
 
 def rule_based_summary(transcript: str) -> dict:
     """備援：規則式五部分摘要（零 API）"""
@@ -233,24 +245,21 @@ def save_summary(summary: dict, date_str: str, extra: dict = None) -> str:
 # ============================================================
 
 def format_summary_message(key: str, summary: dict, date_str: str, url: str = "") -> str:
-    """精簡版 LINE 訊息（約 300 字），完整內容見 HTML 網頁"""
+    """精簡版 LINE 訊息（約 300 字）"""
     def trim(text: str, limit: int) -> str:
         text = (text or "").strip()
         return text[:limit] + "…" if len(text) > limit else text
 
     d = f"{date_str[:4]}/{date_str[4:6]}/{date_str[6:]}"
-    url_line = f"\n🌐 {url}/summary/{date_str}" if url else ""
     return (
         f"📚 培訓記錄 {d}\n"
-        f"🔑 {key}{url_line}\n"
+        f"🔑 {key}\n"
         f"{'─'*20}\n"
         f"🙏 {trim(summary.get('感恩',''), 40)}\n"
         f"💡 {trim(summary.get('悟到',''), 50)}\n"
         f"📖 {trim(summary.get('學到',''), 50)}\n"
         f"✅ {trim(summary.get('做到',''), 40)}\n"
-        f"🎯 {trim(summary.get('目標',''), 40)}\n"
-        f"{'─'*20}\n"
-        f"點連結查看完整記錄 ↑"
+        f"🎯 {trim(summary.get('目標',''), 40)}"
     )
 
 def format_summary_html(key: str, summary: dict, date_str: str) -> str:
@@ -343,8 +352,18 @@ def process_transcript(transcript: str, date_str: str = None, force: bool = Fals
     # 歸檔逐字稿
     archive_transcript(transcript, date_str)
 
-    # 整理五部分
-    summary = summarize_with_claude(transcript)
+    # 整理五部分：Codex → Claude → 規則式
+    summary = None
+    for fn, name in [(summarize_with_codex, "Codex"), (summarize_with_claude, "Claude")]:
+        try:
+            summary = fn(transcript)
+            log(f"{name} CLI 整理成功")
+            break
+        except Exception:
+            log(f"{name} CLI 失敗，嘗試下一個...")
+    if summary is None:
+        log("所有 CLI 失敗，使用規則式摘要")
+        summary = rule_based_summary(transcript)
 
     # 儲存
     key = save_summary(summary, date_str)
