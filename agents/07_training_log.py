@@ -141,15 +141,16 @@ def summarize_with_claude(transcript: str) -> dict:
     try:
         result = subprocess.run(
             ["cmd", "/c", "claude", "-p", "--output-format", "text"],
-            input=prompt,
+            input=prompt.encode("utf-8"),   # bytes 模式避免 Windows cp950 編碼錯誤
             capture_output=True,
-            text=True,
-            encoding="utf-8",
             timeout=90
         )
         if result.returncode != 0:
-            raise RuntimeError(result.stderr or result.stdout)
-        cleaned = re.sub(r"```json|```", "", result.stdout).strip()
+            stderr = result.stderr.decode("utf-8", errors="replace")
+            stdout = result.stdout.decode("utf-8", errors="replace")
+            raise RuntimeError(stderr or stdout)
+        stdout = result.stdout.decode("utf-8", errors="replace")
+        cleaned = re.sub(r"```json|```", "", stdout).strip()
         match = re.search(r"\{.*\}", cleaned, re.DOTALL)
         if not match:
             raise ValueError("無法解析 JSON")
@@ -194,6 +195,11 @@ def save_summary(summary: dict, date_str: str, extra: dict = None) -> str:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
+    # 同步產生 HTML 頁面
+    html_path = date_dir / "summary.html"
+    with open(html_path, "w", encoding="utf-8") as f:
+        f.write(format_summary_html(key, summary, date_str))
+
     # 更新索引
     index = load_index()
     index[key] = date_str
@@ -207,11 +213,12 @@ def save_summary(summary: dict, date_str: str, extra: dict = None) -> str:
 # 📤 格式化總結訊息
 # ============================================================
 
-def format_summary_message(key: str, summary: dict, date_str: str) -> str:
+def format_summary_message(key: str, summary: dict, date_str: str, url: str = "") -> str:
+    url_line = f"\n🌐 網頁版：{url}/summary/{date_str}" if url else ""
     return (
         f"📚 培訓記錄總結\n"
         f"📅 日期：{date_str[:4]}/{date_str[4:6]}/{date_str[6:]}\n"
-        f"🔑 Key：{key}\n"
+        f"🔑 Key：{key}{url_line}\n"
         f"{'─'*30}\n"
         f"🙏 感恩\n{summary.get('感恩','')}\n\n"
         f"💡 悟到\n{summary.get('悟到','')}\n\n"
@@ -221,6 +228,48 @@ def format_summary_message(key: str, summary: dict, date_str: str) -> str:
         f"{'─'*30}\n"
         f"輸入「{key}」可再次查詢此記錄"
     )
+
+def format_summary_html(key: str, summary: dict, date_str: str) -> str:
+    """產生行動裝置友善的 HTML 總結頁面"""
+    d = f"{date_str[:4]}/{date_str[4:6]}/{date_str[6:]}"
+    def row(icon, title, content):
+        return (
+            f'<div class="card">'
+            f'<div class="sec">{icon} {title}</div>'
+            f'<div class="body">{content}</div>'
+            f'</div>'
+        )
+    return f"""<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{key} 群雁培訓記錄</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+        background:#f0f4ff;color:#333;padding:16px}}
+  h1{{color:#1a73e8;font-size:1.2em;margin-bottom:4px}}
+  .meta{{color:#666;font-size:.85em;margin-bottom:14px}}
+  .key{{display:inline-block;background:#e8f0fe;color:#1a73e8;
+        font-family:monospace;padding:4px 10px;border-radius:6px;font-size:.9em}}
+  .card{{background:#fff;border-radius:12px;padding:16px;margin:10px 0;
+         box-shadow:0 2px 8px rgba(0,0,0,.07)}}
+  .sec{{font-weight:700;color:#444;margin-bottom:8px;font-size:1em}}
+  .body{{line-height:1.7;color:#555;font-size:.95em}}
+</style>
+</head>
+<body>
+<h1>📚 群雁團隊培訓記錄</h1>
+<p class="meta">📅 {d}</p>
+<span class="key">🔑 {key}</span>
+{row('🙏','感恩', summary.get('感恩',''))}
+{row('💡','悟到', summary.get('悟到',''))}
+{row('📖','學到', summary.get('學到',''))}
+{row('✅','做到', summary.get('做到',''))}
+{row('🎯','目標', summary.get('目標',''))}
+</body>
+</html>"""
 
 
 # ============================================================

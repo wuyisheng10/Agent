@@ -37,6 +37,8 @@ LOG_FILE      = BASE_DIR / "logs" / "webhook_log.txt"
 LINE_TOKEN    = os.getenv("LINE_CHANNEL_TOKEN", "")
 LINE_SECRET   = os.getenv("LINE_CHANNEL_SECRET", "")
 LINE_REPLY    = "https://api.line.me/v2/bot/message/reply"
+LINE_PUSH     = "https://api.line.me/v2/bot/message/push"
+NGROK_URL     = os.getenv("NGROK_URL", "").rstrip("/")
 
 # 觸發詞設定（訊息必須以此開頭才會被處理）
 TRIGGER_WORDS = ["小幫手", "@Yisheng", "/yisheng"]
@@ -140,7 +142,23 @@ def reply_message(reply_token: str, message: str):
         "replyToken": reply_token,
         "messages": [{"type": "text", "text": message}]
     }
-    requests.post(LINE_REPLY, headers=headers, json=payload, timeout=5)
+    r = requests.post(LINE_REPLY, headers=headers, json=payload, timeout=5)
+    if r.status_code != 200:
+        log(f"  ⚠️ Reply 失敗：{r.status_code} {r.text[:80]}")
+
+def push_message(user_id: str, message: str):
+    """Push API：不受 reply token 限制，用於長時間處理後回傳結果"""
+    headers = {
+        "Content-Type":  "application/json",
+        "Authorization": f"Bearer {LINE_TOKEN}"
+    }
+    payload = {
+        "to": user_id,
+        "messages": [{"type": "text", "text": message}]
+    }
+    r = requests.post(LINE_PUSH, headers=headers, json=payload, timeout=10)
+    if r.status_code != 200:
+        log(f"  ⚠️ Push 失敗：{r.status_code} {r.text[:80]}")
 
 
 # ============================================================
@@ -165,7 +183,7 @@ def handle_image_message(event: dict):
         reply_message(reply_token, "⚠️ 圖片下載失敗，請重試")
 
 
-def handle_training_command(user_msg: str, reply_token: str):
+def handle_training_command(user_msg: str, reply_token: str, user_id: str = ""):
     """
     培訓記錄指令判斷：
       整理 / 整理YYYYMMDD → 產生當日或指定日期總結
@@ -201,6 +219,15 @@ def handle_training_command(user_msg: str, reply_token: str):
         # 其餘視為內嵌逐字稿
         return datetime.now().strftime("%Y%m%d"), rest
 
+    def _push_result(key: str, summary_msg: str, date_str: str):
+        """整理完成後用 Push API 發送（Reply token 已在 ack 時消耗）"""
+        url_line = f"\n\n🌐 網頁版：{NGROK_URL}/summary/{date_str}" if NGROK_URL else ""
+        full_msg = summary_msg + url_line
+        if user_id:
+            push_message(user_id, full_msg)
+        else:
+            log("  ⚠️ 無 user_id，無法 Push 結果")
+
     # 2. 再次整理（強制覆蓋）
     if msg.startswith("再次整理"):
         date_str, inline = _parse_cmd("再次整理")
@@ -216,7 +243,7 @@ def handle_training_command(user_msg: str, reply_token: str):
                 transcript = f.read()
         reply_message(reply_token, "⏳ 重新整理中（覆蓋舊記錄），請稍候...")
         key, summary_msg = tl.process_transcript(transcript, date_str, force=True)
-        reply_message(reply_token, summary_msg)
+        _push_result(key, summary_msg, date_str)
         return True
 
     # 3. 整理指令
@@ -234,14 +261,15 @@ def handle_training_command(user_msg: str, reply_token: str):
                 transcript = f.read()
         reply_message(reply_token, "⏳ 整理中，請稍候...")
         key, summary_msg = tl.process_transcript(transcript, date_str, force=False)
-        reply_message(reply_token, summary_msg)
+        _push_result(key, summary_msg, date_str)
         return True
 
     # 4. 長文字視為逐字稿（>100字）
     if len(msg) > 100:
         reply_message(reply_token, "⏳ 偵測到逐字稿，整理中...")
-        key, summary_msg = tl.process_transcript(msg, force=False)
-        reply_message(reply_token, summary_msg)
+        date_str = datetime.now().strftime("%Y%m%d")
+        key, summary_msg = tl.process_transcript(msg, date_str, force=False)
+        _push_result(key, summary_msg, date_str)
         return True
 
     return False
@@ -288,7 +316,7 @@ def webhook():
         log(f"  觸發詞符合，內容：{content[:40]}")
 
         # 培訓記錄指令優先
-        if handle_training_command(content, reply_token):
+        if handle_training_command(content, reply_token, user_id):
             continue
 
         # 一般意圖回覆
@@ -303,6 +331,17 @@ def webhook():
 @app.route("/health", methods=["GET"])
 def health():
     return {"status": "running", "time": datetime.now().isoformat()}
+
+
+@app.route("/summary/<date_str>", methods=["GET"])
+def view_summary(date_str):
+    tl = _load_training()
+    path = tl.get_date_dir(date_str) / "summary.html"
+    if not path.exists():
+        return f"<h2>找不到 {date_str} 的記錄</h2>", 404
+    with open(path, encoding="utf-8") as f:
+        content = f.read()
+    return content, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
 # ============================================================
