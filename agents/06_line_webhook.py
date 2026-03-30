@@ -346,6 +346,8 @@ EXEC_MENU_TEXT = """\
 _exec_menu_active: dict = {}
 # 追蹤哪些 scope 正在等待輸入人物名稱以設定模式（scope_id → mode_name）
 _awaiting_person_for_mode: dict = {}
+# 追蹤哪些 scope 已送出 prompt 等待使用者填入後回傳（scope_id → True）
+_awaiting_exec_input: dict = {}
 
 app = Flask(__name__)
 
@@ -901,8 +903,17 @@ def webhook():
                 reply_message(reply_token, f"🗑️ 已取消歸檔，刪除 {count} 個待歸檔項目。")
                 continue
 
-        # ── 等待人物名稱輸入 → 設定模式 ──────────────────────────────
+        # ── 等待執行選單後續輸入時，NA 可取消 ────────────────────────
         _scope = group_id or user_id
+        if user_msg.strip().upper() == "NA" and (
+            _awaiting_person_for_mode.get(_scope) or _awaiting_exec_input.get(_scope)
+        ):
+            _awaiting_person_for_mode.pop(_scope, None)
+            _awaiting_exec_input.pop(_scope, None)
+            reply_message(reply_token, "↩️ 已取消，返回待機。")
+            continue
+
+        # ── 等待人物名稱輸入 → 設定模式 ──────────────────────────────
         if _awaiting_person_for_mode.get(_scope):
             mode_name = _awaiting_person_for_mode.pop(_scope)
             person_name = user_msg.strip()
@@ -943,6 +954,7 @@ def webhook():
             if not item:
                 reply_message(reply_token, f"⚠️ 無效選項 {choice}，請輸入 1～{len(EXEC_MENU_ITEMS)}")
             elif item["prompt"]:
+                _awaiting_exec_input[_exec_scope] = True
                 reply_message(reply_token, item["prompt"])
             elif item.get("ask_person"):
                 # 需要先輸入人物名稱再設定模式
@@ -977,6 +989,7 @@ def webhook():
             continue
 
         log(f"  觸發詞符合，內容：{content[:40]}")
+        _awaiting_exec_input.pop(group_id or user_id, None)
 
         # 執行選單 — 顯示數字選單並進入等待狀態
         if content.strip() == "執行選單":

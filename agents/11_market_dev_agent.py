@@ -18,6 +18,7 @@ import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import anthropic
 from dotenv import load_dotenv
 
 BASE_DIR   = Path(r"C:\Users\user\claude AI_Agent")
@@ -87,6 +88,16 @@ def log(msg: str):
 
 
 def run_claude(prompt: str, timeout: int = 60) -> str:
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if api_key:
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return msg.content[0].text.strip()
+    # 備援：Claude CLI（不含中文內容時可用）
     result = subprocess.run(
         ["cmd", "/c", "claude", "-p", "--output-format", "text"],
         input=prompt,

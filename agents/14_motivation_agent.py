@@ -12,6 +12,7 @@ Trigger:
 """
 
 import argparse
+import anthropic
 import csv
 import json
 import os
@@ -112,6 +113,15 @@ def load_config() -> dict:
 
 
 def run_claude(prompt: str, timeout: int = 90) -> str:
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if api_key:
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return msg.content[0].text.strip()
     result = subprocess.run(
         ["cmd", "/c", "claude", "-p", "--output-format", "text"],
         input=prompt,
