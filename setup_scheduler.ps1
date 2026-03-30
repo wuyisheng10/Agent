@@ -44,6 +44,18 @@ $trigger5 = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At "07:30"
 Register-ScheduledTask -TaskName "Amway_AI_WeeklyReport" -Description "Weekly CrewAI deep analysis every Monday" -Action $action5 -Trigger $trigger5 -RunLevel Highest -Force
 Write-Host "OK Task5: Weekly Report Monday 07:30" -ForegroundColor Green
 
+# Task 6: Morning Orchestrator (09:00) - Market Dev + Training + Motivation
+$action6  = New-ScheduledTaskAction -Execute $Python -Argument "`"$AgentsDir\10_orchestrator.py`" --mode morning" -WorkingDirectory $AgentsDir
+$trigger6 = New-ScheduledTaskTrigger -Daily -At "09:00"
+Register-ScheduledTask -TaskName "Amway_AI_MorningOrchestrator" -Description "Daily 09:00: Market Dev + Training + Motivation scheduled" -Action $action6 -Trigger $trigger6 -RunLevel Highest -Force
+Write-Host "OK Task6: Morning Orchestrator 09:00" -ForegroundColor Green
+
+# Task 7: Evening Followup (17:00) - Partner Risk Report
+$action7  = New-ScheduledTaskAction -Execute $Python -Argument "`"$AgentsDir\10_orchestrator.py`" --mode evening" -WorkingDirectory $AgentsDir
+$trigger7 = New-ScheduledTaskTrigger -Daily -At "17:00"
+Register-ScheduledTask -TaskName "Amway_AI_EveningFollowup" -Description "Daily 17:00: Partner follow-up risk report" -Action $action7 -Trigger $trigger7 -RunLevel Highest -Force
+Write-Host "OK Task7: Evening Followup 17:00" -ForegroundColor Green
+
 # Show all tasks
 Write-Host ("`n" + "=" * 60) -ForegroundColor Cyan
 Write-Host "All Scheduled Tasks:" -ForegroundColor Cyan

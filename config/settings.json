@@ -21,6 +21,20 @@
     "Claude": 50000,
     "Codex": 50000
   },
+  "csv_data": {
+    "dir": "C:\\Users\\user\\claude AI_Agent\\output\\csv_data",
+    "market":         "market_list.csv",
+    "partners":       "partners.csv",
+    "motivation_log": "motivation_log.csv",
+    "_note": "切換至 Google Sheets 時，將此區塊換回 google_sheets 設定即可"
+  },
+  "new_agents": {
+    "market_scoring_threshold": 3,
+    "training_days": [1, 3, 5, 7, 14, 30],
+    "followup_red_days": 3,
+    "followup_yellow_days": 5,
+    "motivation_silent_days": 5
+  },
   "bypass_domains": [
     "1111.com.tw",
     "104.com.tw",

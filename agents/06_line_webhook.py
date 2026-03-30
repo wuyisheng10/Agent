@@ -49,11 +49,62 @@ def _load_partner():
     spec.loader.exec_module(m)
     return m
 
+
+def _load_market_dev():
+    spec = _ilu.spec_from_file_location(
+        "market_dev_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "11_market_dev_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _load_training_agent():
+    spec = _ilu.spec_from_file_location(
+        "training_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "12_training_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _load_followup():
+    spec = _ilu.spec_from_file_location(
+        "followup_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "13_followup_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _load_motivation():
+    spec = _ilu.spec_from_file_location(
+        "motivation_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "14_motivation_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _load_classifier():
+    spec = _ilu.spec_from_file_location(
+        "classifier_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "15_classifier_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
 load_dotenv(dotenv_path=r"C:\Users\user\claude AI_Agent\.env")
 
-BASE_DIR      = Path(r"C:\Users\user\claude AI_Agent")
-SENT_LOG      = BASE_DIR / "output" / "sent_log.json"
-LOG_FILE      = BASE_DIR / "logs" / "webhook_log.txt"
+BASE_DIR        = Path(r"C:\Users\user\claude AI_Agent")
+SENT_LOG        = BASE_DIR / "output" / "sent_log.json"
+LOG_FILE        = BASE_DIR / "logs" / "webhook_log.txt"
+CLASSIFIED_DIR  = BASE_DIR / "output" / "classified"
 
 LINE_TOKEN    = os.getenv("LINE_CHANNEL_TOKEN", "")
 LINE_SECRET   = os.getenv("LINE_CHANNEL_SECRET", "")
@@ -109,6 +160,52 @@ HELP_TEXT += """
 
 📷 行事曆圖片
   若上傳的是行事曆，會自動整理今天之後的活動。
+"""
+
+HELP_TEXT += """
+
+📂 歸類模式（Content Router）
+  歸類模式
+    → 查詢目前模式與可用模式清單
+  歸類模式 [模式名稱]
+    → 設定歸類模式（設定後傳任何內容都自動歸檔）
+    可用：會議記錄 / 行事曆 / 夥伴跟進 / 市場開發 / 培訓資料 / 一般歸檔
+  歸類模式 [人員名稱] [模式名稱]
+    → 設定人員專屬歸類（如：歸類模式 建德 會議記錄）
+  關閉歸類模式
+    → 回到自動模式
+  查詢歸檔
+    → 列出所有人員的歸檔記錄（含網頁瀏覽連結）
+  查詢歸檔 [人員名稱]
+    → 查詢指定人員的所有歸檔（含網頁連結可查看圖片/檔案）
+
+  在歸類模式下，不需觸發詞，直接傳：
+    🖼️ 圖片 → 自動歸入對應功能
+    🎤 音檔 → 儲存至模式資料夾
+    🎬 影片 → 儲存至模式資料夾
+    📄 PDF / PPTX / XLSX → 儲存至模式資料夾
+    💬 文字 → 記入今日備註（行事曆/夥伴跟進模式會嘗試解析）
+"""
+
+HELP_TEXT += """
+
+🎯 市場開發（新系統）
+  新增潛在客戶 姓名|職業|接觸管道|備註
+    → 新增至 Google Sheets 並立即 AI 評分 + 生成話術
+
+📚 培訓系統（新系統）
+  培訓 夥伴名
+    → 查詢該夥伴培訓進度（Day 1/3/5/7/14/30）
+
+📋 夥伴跟進（新系統）
+  跟進報告
+    → 即時生成🔴🟡🟢風險報告 + 關懷草稿
+
+💪 夥伴激勵（新系統）
+  激勵 夥伴名 [情境說明]
+    → 生成個人化鼓勵文 + 今日小目標
+  里程碑 夥伴名 [成就描述]
+    → 生成慶賀訊息 + 更新里程碑紀錄
 """
 
 HELP_TEXT += """
@@ -248,32 +345,129 @@ def push_message(user_id: str, message: str):
 # 📡 Webhook 路由
 # ============================================================
 
-def handle_image_message(event: dict):
-    """接收圖片 → 下載並歸檔"""
+def _download_line_content(msg_id: str, timeout: int = 30) -> bytes | None:
+    """從 LINE Content API 下載媒體（圖片/音檔/影片/檔案）"""
+    url = f"https://api-data.line.me/v2/bot/message/{msg_id}/content"
+    r = requests.get(url, headers={"Authorization": f"Bearer {LINE_TOKEN}"}, timeout=timeout)
+    return r.content if r.status_code == 200 else None
+
+
+def handle_image_message(event: dict, mode_info: dict = None, clf=None):
+    """接收圖片 → 依歸類模式路由；無模式時自動偵測行事曆或訓練記錄"""
     msg_id      = event["message"]["id"]
     reply_token = event["replyToken"]
+    user_id     = event.get("source", {}).get("userId", "")
+    group_id    = event.get("source", {}).get("groupId", "")
+    push_target = group_id or user_id
     date_str    = datetime.now().strftime("%Y%m%d")
 
-    url = f"https://api-data.line.me/v2/bot/message/{msg_id}/content"
-    headers = {"Authorization": f"Bearer {LINE_TOKEN}"}
-    r = requests.get(url, headers=headers, timeout=15)
-    if r.status_code == 200:
-        tl = _load_training()
-        cal = _load_calendar()
-        try:
-            result = cal.process_calendar_image(r.content, msg_id)
-        except Exception as e:
-            log(f"  行事曆整理失敗：{repr(e)}")
-            result = {"is_calendar": False}
-
-        if result.get("is_calendar"):
-            reply_message(reply_token, result["message"])
-        else:
-            filename = f"image_{msg_id}.jpg"
-            tl.archive_image(r.content, filename, date_str)
-            reply_message(reply_token, f"📸 圖片已歸檔（{date_str}）\n若這是行事曆，請上傳更清楚的整張截圖。")
-    else:
+    img_bytes = _download_line_content(msg_id)
+    if img_bytes is None:
         reply_message(reply_token, "⚠️ 圖片下載失敗，請重試")
+        return
+
+    mode = (mode_info or {}).get("mode", "auto")
+
+    # ── 歸類模式：交給 ClassifierAgent 路由 ──────────────────
+    if mode != "auto" and clf is not None:
+        person = (mode_info or {}).get("person", "")
+        clf.route_image(
+            img_bytes, msg_id, mode, person,
+            reply_message, push_message, reply_token, push_target
+        )
+        return
+
+    # ── 自動模式：原有邏輯（行事曆偵測 → 訓練圖庫） ──────────
+    tl  = _load_training()
+    cal = _load_calendar()
+    try:
+        result = cal.process_calendar_image(img_bytes, msg_id)
+    except Exception as e:
+        log(f"  行事曆整理失敗：{repr(e)}")
+        result = {"is_calendar": False}
+
+    if result.get("is_calendar"):
+        reply_message(reply_token, result["message"])
+    else:
+        filename = f"image_{msg_id}.jpg"
+        tl.archive_image(img_bytes, filename, date_str)
+        reply_message(reply_token, f"📸 圖片已歸檔（{date_str}）\n若這是行事曆，請上傳更清楚的整張截圖。")
+
+
+def handle_audio_message(event: dict, mode_info: dict, clf):
+    """接收音檔 → 儲存至歸類模式資料夾"""
+    msg_id      = event["message"]["id"]
+    reply_token = event["replyToken"]
+    mode        = mode_info.get("mode", "一般歸檔")
+    if mode == "auto":
+        mode = "一般歸檔"
+
+    data = _download_line_content(msg_id, timeout=60)
+    if data is None:
+        reply_message(reply_token, "⚠️ 音檔下載失敗，請重試")
+        return
+
+    duration = event["message"].get("duration", 0)
+    filename = f"audio_{msg_id}.m4a"
+    person = mode_info.get("person", "")
+    saved = clf.archive_file(data, filename, mode, "audio", person)
+    icon = {"會議記錄": "📝", "一般歸檔": "📁"}.get(mode, "🎤")
+    dur_s = f"{duration//1000}秒" if duration else ""
+    reply_message(
+        reply_token,
+        f"{icon} 音檔已歸入「{mode}」{dur_s}\n檔名：{saved.name}"
+    )
+
+
+def handle_video_message(event: dict, mode_info: dict, clf):
+    """接收影片 → 儲存至歸類模式資料夾"""
+    msg_id      = event["message"]["id"]
+    reply_token = event["replyToken"]
+    mode        = mode_info.get("mode", "一般歸檔")
+    if mode == "auto":
+        mode = "一般歸檔"
+
+    data = _download_line_content(msg_id, timeout=120)
+    if data is None:
+        reply_message(reply_token, "⚠️ 影片下載失敗，請重試")
+        return
+
+    filename = f"video_{msg_id}.mp4"
+    person = mode_info.get("person", "")
+    saved = clf.archive_file(data, filename, mode, "videos", person)
+    icon = {"會議記錄": "📝", "一般歸檔": "📁"}.get(mode, "🎬")
+    reply_message(
+        reply_token,
+        f"{icon} 影片已歸入「{mode}」\n檔名：{saved.name}"
+    )
+
+
+def handle_file_message(event: dict, mode_info: dict, clf):
+    """接收檔案（PDF/PPTX/XLSX/其他）→ 儲存至歸類模式資料夾"""
+    msg_id      = event["message"]["id"]
+    reply_token = event["replyToken"]
+    mode        = mode_info.get("mode", "一般歸檔")
+    if mode == "auto":
+        mode = "一般歸檔"
+
+    orig_name = event["message"].get("fileName", "")
+    file_size = event["message"].get("fileSize", 0)
+    # 安全化檔名
+    safe = "".join(c for c in orig_name if c.isalnum() or c in "._- ()[]") or f"file_{msg_id}"
+
+    data = _download_line_content(msg_id, timeout=60)
+    if data is None:
+        reply_message(reply_token, "⚠️ 檔案下載失敗，請重試")
+        return
+
+    person = mode_info.get("person", "")
+    saved = clf.archive_file(data, safe, mode, "files", person)
+    icon = {"培訓資料": "📚", "市場開發": "🎯", "一般歸檔": "📁"}.get(mode, "📄")
+    size_kb = f"{file_size//1024}KB" if file_size else ""
+    reply_message(
+        reply_token,
+        f"{icon} 檔案已歸入「{mode}」{size_kb}\n檔名：{saved.name}"
+    )
 
 
 def handle_training_command(user_msg: str, reply_token: str,
@@ -291,6 +485,45 @@ def handle_training_command(user_msg: str, reply_token: str,
     msg = user_msg.strip()
     push_target = group_id or user_id   # 優先推送回群組
 
+    # ── 歸類模式指令（優先處理）──────────────────────────────
+    if msg.startswith("歸類模式") or msg == "關閉歸類模式":
+        try:
+            clf_mod = _load_classifier()
+            result = clf_mod.ClassifierAgent().handle_command(msg)
+            if result:
+                reply_message(reply_token, result)
+                return True
+        except Exception as e:
+            reply_message(reply_token, f"✗ 歸類模式設定失敗：{e}")
+            return True
+
+    if msg.startswith("查詢歸檔"):
+        try:
+            clf_mod = _load_classifier()
+            person = msg.replace("查詢歸檔", "").strip()
+            result = clf_mod.ClassifierAgent().query_archive(person)
+            # 附上網頁瀏覽連結
+            if NGROK_URL:
+                if person:
+                    # 嘗試找實際資料夾名稱（支援模糊）
+                    from pathlib import Path as _P
+                    _classified = BASE_DIR / "output" / "classified"
+                    matched_name = person
+                    if _classified.exists():
+                        for _d in _classified.iterdir():
+                            if _d.is_dir() and (person in _d.name or _d.name in person):
+                                matched_name = _d.name
+                                break
+                    import urllib.parse
+                    url_path = urllib.parse.quote(matched_name, safe="")
+                    result += f"\n\n🌐 網頁查看：{NGROK_URL}/archive/{url_path}"
+                else:
+                    result += f"\n\n🌐 網頁查看：{NGROK_URL}/archive"
+            reply_message(reply_token, result)
+        except Exception as e:
+            reply_message(reply_token, f"✗ 查詢歸檔失敗：{e}")
+        return True
+
     cal_result = cal.handle_calendar_command(msg)
     if cal_result:
         reply_message(reply_token, cal_result)
@@ -299,6 +532,53 @@ def handle_training_command(user_msg: str, reply_token: str,
     partner_result = partner.handle_partner_command(msg)
     if partner_result:
         reply_message(reply_token, partner_result)
+        return True
+
+    # === 新系統：市場開發 / 培訓 / 跟進 / 激勵 ===
+
+    if msg.startswith("新增潛在客戶"):
+        def _run_market():
+            try:
+                market = _load_market_dev()
+                result = market.MarketDevAgent().handle_add_prospect(msg)
+                push_message(push_target, result)
+            except Exception as e:
+                push_message(push_target, f"✗ 新增潛在客戶失敗：{e}")
+        reply_message(reply_token, "⏳ 正在新增並 AI 評分，請稍候...")
+        threading.Thread(target=_run_market, daemon=True).start()
+        return True
+
+    if msg.startswith("培訓"):
+        try:
+            training = _load_training_agent()
+            result = training.TrainingAgent().handle_query(msg)
+            reply_message(reply_token, result)
+        except Exception as e:
+            reply_message(reply_token, f"✗ 培訓查詢失敗：{e}")
+        return True
+
+    if msg.strip() == "跟進報告":
+        def _run_followup():
+            try:
+                followup = _load_followup()
+                result = followup.FollowupAgent().generate_report_text()
+                push_message(push_target, result)
+            except Exception as e:
+                push_message(push_target, f"✗ 跟進報告失敗：{e}")
+        reply_message(reply_token, "⏳ 正在生成跟進報告，請稍候...")
+        threading.Thread(target=_run_followup, daemon=True).start()
+        return True
+
+    if msg.startswith("激勵") or msg.startswith("里程碑"):
+        def _run_motivation():
+            try:
+                motivation = _load_motivation()
+                result = motivation.MotivationAgent().handle_realtime(msg)
+                push_message(push_target, result)
+            except Exception as e:
+                push_message(push_target, f"✗ 激勵訊息失敗：{e}")
+        reply_message(reply_token, "⏳ 正在生成激勵訊息，請稍候...")
+        threading.Thread(target=_run_motivation, daemon=True).start()
         return True
 
     # 1. Key 查詢（立即回覆）
@@ -383,30 +663,78 @@ def webhook():
     data   = request.json
     events = data.get("events", [])
 
+    # 載入歸類模式（一次，供所有 event 共用）
+    try:
+        _clf_mod   = _load_classifier()
+        _clf_agent = _clf_mod.ClassifierAgent()
+        _mode_info = _clf_agent.get_mode()
+    except Exception as _e:
+        log(f"  ⚠️ ClassifierAgent 載入失敗：{_e}")
+        _clf_agent = None
+        _mode_info = {"mode": "auto", "set_at": ""}
+
     for event in events:
         if event.get("type") != "message":
             continue
 
         msg_type    = event.get("message", {}).get("type", "")
-        reply_token = event["replyToken"]
+        reply_token = event.get("replyToken", "")
+        user_id     = event.get("source", {}).get("userId", "")
+        group_id    = event.get("source", {}).get("groupId", "")
+        push_target = group_id or user_id
 
-        # 圖片訊息
+        # ── 圖片 ───────────────────────────────────────────────
         if msg_type == "image":
-            log("🖼️ 收到圖片")
-            handle_image_message(event)
+            log(f"🖼️ 收到圖片（模式：{_mode_info['mode']}）")
+            handle_image_message(event, _mode_info, _clf_agent)
+            continue
+
+        # ── 音檔 ───────────────────────────────────────────────
+        if msg_type == "audio":
+            log(f"🎤 收到音檔（模式：{_mode_info['mode']}）")
+            if _clf_agent:
+                handle_audio_message(event, _mode_info, _clf_agent)
+            else:
+                reply_message(reply_token, "⚠️ 音檔功能暫時無法使用")
+            continue
+
+        # ── 影片 ───────────────────────────────────────────────
+        if msg_type == "video":
+            log(f"🎬 收到影片（模式：{_mode_info['mode']}）")
+            if _clf_agent:
+                handle_video_message(event, _mode_info, _clf_agent)
+            else:
+                reply_message(reply_token, "⚠️ 影片功能暫時無法使用")
+            continue
+
+        # ── 檔案（PDF/PPTX/XLSX 等）────────────────────────────
+        if msg_type == "file":
+            fname = event.get("message", {}).get("fileName", "")
+            log(f"📄 收到檔案：{fname}（模式：{_mode_info['mode']}）")
+            if _clf_agent:
+                handle_file_message(event, _mode_info, _clf_agent)
+            else:
+                reply_message(reply_token, "⚠️ 檔案功能暫時無法使用")
             continue
 
         if msg_type != "text":
             continue
 
-        user_id  = event["source"]["userId"]
         user_msg = event["message"]["text"]
         log(f"📨 收到訊息 from {user_id[:8]}：{user_msg[:50]}")
 
-        # 觸發詞檢查
+        # ── 觸發詞檢查 ─────────────────────────────────────────
         content = extract_trigger(user_msg)
         if content is None:
-            log("  略過（無觸發詞）")
+            # 歸類模式：無觸發詞的文字也要處理
+            if _mode_info["mode"] != "auto" and _clf_agent:
+                log(f"  歸類模式({_mode_info['mode']})：路由文字")
+                _clf_agent.route_text(
+                    user_msg, _mode_info["mode"], _mode_info.get("person", ""),
+                    reply_message, push_message, reply_token, push_target
+                )
+            else:
+                log("  略過（無觸發詞）")
             continue
 
         log(f"  觸發詞符合，內容：{content[:40]}")
@@ -453,6 +781,201 @@ def view_summary_image(date_str, filename):
     if not img_dir.exists():
         return f"<h2>找不到 {date_str} 的圖片資料夾</h2>", 404
     return send_from_directory(str(img_dir), filename)
+
+
+# ============================================================
+# 📂 歸檔瀏覽器（HTML）
+# ============================================================
+
+_ARCHIVE_MODE_ICON = {
+    "會議記錄": "📝", "行事曆": "🗓️", "夥伴跟進": "🤝",
+    "市場開發": "🎯", "培訓資料": "📚", "一般歸檔": "📁",
+}
+_ARCHIVE_EXT_ICON = {
+    ".pdf": "📄", ".pptx": "📊", ".xlsx": "📊", ".docx": "📝",
+    ".mp4": "🎬", ".m4a": "🎤", ".mov": "🎬",
+}
+_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+
+
+def _render_archive_html(current_dir: Path, url_parts: list) -> str:
+    """產生歸檔瀏覽器 HTML 頁面"""
+
+    # ── 麵包屑 ──────────────────────────────────────────────
+    crumbs = ['<a href="/archive">歸檔總覽</a>']
+    for i, part in enumerate(url_parts):
+        href = "/archive/" + "/".join(url_parts[:i + 1])
+        crumbs.append(f'<a href="{href}">{part}</a>')
+    breadcrumb = " &rsaquo; ".join(crumbs)
+
+    # ── 分類子項 ────────────────────────────────────────────
+    subdirs, images, other_files, notes_text = [], [], [], ""
+
+    if current_dir.exists():
+        for item in sorted(current_dir.iterdir()):
+            if item.is_dir():
+                subdirs.append(item)
+            elif item.is_file():
+                if item.name == "notes.txt":
+                    try:
+                        notes_text = item.read_text(encoding="utf-8")
+                    except Exception:
+                        notes_text = "(讀取失敗)"
+                elif item.suffix.lower() in _IMAGE_EXTS:
+                    images.append(item)
+                else:
+                    other_files.append(item)
+
+    # ── 資料夾卡片 ──────────────────────────────────────────
+    dir_cards_html = ""
+    for d in subdirs:
+        href = "/archive/" + "/".join(url_parts + [d.name])
+        icon = _ARCHIVE_MODE_ICON.get(d.name, "📁")
+        try:
+            dt = datetime.strptime(d.name, "%Y%m%d")
+            label = dt.strftime("%Y/%m/%d")
+            icon = "📅"
+        except ValueError:
+            label = d.name
+        file_count = sum(1 for _ in d.rglob("*") if _.is_file())
+        dir_cards_html += f'''
+        <a href="{href}" class="card">
+          <span class="icon">{icon}</span>
+          <div>
+            <div class="card-name">{label}</div>
+            <div class="card-meta">{file_count} 個檔案</div>
+          </div>
+        </a>'''
+
+    # ── 圖片格子 ────────────────────────────────────────────
+    images_html = ""
+    for img in images:
+        href = "/archive/" + "/".join(url_parts + [img.name])
+        images_html += f'''
+        <a href="{href}" target="_blank" class="img-thumb">
+          <img src="{href}" alt="{img.name}" loading="lazy">
+          <div class="img-name">{img.name}</div>
+        </a>'''
+
+    # ── 一般檔案列表 ────────────────────────────────────────
+    files_html = ""
+    for f in other_files:
+        href = "/archive/" + "/".join(url_parts + [f.name])
+        ext = f.suffix.lower()
+        icon = _ARCHIVE_EXT_ICON.get(ext, "📎")
+        size = f.stat().st_size
+        size_str = f"{size // 1024}KB" if size >= 1024 else f"{size}B"
+        files_html += f'''
+        <div class="file-row">
+          <a href="{href}" download="{f.name}">{icon} {f.name}</a>
+          <span class="file-size">{size_str}</span>
+        </div>'''
+
+    # ── notes.txt 預覽 ──────────────────────────────────────
+    notes_html = ""
+    if notes_text:
+        safe = notes_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        notes_html = f'''
+        <div class="section-title">📋 備註記錄</div>
+        <div class="notes-box"><pre>{safe}</pre></div>'''
+
+    # ── 各區塊組合 ──────────────────────────────────────────
+    body_parts = []
+    if dir_cards_html:
+        body_parts.append(
+            f'<div class="section-title">資料夾</div>'
+            f'<div class="cards">{dir_cards_html}</div>'
+        )
+    body_parts.append(notes_html)
+    if images_html:
+        body_parts.append(
+            f'<div class="section-title">圖片（{len(images)} 張）</div>'
+            f'<div class="img-grid">{images_html}</div>'
+        )
+    if files_html:
+        body_parts.append(
+            f'<div class="section-title">檔案（{len(other_files)} 個）</div>'
+            f'<div class="file-list">{files_html}</div>'
+        )
+    if not dir_cards_html and not images_html and not files_html and not notes_text:
+        body_parts.append('<div class="empty">此資料夾目前沒有內容</div>')
+
+    body = "\n".join(body_parts)
+    title = url_parts[-1] if url_parts else "歸檔總覽"
+
+    return f'''<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title} — 歸檔瀏覽器</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+     background:#f5f5f7;color:#1d1d1f;}}
+.header{{background:#fff;padding:14px 20px;border-bottom:1px solid #e5e5ea;
+         position:sticky;top:0;z-index:10;box-shadow:0 1px 4px rgba(0,0,0,.06)}}
+.header h1{{font-size:18px;margin-bottom:4px}}
+.breadcrumb{{font-size:13px;color:#888}}
+.breadcrumb a{{color:#007aff;text-decoration:none}}
+.breadcrumb a:hover{{text-decoration:underline}}
+.container{{max-width:900px;margin:0 auto;padding:16px 20px}}
+.section-title{{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;
+                letter-spacing:.5px;margin:20px 0 8px}}
+.cards{{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}}
+.card{{background:#fff;border-radius:12px;padding:12px 14px;text-decoration:none;
+       color:#1d1d1f;display:flex;align-items:center;gap:10px;
+       box-shadow:0 1px 3px rgba(0,0,0,.08);transition:box-shadow .15s}}
+.card:hover{{box-shadow:0 4px 12px rgba(0,0,0,.14)}}
+.icon{{font-size:26px;line-height:1;flex-shrink:0}}
+.card-name{{font-size:13px;font-weight:600;word-break:break-word}}
+.card-meta{{font-size:11px;color:#aaa;margin-top:2px}}
+.img-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}}
+.img-thumb{{display:block;text-decoration:none;color:#555}}
+.img-thumb img{{width:100%;height:110px;object-fit:cover;border-radius:8px;
+                border:1px solid #e5e5ea;display:block}}
+.img-name{{font-size:10px;margin-top:3px;text-align:center;
+           overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.file-list{{background:#fff;border-radius:12px;overflow:hidden;
+            box-shadow:0 1px 3px rgba(0,0,0,.08)}}
+.file-row{{display:flex;justify-content:space-between;align-items:center;
+           padding:11px 16px;border-bottom:1px solid #f2f2f7}}
+.file-row:last-child{{border-bottom:none}}
+.file-row a{{text-decoration:none;color:#007aff;font-size:13px}}
+.file-row a:hover{{text-decoration:underline}}
+.file-size{{font-size:11px;color:#aaa;margin-left:8px;white-space:nowrap}}
+.notes-box{{background:#fffde7;border:1px solid #ffe082;border-radius:12px;padding:14px 16px}}
+.notes-box pre{{white-space:pre-wrap;font-size:13px;line-height:1.65;font-family:inherit}}
+.empty{{text-align:center;color:#bbb;padding:48px 0;font-size:14px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📂 歸檔瀏覽器</h1>
+  <div class="breadcrumb">{breadcrumb}</div>
+</div>
+<div class="container">
+{body}
+</div>
+</body>
+</html>'''
+
+
+@app.route("/archive")
+@app.route("/archive/")
+def archive_index():
+    return _render_archive_html(CLASSIFIED_DIR, []), 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/archive/<path:subpath>")
+def archive_browse(subpath):
+    target = CLASSIFIED_DIR / subpath
+    if not target.exists():
+        return "<h2 style='font-family:sans-serif;padding:20px'>找不到此路徑</h2>", 404
+    if target.is_file():
+        return send_from_directory(str(target.parent), target.name)
+    parts = list(Path(subpath).parts)
+    return _render_archive_html(target, parts), 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
 # ============================================================
