@@ -243,6 +243,7 @@ HELP_TEXT += """
 EXEC_MENU_ITEMS = {
     1:  {"label": "新增潛在家人",       "cmd": None,
          "prompt": "請複製後修改再送出：\n小幫手 新增潛在家人 姓名|職業|管道|備註\n\n查詢名單：小幫手 查詢潛在家人\n上傳照片：小幫手 潛在家人資料 姓名"},
+    32: {"label": "查詢潛在家人",       "cmd": "查詢潛在家人",  "prompt": None},
     2:  {"label": "查詢培訓進度",       "cmd": None,
          "prompt": "請複製後修改再送出：\n小幫手 培訓 夥伴名"},
     3:  {"label": "跟進報告",           "cmd": "跟進報告",       "prompt": None},
@@ -295,6 +296,7 @@ EXEC_MENU_TEXT = """\
 ══════════════════
 🎯 市場開發
   1. 新增潛在家人
+ 32. 查詢潛在家人 ▶
 
 📚 培訓系統
   2. 查詢培訓進度
@@ -352,6 +354,24 @@ _exec_menu_active: dict = {}
 _awaiting_person_for_mode: dict = {}
 # 追蹤哪些 scope 已送出 prompt 等待使用者填入後回傳（scope_id → True）
 _awaiting_exec_input: dict = {}
+# 追蹤哪些 scope 正在等待潛在家人編號選擇（scope_id → list[dict]）
+_awaiting_prospect_selection: dict = {}
+
+
+def _format_prospect_detail(r: dict) -> str:
+    star = "⭐" * int(r["AI評分"]) if r.get("AI評分", "").isdigit() else ""
+    lines = [
+        f"👤 {r.get('姓名','')}　{r.get('職業','')}",
+        f"AI評分：{r.get('AI評分','')} {star}　需求：{r.get('需求標籤','')}",
+        f"管道：{r.get('接觸管道','')}",
+        f"狀態：{r.get('接觸狀態','')}　下次跟進：{r.get('下次跟進日','')}",
+        f"備註：{r.get('備註','')}",
+    ]
+    for key, label in [("話術_健康型", "🌿 健康型"), ("話術_收入型", "💰 收入型"), ("話術_好奇型", "🤔 好奇型")]:
+        val = r.get(key, "")
+        if val:
+            lines.append(f"{label}：{val}")
+    return "\n".join(lines)
 
 app = Flask(__name__)
 
@@ -713,9 +733,18 @@ def handle_training_command(user_msg: str, reply_token: str,
 
     if msg.startswith("查詢潛在家人"):
         try:
+            keyword = msg.replace("查詢潛在家人", "", 1).strip()
             market = _load_market_dev()
-            result = market.MarketDevAgent().handle_query_prospect(msg)
-            reply_message(reply_token, result)
+            rows = market.MarketDevAgent().list_prospects(keyword)
+            if not rows:
+                reply_message(reply_token, "📋 目前名單是空的。\n新增：小幫手 新增潛在家人 姓名|職業|管道|備註")
+                return True
+            _awaiting_prospect_selection[pending_scope] = rows
+            lines = [f"📋 潛在家人名單（共 {len(rows)} 位）\n輸入編號查看詳細資料，NA 取消\n"]
+            for i, r in enumerate(rows, 1):
+                star = "⭐" * int(r["AI評分"]) if r.get("AI評分", "").isdigit() else "─"
+                lines.append(f"{i}. {r.get('姓名','')}　{r.get('職業','')}　{star}")
+            reply_message(reply_token, "\n".join(lines))
         except Exception as e:
             reply_message(reply_token, f"✗ 查詢失敗：{e}")
         return True
@@ -934,10 +963,23 @@ def webhook():
         _scope = group_id or user_id
         if user_msg.strip().upper() == "NA" and (
             _awaiting_person_for_mode.get(_scope) or _awaiting_exec_input.get(_scope)
+            or _awaiting_prospect_selection.get(_scope)
         ):
             _awaiting_person_for_mode.pop(_scope, None)
             _awaiting_exec_input.pop(_scope, None)
+            _awaiting_prospect_selection.pop(_scope, None)
             reply_message(reply_token, "↩️ 已取消，返回待機。")
+            continue
+
+        # ── 潛在家人編號選擇 ──────────────────────────────────────
+        if _awaiting_prospect_selection.get(_scope) and user_msg.strip().isdigit():
+            rows = _awaiting_prospect_selection[_scope]
+            idx = int(user_msg.strip())
+            if 1 <= idx <= len(rows):
+                detail = _format_prospect_detail(rows[idx - 1])
+                reply_message(reply_token, detail)
+            else:
+                reply_message(reply_token, f"⚠️ 請輸入 1～{len(rows)} 的編號，NA 取消")
             continue
 
         # ── 等待人物名稱輸入 → 設定模式 ──────────────────────────────

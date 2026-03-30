@@ -327,6 +327,13 @@ class MarketDevAgent:
             log(f"  評分失敗：{e}")
             return f"✅ {name} 已新增至名單（評分稍後自動執行）"
 
+    def list_prospects(self, keyword: str = "") -> list[dict]:
+        """回傳所有（或關鍵字篩選）潛在家人 row list"""
+        rows = read_csv()
+        if keyword:
+            rows = [r for r in rows if keyword in r.get("姓名", "")]
+        return rows
+
     def handle_query_prospect(self, msg: str) -> str:
         """LINE 指令：查詢潛在家人 [姓名（可省略）]"""
         keyword = msg.replace("查詢潛在家人", "", 1).strip()
