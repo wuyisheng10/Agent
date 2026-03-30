@@ -42,7 +42,7 @@ def save_partners(items: list[dict]):
 
 
 def _clean(value: str) -> str:
-    value = (value or "").strip()
+    value = (value or "").replace("\ufeff", "").strip()
     return "" if value in EMPTY_MARKERS else value
 
 
