@@ -14,10 +14,10 @@ import csv
 import json
 import os
 import subprocess
+import tempfile
 from datetime import datetime, date
 from pathlib import Path
 
-import anthropic
 from dotenv import load_dotenv
 
 BASE_DIR     = Path(r"C:\Users\user\claude AI_Agent")
@@ -141,29 +141,41 @@ def load_config() -> dict:
 
 
 def run_claude(prompt: str, timeout: int = 90) -> str:
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if api_key:
-        client = anthropic.Anthropic(api_key=api_key)
-        msg = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=2048,
-            messages=[{"role": "user", "content": prompt}],
+    # 優先：Codex CLI
+    response_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".txt",
+            delete=False, dir=str(BASE_DIR / "logs")
+        ) as f:
+            response_path = f.name
+        result = subprocess.run(
+            ["cmd", "/c", "codex", "exec",
+             "--skip-git-repo-check", "--sandbox", "read-only",
+             "--color", "never", "-C", str(BASE_DIR),
+             "-o", response_path, "-"],
+            input=prompt, capture_output=True, text=True,
+            encoding="utf-8", timeout=timeout,
         )
-        return msg.content[0].text.strip()
-    result = subprocess.run(
-        ["cmd", "/c", "claude", "-p", "--output-format", "text"],
-        input=prompt,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=timeout,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "claude CLI 回傳非零")
-    out = result.stdout.strip()
-    if not out:
-        raise RuntimeError("claude CLI 未回傳內容")
-    return out
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "codex CLI 回傳非零")
+        out = ""
+        if response_path and os.path.exists(response_path):
+            with open(response_path, "r", encoding="utf-8") as f:
+                out = f.read().strip()
+        if not out:
+            out = result.stdout.strip()
+        if out:
+            return out
+        raise RuntimeError("codex CLI 未回傳內容")
+    except Exception:
+        raise
+    finally:
+        if response_path and os.path.exists(response_path):
+            try:
+                os.unlink(response_path)
+            except Exception:
+                pass
 
 
 def push_line(user_id: str, message: str):
