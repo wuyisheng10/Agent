@@ -12,6 +12,7 @@ import hmac
 import hashlib
 import base64
 import threading
+import time
 import requests
 from datetime import datetime
 from pathlib import Path
@@ -140,8 +141,8 @@ HELP_TEXT = """\
   → 自動歸檔至今日培訓資料夾
 
 ❓ 說明
-  查詢 / 指令 / help / ?
-    → 顯示此說明
+  指令集 / 所有指令 / 查詢 / 指令 / help / ?
+    → 顯示所有可用指令
 ══════════════════════
 完整記錄網頁版：
 """ + (NGROK_URL + "/summary/YYYYMMDD" if NGROK_URL else "（尚未設定 NGROK_URL）")
@@ -173,11 +174,16 @@ HELP_TEXT += """
     → 重新查看目前待歸檔選單
   歸類模式
     → 查詢目前模式與可用模式清單
-  歸類模式 [模式名稱]
-    → 設定歸類模式（設定後傳任何內容都自動歸檔）
+  歸類模式 [模式名稱] [日期]
+    → 設定歸類模式，可加日期指定歸檔目錄
+    日期可輸入：今日 / 昨日 / 今天 / 昨天 / YYYY-MM-DD / YYYYMMDD
     可用：會議記錄 / 行事曆 / 夥伴跟進 / 市場開發 / 培訓資料 / 一般歸檔
-  歸類模式 [人員名稱] [模式名稱]
-    → 設定人員專屬歸類（如：歸類模式 建德 會議記錄）
+         整理會議心得 / 歸檔會議紀錄 / 歸檔行動紀錄 / 歸檔文件
+         421故事歸檔 / 課程文宣歸檔
+    例：歸類模式 培訓資料 昨日
+        歸類模式 會議記錄 2026-03-28
+  歸類模式 [人員名稱] [模式名稱] [日期]
+    → 設定人員專屬歸類（如：歸類模式 建德 會議記錄 昨日）
   關閉歸類模式
     → 回到自動模式
   查詢歸檔
@@ -194,7 +200,7 @@ HELP_TEXT += """
 
 🎯 市場開發（新系統）
   新增潛在客戶 姓名|職業|接觸管道|備註
-    → 新增至 Google Sheets 並立即 AI 評分 + 生成話術
+    → 新增至本地清單並立即 AI 評分 + 生成三種接觸話術
 
 📚 培訓系統（新系統）
   培訓 夥伴名
@@ -225,6 +231,121 @@ HELP_TEXT += """
   刪除夥伴 姓名
   匯入夥伴名單
 """
+
+# ============================================================
+# 📋 執行選單
+# ============================================================
+
+EXEC_MENU_ITEMS = {
+    1:  {"label": "新增潛在客戶",       "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 新增潛在客戶 姓名|職業|管道|備註"},
+    2:  {"label": "查詢培訓進度",       "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 培訓 夥伴名"},
+    3:  {"label": "跟進報告",           "cmd": "跟進報告",       "prompt": None},
+    4:  {"label": "激勵夥伴",           "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 激勵 夥伴名 [情境說明]"},
+    5:  {"label": "里程碑記錄",         "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 里程碑 夥伴名 [成就描述]"},
+    6:  {"label": "查詢所有夥伴",       "cmd": "查詢夥伴",       "prompt": None},
+    7:  {"label": "查詢待跟進夥伴",     "cmd": "查詢待跟進夥伴", "prompt": None},
+    8:  {"label": "查詢今日行事曆",     "cmd": "查詢行事曆",     "prompt": None},
+    9:  {"label": "查詢過往行事曆",     "cmd": "查詢過往行事曆", "prompt": None},
+    10: {"label": "新增行事曆事件",     "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 新增行事曆 YYYY-MM-DD [HH:MM] 標題 | 備註"},
+    11: {"label": "查詢目前歸類模式",   "cmd": "歸類模式",       "prompt": None},
+    12: {"label": "設定歸類模式",       "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 歸類模式 [模式名稱]\n"
+                   "可用模式：會議記錄 / 行事曆 / 夥伴跟進 / 市場開發\n"
+                   "培訓資料 / 一般歸檔 / 整理會議心得\n"
+                   "歸檔會議紀錄 / 歸檔行動紀錄 / 歸檔文件\n"
+                   "421故事歸檔 / 課程文宣歸檔"},
+    13: {"label": "設定人員＋歸類模式", "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 歸類模式 [人員名稱] [模式名稱]"},
+    14: {"label": "關閉歸類模式",       "cmd": "關閉歸類模式",   "prompt": None},
+    15: {"label": "查詢所有歸檔",       "cmd": "查詢歸檔",       "prompt": None},
+    16: {"label": "查詢指定人員歸檔",   "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 查詢歸檔 [人員名稱]"},
+    17: {"label": "整理今日培訓記錄",   "cmd": "整理",           "prompt": None},
+    18: {"label": "新增夥伴",           "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註"},
+    19: {"label": "跟進夥伴",           "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 跟進夥伴 姓名 | 狀態 | 下次跟進日期 | 備註"},
+    20: {"label": "顯示所有指令",       "cmd": "指令集",         "prompt": None},
+    # 安麗產品歸檔（不綁定人員）
+    21: {"label": "💊 營養保健歸檔 (Nutrilite)", "cmd": "營養保健歸檔", "prompt": None, "reset_person": True},
+    22: {"label": "💄 美容保養歸檔 (Artistry)",  "cmd": "美容保養歸檔", "prompt": None, "reset_person": True},
+    23: {"label": "🧹 居家清潔歸檔 (Amway Home)","cmd": "居家清潔歸檔", "prompt": None, "reset_person": True},
+    24: {"label": "🪥 個人護理歸檔 (Glister)",   "cmd": "個人護理歸檔", "prompt": None, "reset_person": True},
+    25: {"label": "🍳 廚具與生活用品歸檔",        "cmd": "廚具生活歸檔", "prompt": None, "reset_person": True},
+    26: {"label": "💧 空氣與水處理設備歸檔",      "cmd": "空水設備歸檔", "prompt": None, "reset_person": True},
+    27: {"label": "⚖️ 體重管理與運動營養歸檔",    "cmd": "體重管理歸檔", "prompt": None, "reset_person": True},
+    28: {"label": "🌸 香氛與個人風格歸檔",        "cmd": "香氛風格歸檔", "prompt": None, "reset_person": True},
+    29: {"label": "🛠️ 事業工具與教育系統歸檔",    "cmd": "事業工具歸檔", "prompt": None, "reset_person": True},
+    # 故事分類
+    30: {"label": "👤 人物故事歸檔",              "cmd": None, "prompt": None, "ask_person": "人物故事歸檔"},
+    31: {"label": "📖 產品故事歸檔",              "cmd": "產品故事歸檔", "prompt": None, "reset_person": True},
+}
+
+EXEC_MENU_TEXT = """\
+📋 小幫手執行選單
+══════════════════
+🎯 市場開發
+  1. 新增潛在客戶
+
+📚 培訓系統
+  2. 查詢培訓進度
+
+🤝 夥伴陪伴
+  3. 跟進報告 ▶
+  4. 激勵夥伴
+  5. 里程碑記錄
+  6. 查詢所有夥伴 ▶
+  7. 查詢待跟進夥伴 ▶
+ 18. 新增夥伴
+ 19. 跟進夥伴
+
+🗓️ 行事曆
+  8. 查詢今日行事曆 ▶
+  9. 查詢過往行事曆 ▶
+ 10. 新增行事曆事件
+
+📂 歸類模式
+ 11. 查詢目前歸類模式 ▶
+ 12. 設定歸類模式
+ 13. 設定人員＋歸類模式
+ 14. 關閉歸類模式 ▶
+ 15. 查詢所有歸檔 ▶
+ 16. 查詢指定人員歸檔
+
+📖 培訓記錄
+ 17. 整理今日培訓記錄 ▶
+
+❓ 說明
+ 20. 顯示所有指令 ▶
+
+🛍️ 安麗產品歸檔（設定模式）
+ 21. 💊 營養保健 (Nutrilite) ▶
+ 22. 💄 美容保養 (Artistry) ▶
+ 23. 🧹 居家清潔 (Amway Home) ▶
+ 24. 🪥 個人護理 (Glister) ▶
+ 25. 🍳 廚具與生活用品 ▶
+ 26. 💧 空氣與水處理設備 ▶
+ 27. ⚖️ 體重管理與運動營養 ▶
+ 28. 🌸 香氛與個人風格 ▶
+ 29. 🛠️ 事業工具與教育系統 ▶
+
+📝 故事分類
+ 30. 👤 人物故事歸檔 ▶
+ 31. 📖 產品故事歸檔 ▶
+
+══════════════════
+▶ 直接執行　其餘顯示輸入範本
+回覆數字即可　NA = 取消返回"""
+
+# 追蹤哪些 scope 正在等待執行選單輸入（in-memory，重啟後清除）
+_exec_menu_active: dict = {}
+# 追蹤哪些 scope 正在等待輸入人物名稱以設定模式（scope_id → mode_name）
+_awaiting_person_for_mode: dict = {}
 
 app = Flask(__name__)
 
@@ -344,6 +465,20 @@ def push_message(user_id: str, message: str):
         log(f"  ⚠️ Push 失敗：{r.status_code} {r.text[:120]}")
 
 
+def schedule_pending_menu(clf, scope_id: str, push_target: str, delay_sec: int = 3):
+    token = clf.mark_pending_menu(scope_id)
+    if not token:
+        return
+
+    def _worker():
+        time.sleep(delay_sec)
+        if clf.should_push_pending_menu(scope_id, token):
+            push_message(push_target, clf.format_pending_menu(scope_id))
+            clf.mark_menu_sent(scope_id)
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
 # ============================================================
 # 📡 Webhook 路由
 # ============================================================
@@ -356,20 +491,30 @@ def _download_line_content(msg_id: str, timeout: int = 30) -> bytes | None:
 
 
 def handle_image_message(event: dict, mode_info: dict = None, clf=None):
-    """接收圖片 → 先暫存至待歸檔，再由使用者回覆數字執行歸類"""
+    """接收圖片 → 模式已設定時直接歸檔；auto 模式先暫存顯示選單"""
     msg_id      = event["message"]["id"]
     reply_token = event["replyToken"]
     user_id     = event.get("source", {}).get("userId", "")
     group_id    = event.get("source", {}).get("groupId", "")
     scope_id    = group_id or user_id
+    push_target = group_id or user_id
 
     img_bytes = _download_line_content(msg_id)
     if img_bytes is None:
         reply_message(reply_token, "⚠️ 圖片下載失敗，請重試")
         return
 
+    mode   = (mode_info or {}).get("mode", "auto")
+    person = (mode_info or {}).get("person", "")
+
+    if clf is not None and mode != "auto":
+        # 模式已設定 → 直接歸檔
+        clf.route_image(img_bytes, msg_id, mode, person,
+                        reply_message, push_message, reply_token, push_target)
+        return
+
     if clf is not None:
-        menu = clf.stage_file(
+        clf.stage_file(
             img_bytes,
             f"image_{msg_id}.jpg",
             "image",
@@ -377,7 +522,7 @@ def handle_image_message(event: dict, mode_info: dict = None, clf=None):
             content_type="image/jpeg",
             source_name=event.get("message", {}).get("type", "image"),
         )
-        reply_message(reply_token, menu)
+        schedule_pending_menu(clf, scope_id, scope_id)
         return
 
     date_str = datetime.now().strftime("%Y%m%d")
@@ -388,7 +533,7 @@ def handle_image_message(event: dict, mode_info: dict = None, clf=None):
 
 
 def handle_audio_message(event: dict, mode_info: dict, clf):
-    """接收音檔 → 先暫存至待歸檔"""
+    """接收音檔 → 模式已設定時直接歸檔；auto 模式先暫存顯示選單"""
     msg_id      = event["message"]["id"]
     reply_token = event["replyToken"]
     user_id     = event.get("source", {}).get("userId", "")
@@ -400,19 +545,26 @@ def handle_audio_message(event: dict, mode_info: dict, clf):
         reply_message(reply_token, "⚠️ 音檔下載失敗，請重試")
         return
 
-    menu = clf.stage_file(
-        data,
-        f"audio_{msg_id}.m4a",
-        "audio",
-        scope_id,
-        content_type="audio/m4a",
-        source_name=event.get("message", {}).get("type", "audio"),
-    )
-    reply_message(reply_token, menu)
+    mode      = (mode_info or {}).get("mode", "auto")
+    person    = (mode_info or {}).get("person", "")
+    date_str  = (mode_info or {}).get("archive_date", "")
+    filename  = f"audio_{msg_id}.m4a"
+
+    if mode != "auto":
+        saved = clf.archive_file(data, filename, mode, "audio", person, date_str)
+        person_tag = f"「{person}」的" if person else ""
+        reply_message(reply_token,
+                      f"🎤 音檔已歸入{person_tag}「{mode}」\n路徑：.../{'/'.join(saved.parts[-4:])}")
+        return
+
+    clf.stage_file(data, filename, "audio", scope_id,
+                   content_type="audio/m4a",
+                   source_name=event.get("message", {}).get("type", "audio"))
+    schedule_pending_menu(clf, scope_id, scope_id)
 
 
 def handle_video_message(event: dict, mode_info: dict, clf):
-    """接收影片 → 先暫存至待歸檔"""
+    """接收影片 → 模式已設定時直接歸檔；auto 模式先暫存顯示選單"""
     msg_id      = event["message"]["id"]
     reply_token = event["replyToken"]
     user_id     = event.get("source", {}).get("userId", "")
@@ -424,19 +576,26 @@ def handle_video_message(event: dict, mode_info: dict, clf):
         reply_message(reply_token, "⚠️ 影片下載失敗，請重試")
         return
 
-    menu = clf.stage_file(
-        data,
-        f"video_{msg_id}.mp4",
-        "video",
-        scope_id,
-        content_type="video/mp4",
-        source_name=event.get("message", {}).get("type", "video"),
-    )
-    reply_message(reply_token, menu)
+    mode      = (mode_info or {}).get("mode", "auto")
+    person    = (mode_info or {}).get("person", "")
+    date_str  = (mode_info or {}).get("archive_date", "")
+    filename  = f"video_{msg_id}.mp4"
+
+    if mode != "auto":
+        saved = clf.archive_file(data, filename, mode, "videos", person, date_str)
+        person_tag = f"「{person}」的" if person else ""
+        reply_message(reply_token,
+                      f"🎬 影片已歸入{person_tag}「{mode}」\n路徑：.../{'/'.join(saved.parts[-4:])}")
+        return
+
+    clf.stage_file(data, filename, "video", scope_id,
+                   content_type="video/mp4",
+                   source_name=event.get("message", {}).get("type", "video"))
+    schedule_pending_menu(clf, scope_id, scope_id)
 
 
 def handle_file_message(event: dict, mode_info: dict, clf):
-    """接收檔案（PDF/PPTX/XLSX/其他）→ 先暫存至待歸檔"""
+    """接收檔案（PDF/PPTX/XLSX/其他）→ 模式已設定時直接歸檔；auto 模式先暫存顯示選單"""
     msg_id      = event["message"]["id"]
     reply_token = event["replyToken"]
     user_id     = event.get("source", {}).get("userId", "")
@@ -444,7 +603,6 @@ def handle_file_message(event: dict, mode_info: dict, clf):
     scope_id    = group_id or user_id
 
     orig_name = event["message"].get("fileName", "")
-    # 安全化檔名
     safe = "".join(c for c in orig_name if c.isalnum() or c in "._- ()[]") or f"file_{msg_id}"
 
     data = _download_line_content(msg_id, timeout=60)
@@ -452,15 +610,21 @@ def handle_file_message(event: dict, mode_info: dict, clf):
         reply_message(reply_token, "⚠️ 檔案下載失敗，請重試")
         return
 
-    menu = clf.stage_file(
-        data,
-        safe,
-        "file",
-        scope_id,
-        content_type=event.get("message", {}).get("fileName", ""),
-        source_name=orig_name,
-    )
-    reply_message(reply_token, menu)
+    mode      = (mode_info or {}).get("mode", "auto")
+    person    = (mode_info or {}).get("person", "")
+    date_str  = (mode_info or {}).get("archive_date", "")
+
+    if mode != "auto":
+        saved = clf.archive_file(data, safe, mode, "files", person, date_str)
+        person_tag = f"「{person}」的" if person else ""
+        reply_message(reply_token,
+                      f"📄 檔案已歸入{person_tag}「{mode}」\n路徑：.../{'/'.join(saved.parts[-4:])}")
+        return
+
+    clf.stage_file(data, safe, "file", scope_id,
+                   content_type=event.get("message", {}).get("fileName", ""),
+                   source_name=orig_name)
+    schedule_pending_menu(clf, scope_id, scope_id)
 
 
 def handle_training_command(user_msg: str, reply_token: str,
@@ -719,6 +883,10 @@ def webhook():
         if _clf_agent:
             pending_scope = group_id or user_id
             pending = _clf_agent.get_pending(pending_scope)
+            folder_result = _clf_agent.submit_pending_folder_name(pending_scope, user_msg.strip())
+            if folder_result:
+                reply_message(reply_token, folder_result)
+                continue
             if pending and user_msg.strip().isdigit():
                 choice = int(user_msg.strip())
                 log(f"  待歸檔選擇：{choice}")
@@ -727,25 +895,98 @@ def webhook():
             if pending and user_msg.strip() in {"待歸檔", "查詢待歸檔"}:
                 reply_message(reply_token, _clf_agent.format_pending_menu(pending_scope))
                 continue
+            if pending and user_msg.strip().upper() == "NA":
+                count = len(pending.get("items", []))
+                _clf_agent.clear_pending(pending_scope, remove_file=True)
+                reply_message(reply_token, f"🗑️ 已取消歸檔，刪除 {count} 個待歸檔項目。")
+                continue
+
+        # ── 等待人物名稱輸入 → 設定模式 ──────────────────────────────
+        _scope = group_id or user_id
+        if _awaiting_person_for_mode.get(_scope):
+            mode_name = _awaiting_person_for_mode.pop(_scope)
+            person_name = user_msg.strip()
+            try:
+                clf_mod = _load_classifier()
+                result = clf_mod.ClassifierAgent().set_mode(mode_name, person_name)
+                reply_message(reply_token, result)
+            except Exception as e:
+                reply_message(reply_token, f"⚠️ 設定失敗：{e}")
+            continue
+
+        # ── 999 快捷鍵 → 關閉歸類模式 ───────────────────────────────
+        if user_msg.strip() == "999":
+            if _clf_agent:
+                result = _clf_agent.clear_mode()
+                reply_message(reply_token, result)
+            else:
+                reply_message(reply_token, "⚠️ 歸類模式功能暫時無法使用")
+            continue
+
+        # ── 5168 快捷鍵 → 執行選單 ───────────────────────────────
+        if user_msg.strip() == "5168":
+            _exec_scope = group_id or user_id
+            _exec_menu_active[_exec_scope] = True
+            reply_message(reply_token, EXEC_MENU_TEXT)
+            continue
+
+        # ── 執行選單：數字選擇 / NA 取消 ─────────────────────────
+        _exec_scope = group_id or user_id
+        if _exec_menu_active.get(_exec_scope) and user_msg.strip().upper() == "NA":
+            _exec_menu_active[_exec_scope] = False
+            reply_message(reply_token, "↩️ 已取消，返回待機。")
+            continue
+        if _exec_menu_active.get(_exec_scope) and user_msg.strip().isdigit():
+            choice = int(user_msg.strip())
+            _exec_menu_active[_exec_scope] = False
+            item = EXEC_MENU_ITEMS.get(choice)
+            if not item:
+                reply_message(reply_token, f"⚠️ 無效選項 {choice}，請輸入 1～{len(EXEC_MENU_ITEMS)}")
+            elif item["prompt"]:
+                reply_message(reply_token, item["prompt"])
+            elif item.get("ask_person"):
+                # 需要先輸入人物名稱再設定模式
+                _awaiting_person_for_mode[_exec_scope] = item["ask_person"]
+                reply_message(reply_token, f"👤 請輸入人物名稱：")
+            elif item.get("reset_person"):
+                # 安麗產品分類：直接設定模式，不繼承目前人員
+                try:
+                    clf_mod = _load_classifier()
+                    result = clf_mod.ClassifierAgent().set_mode(item["cmd"], "")
+                    reply_message(reply_token, result)
+                except Exception as e:
+                    reply_message(reply_token, f"⚠️ 設定失敗：{e}")
+            else:
+                handle_training_command(item["cmd"], reply_token, user_id, group_id)
+            continue
 
         # ── 觸發詞檢查 ─────────────────────────────────────────
         content = extract_trigger(user_msg)
         if content is None:
-            # 歸類模式：無觸發詞的文字也要處理
+            if _clf_agent and _mode_info["mode"] == "auto":
+                _clf_agent.stage_text(user_msg, pending_scope)
+                schedule_pending_menu(_clf_agent, pending_scope, push_target)
+                continue
+            # 歸類模式：無觸發詞的文字先暫存，回傳選單讓使用者確認
             if _mode_info["mode"] != "auto" and _clf_agent:
-                log(f"  歸類模式({_mode_info['mode']})：路由文字")
-                _clf_agent.route_text(
-                    user_msg, _mode_info["mode"], _mode_info.get("person", ""),
-                    reply_message, push_message, reply_token, push_target
-                )
+                log(f"  歸類模式({_mode_info['mode']})：暫存文字，等待確認")
+                _clf_agent.stage_text(user_msg, pending_scope)
+                schedule_pending_menu(_clf_agent, pending_scope, push_target)
             else:
                 log("  略過（無觸發詞）")
             continue
 
         log(f"  觸發詞符合，內容：{content[:40]}")
 
+        # 執行選單 — 顯示數字選單並進入等待狀態
+        if content.strip() == "執行選單":
+            _exec_scope = group_id or user_id
+            _exec_menu_active[_exec_scope] = True
+            reply_message(reply_token, EXEC_MENU_TEXT)
+            continue
+
         # 查詢指令 — 回傳所有可用指令說明
-        if content.strip() in ("查詢", "指令", "help", "?", "？"):
+        if content.strip() in ("查詢", "指令", "help", "?", "？", "指令集", "所有指令", "commands"):
             reply_message(reply_token, HELP_TEXT)
             continue
 

@@ -17,7 +17,6 @@ LINE 指令：
 """
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -30,15 +29,26 @@ PENDING_STATE_DIR = PENDING_DIR / "states"
 
 AVAILABLE_MODES = [
     "會議記錄", "行事曆", "夥伴跟進", "市場開發", "培訓資料", "一般歸檔",
-    "整理會議心得", "歸檔會議紀錄", "歸檔行動紀錄", "歸檔文件",
+    "整理會議心得", "歸檔會議紀錄", "歸檔行動紀錄", "歸檔文件", "421故事歸檔", "課程文宣歸檔",
+    # 安麗產品分類
+    "營養保健歸檔", "美容保養歸檔", "居家清潔歸檔", "個人護理歸檔",
+    "廚具生活歸檔", "空水設備歸檔", "體重管理歸檔", "香氛風格歸檔", "事業工具歸檔",
+    # 故事分類
+    "人物故事歸檔", "產品故事歸檔",
 ]
 PENDING_ARCHIVE_MODES = ["整理會議心得", "歸檔會議紀錄", "歸檔行動紀錄", "歸檔文件"]
-SPECIAL_PENDING_ACTIONS = ["行事曆圖檔", "行事曆文字新增"]
+SPECIAL_PERSONS = ["建德", "宜芸"]
 
 MODE_ICON = {
     "會議記錄": "📝", "行事曆": "🗓️", "夥伴跟進": "🤝",
     "市場開發": "🎯", "培訓資料": "📚", "一般歸檔": "📁", "auto": "🤖",
     "整理會議心得": "🧠", "歸檔會議紀錄": "📝", "歸檔行動紀錄": "✅", "歸檔文件": "📄",
+    "421故事歸檔": "📚", "課程文宣歸檔": "📰",
+    # 安麗產品
+    "營養保健歸檔": "💊", "美容保養歸檔": "💄", "居家清潔歸檔": "🧹",
+    "個人護理歸檔": "🪥", "廚具生活歸檔": "🍳", "空水設備歸檔": "💧",
+    "體重管理歸檔": "⚖️", "香氛風格歸檔": "🌸", "事業工具歸檔": "🛠️",
+    "人物故事歸檔": "👤", "產品故事歸檔": "📖",
 }
 MODE_DESC = {
     "會議記錄": "圖片→訓練歸檔 ／ 音檔→音訊資料夾 ／ 影片→影片資料夾 ／ PDF/PPTX→檔案資料夾 ／ 文字→備註",
@@ -51,6 +61,20 @@ MODE_DESC = {
     "歸檔會議紀錄": "歸入會議資料夾，保留圖檔、音檔、影片與文件",
     "歸檔行動紀錄": "歸入行動追蹤資料夾，集中保存執行與跟進素材",
     "歸檔文件": "歸入一般文件資料夾",
+    "421故事歸檔": "集中歸檔 421 故事相關圖片、影片、文件與文字，並可自訂目錄名稱。",
+    "課程文宣歸檔": "集中歸檔課程宣傳圖片、文案、影片與文件，並可自訂目錄名稱。",
+    # 安麗產品
+    "營養保健歸檔": "Nutrilite 系列－保健品圖片、文件、產品資訊歸檔",
+    "美容保養歸檔": "Artistry 系列－保養品圖片、教學、文案歸檔",
+    "居家清潔歸檔": "Amway Home 系列－清潔用品圖片、說明歸檔",
+    "個人護理歸檔": "Glister 等個人護理品－圖片、產品資訊歸檔",
+    "廚具生活歸檔": "Queen Cookware、eSpring 等廚具生活用品歸檔",
+    "空水設備歸檔": "空氣清淨機、淨水器等設備圖片、說明書歸檔",
+    "體重管理歸檔": "體重管理與運動營養產品資料歸檔",
+    "香氛風格歸檔": "香氛與個人風格產品圖片、文案歸檔",
+    "事業工具歸檔": "課程、培訓教材、系統工具等事業資源歸檔",
+    "人物故事歸檔": "人物見證、成功故事、夥伴經歷等人物相關素材歸檔",
+    "產品故事歸檔": "產品見證、使用心得、效果分享等產品相關故事歸檔",
 }
 
 
@@ -79,6 +103,36 @@ def _fuzzy_mode(text: str) -> str | None:
 def _safe_name(name: str) -> str:
     cleaned = "".join(c for c in (name or "") if c.isalnum() or c in "._- ()[]")
     return cleaned.strip() or f"file_{datetime.now().strftime('%H%M%S')}"
+
+
+def _safe_folder_name(name: str) -> str:
+    forbidden = '<>:"/\\|?*'
+    cleaned = "".join(c for c in (name or "") if c not in forbidden and ord(c) >= 32)
+    return cleaned.strip().strip(".")[:80]
+
+
+def _parse_archive_date(text: str) -> str | None:
+    """
+    解析歸檔日期字串，回傳 YYYYMMDD 或 None。
+    支援：今日 / 今天 / 昨日 / 昨天 / YYYY-MM-DD / YYYYMMDD
+    """
+    import re as _re
+    from datetime import timedelta
+    text = text.strip()
+    if text in ("今日", "今天"):
+        return datetime.now().strftime("%Y%m%d")
+    if text in ("昨日", "昨天"):
+        return (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+    m = _re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", text)
+    if m:
+        return m.group(1) + m.group(2) + m.group(3)
+    if _re.fullmatch(r"\d{8}", text):
+        try:
+            datetime.strptime(text, "%Y%m%d")
+            return text
+        except ValueError:
+            pass
+    return None
 
 
 # ============================================================
@@ -112,20 +166,23 @@ class ClassifierAgent:
             pass
         return {"mode": "auto", "person": "", "set_at": ""}
 
-    def set_mode(self, mode: str, person: str = "") -> str:
+    def set_mode(self, mode: str, person: str = "", date_str: str = "") -> str:
         MODE_FILE.parent.mkdir(parents=True, exist_ok=True)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(MODE_FILE, "w", encoding="utf-8") as f:
-            json.dump({"mode": mode, "person": person, "set_at": now}, f, ensure_ascii=False)
+            json.dump({"mode": mode, "person": person, "set_at": now,
+                       "archive_date": date_str}, f, ensure_ascii=False)
 
         icon = MODE_ICON.get(mode, "📌")
         desc = MODE_DESC.get(mode, "")
         target = f"「{person}」的「{mode}」" if person else f"「{mode}」"
-        dest = self._today_dir(mode, person)
+        dest = self._today_dir(mode, person, date_str)
+        date_label = date_str if date_str else datetime.now().strftime("%Y%m%d")
         return (
             f"{icon} 歸類模式已設定\n"
             f"{'👤 人員：' + person + chr(10) if person else ''}"
             f"📂 模式：{mode}\n"
+            f"📅 歸檔日期：{date_label}\n"
             f"⏰ 時間：{now}\n"
             f"📁 路徑：.../{'/'.join(dest.parts[-3:])}\n\n"
             f"現在傳入任何內容都會歸入{target}：\n{desc}\n\n"
@@ -155,12 +212,15 @@ class ClassifierAgent:
             )
 
         icon = MODE_ICON.get(mode, "📌")
-        dest = self._today_dir(mode, person)
+        archive_date = info.get("archive_date", "")
+        dest = self._today_dir(mode, person, archive_date)
         person_line = f"👤 人員：{person}\n" if person else ""
+        date_label = archive_date if archive_date else datetime.now().strftime("%Y%m%d")
         return (
             f"{icon} 目前歸類模式\n\n"
             f"{person_line}"
             f"📂 模式：{mode}\n"
+            f"📅 歸檔日期：{date_label}\n"
             f"⏰ 設定：{set_at}\n"
             f"📁 路徑：.../{'/'.join(dest.parts[-3:])}\n\n"
             f"輸入「小幫手 關閉歸類模式」可恢復自動模式。"
@@ -183,23 +243,33 @@ class ClassifierAgent:
 
             parts = args.split()
 
+            # 抽取末尾日期（今日/昨日/YYYY-MM-DD/YYYYMMDD）
+            date_str = ""
+            if parts:
+                parsed_date = _parse_archive_date(parts[-1])
+                if parsed_date:
+                    date_str = parsed_date
+                    parts = parts[:-1]
+
+            if not parts:
+                return self.get_status_text()
+
             # 只有一個詞
             if len(parts) == 1:
                 word = parts[0]
                 matched_mode = _fuzzy_mode(word)
                 if matched_mode:
-                    # 保留目前人員
                     current_person = self.get_mode().get("person", "")
-                    return self.set_mode(matched_mode, current_person)
+                    return self.set_mode(matched_mode, current_person, date_str)
                 # 不是模式名稱 → 視為查詢該人員狀態
                 return self._query_person_brief(word)
 
-            # 兩個以上的詞：第一個是人員，第二個是模式
+            # 兩個以上的詞：第一個是人員，第二個（之後）是模式
             person_candidate = parts[0]
-            mode_candidate   = " ".join(parts[1:])  # 支援「一般歸檔」等含空格的名稱
+            mode_candidate   = " ".join(parts[1:])
             matched_mode = _fuzzy_mode(mode_candidate) or _fuzzy_mode(parts[1])
             if matched_mode:
-                return self.set_mode(matched_mode, person_candidate)
+                return self.set_mode(matched_mode, person_candidate, date_str)
 
             # 都不匹配
             modes_str = "、".join(AVAILABLE_MODES)
@@ -330,23 +400,48 @@ class ClassifierAgent:
                 data = json.load(f)
         except Exception:
             return None
-        file_path = Path(data.get("pending_path", ""))
-        if not file_path.exists():
+        if "items" not in data:
+            pending_path = data.get("pending_path", "")
+            if not pending_path:
+                return None
+            data["items"] = [{
+                "filename": data.get("filename", Path(pending_path).name),
+                "source_type": data.get("source_type", "file"),
+                "content_type": data.get("content_type", ""),
+                "source_name": data.get("source_name", ""),
+                "pending_path": pending_path,
+            }]
+            data.setdefault("status", "collecting")
+            data.setdefault("selected_option", None)
+            data.setdefault("menu_token", "")
+        valid_items = []
+        for item in data.get("items", []):
+            file_path = Path(item.get("pending_path", ""))
+            if file_path.exists():
+                valid_items.append(item)
+        if not valid_items:
             try:
                 path.unlink()
             except Exception:
                 pass
             return None
+        data["items"] = valid_items
         return data
+
+    def _save_pending(self, scope_id: str, data: dict):
+        data["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(self._pending_state_path(scope_id), "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
     def clear_pending(self, scope_id: str, remove_file: bool = True) -> bool:
         pending = self.get_pending(scope_id)
         path = self._pending_state_path(scope_id)
         if remove_file and pending:
-            try:
-                Path(pending["pending_path"]).unlink(missing_ok=True)
-            except Exception:
-                pass
+            for item in pending.get("items", []):
+                try:
+                    Path(item["pending_path"]).unlink(missing_ok=True)
+                except Exception:
+                    pass
         if path.exists():
             try:
                 path.unlink()
@@ -368,12 +463,15 @@ class ClassifierAgent:
     def _build_pending_options(self) -> list[dict]:
         options: list[dict] = []
         for person in self._list_person_options():
-            for mode in PENDING_ARCHIVE_MODES:
+            modes = PENDING_ARCHIVE_MODES if person in SPECIAL_PERSONS else ["歸檔文件"]
+            for mode in modes:
                 options.append({"label": f"{person} {mode}", "person": person, "mode": mode, "action": "archive"})
         for mode in PENDING_ARCHIVE_MODES:
             options.append({"label": mode, "person": "", "mode": mode, "action": "archive"})
         options.append({"label": "行事曆圖檔", "person": "", "mode": "行事曆", "action": "calendar_image"})
         options.append({"label": "行事曆文字新增", "person": "", "mode": "行事曆", "action": "calendar_text"})
+        options.append({"label": "421故事歸檔", "person": "", "mode": "421故事歸檔", "action": "story_421"})
+        options.append({"label": "課程文宣歸檔", "person": "", "mode": "課程文宣歸檔", "action": "archive"})
         return options
 
     def _pending_subdir(self, source_type: str) -> str:
@@ -382,46 +480,118 @@ class ClassifierAgent:
             "audio": "audio",
             "video": "videos",
             "file": "files",
+            "text": "notes",
         }.get(source_type, "files")
 
     def stage_file(self, data: bytes, filename: str, source_type: str, scope_id: str,
                    content_type: str = "", source_name: str = "") -> str:
-        self.clear_pending(scope_id, remove_file=True)
+        pending = self.get_pending(scope_id) or {
+            "scope_id": scope_id,
+            "items": [],
+            "status": "collecting",
+            "selected_option": None,
+            "menu_token": "",
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
         safe_name = _safe_name(filename)
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         pending_path = PENDING_FILE_DIR / f"{stamp}_{safe_name}"
         pending_path.write_bytes(data)
 
-        payload = {
-            "scope_id": scope_id,
+        pending["scope_id"] = scope_id
+        pending.setdefault("items", [])
+        pending["items"].append({
             "filename": safe_name,
             "source_type": source_type,
             "content_type": content_type,
             "source_name": source_name,
             "pending_path": str(pending_path),
+        })
+        pending["status"] = "collecting"
+        pending["selected_option"] = None
+        log(f"  待歸檔暫存：{pending_path}")
+        self._save_pending(scope_id, pending)
+        return self.get_stage_message(scope_id)
+
+    def stage_text(self, text: str, scope_id: str) -> str:
+        pending = self.get_pending(scope_id) or {
+            "scope_id": scope_id,
+            "items": [],
+            "status": "collecting",
+            "selected_option": None,
+            "menu_token": "",
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
-        with open(self._pending_state_path(scope_id), "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        log(f"  待歸檔暫存：{pending_path}")
-        return self.format_pending_menu(scope_id)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        pending_path = PENDING_FILE_DIR / f"{stamp}_text.txt"
+        pending_path.write_text(text.strip() + "\n", encoding="utf-8")
+        pending["items"].append({
+            "filename": pending_path.name,
+            "source_type": "text",
+            "content_type": "text/plain",
+            "source_name": "text",
+            "pending_path": str(pending_path),
+        })
+        pending["status"] = "collecting"
+        pending["selected_option"] = None
+        self._save_pending(scope_id, pending)
+        log(f"  待歸檔文字暫存：{pending_path}")
+        return self.get_stage_message(scope_id)
+
+    def get_stage_message(self, scope_id: str) -> str:
+        pending = self.get_pending(scope_id)
+        if not pending:
+            return ""
+        return f"已接收 {len(pending.get('items', []))} 個待歸檔項目"
+
+    def mark_pending_menu(self, scope_id: str) -> str | None:
+        pending = self.get_pending(scope_id)
+        if not pending:
+            return None
+        token = datetime.now().strftime("%Y%m%d%H%M%S%f")
+        pending["menu_token"] = token
+        self._save_pending(scope_id, pending)
+        return token
+
+    def should_push_pending_menu(self, scope_id: str, token: str) -> bool:
+        pending = self.get_pending(scope_id)
+        return bool(
+            pending
+            and pending.get("status") == "collecting"
+            and pending.get("menu_token") == token
+            and pending.get("items")
+        )
+
+    def mark_menu_sent(self, scope_id: str):
+        pending = self.get_pending(scope_id)
+        if not pending:
+            return
+        pending["status"] = "awaiting_choice"
+        self._save_pending(scope_id, pending)
 
     def format_pending_menu(self, scope_id: str) -> str:
         pending = self.get_pending(scope_id)
         if not pending:
             return "目前沒有待歸檔項目。"
 
+        items = pending.get("items", [])
         lines = [
             "📥 已收到檔案，先放入待歸檔目錄。",
-            f"檔名：{pending.get('filename', '-')}",
-            f"類型：{pending.get('source_type', '-')}",
+            f"項目數：{len(items)}",
+            "",
+            "已接收：",
+        ]
+        for item in items:
+            lines.append(f"- {item.get('source_type', '-')}: {item.get('filename', '-')}")
+        lines.extend([
             "",
             "請直接回覆數字執行：",
-        ]
+        ])
         for idx, option in enumerate(self._build_pending_options(), start=1):
             lines.append(f"{idx}. {option['label']}")
         lines.append("")
-        lines.append("例如回覆 7，就會執行第 7 個選項。")
+        lines.append("回覆選項數字後，系統會再詢問歸檔目錄名稱。")
+        lines.append("回覆 NA 可取消並刪除所有待歸檔項目。")
         return "\n".join(lines)
 
     def execute_pending_option(self, scope_id: str, choice: int) -> str:
@@ -434,39 +604,160 @@ class ClassifierAgent:
             return f"請輸入 1 到 {len(options)} 的數字。"
 
         option = options[choice - 1]
-        data = Path(pending["pending_path"]).read_bytes()
-        filename = pending["filename"]
-        source_type = pending.get("source_type", "file")
         person = option.get("person", "")
         label = option["label"]
 
         try:
-            if option["action"] == "calendar_image":
-                if source_type != "image":
-                    return "這個選項只適用於圖片，請改選其他歸檔項目。"
-                result = self._process_calendar_image(data, filename)
-                self.clear_pending(scope_id, remove_file=True)
-                return f"已執行：{label}\n{result}"
-
-            if option["action"] == "calendar_text":
-                saved = self.archive_file(data, filename, "行事曆", "manual_add", person)
-                self.clear_pending(scope_id, remove_file=True)
-                return (
-                    f"已執行：{label}\n"
-                    f"附件已存入：{saved.name}\n"
-                    "接著可輸入：小幫手 新增行事曆 YYYY-MM-DD [HH:MM] 標題 | 備註"
-                )
-
-            mode = option["mode"]
-            if mode == "整理會議心得" and source_type == "image":
-                self._archive_training_image(data, filename)
-            saved = self.archive_file(data, filename, mode, self._pending_subdir(source_type), person)
-            self.clear_pending(scope_id, remove_file=True)
-            person_tag = f"{person} " if person else ""
-            return f"已執行：{person_tag}{mode}\n檔名：{saved.name}"
+            pending["status"] = "awaiting_folder_name"
+            pending["selected_option"] = option
+            self._save_pending(scope_id, pending)
+            return (f"已選擇：{label}\n"
+                    f"請輸入歸檔目錄名稱\n"
+                    f"（可在末尾加日期，例：宜婷美容 昨日）\n"
+                    f"輸入 NA 可取消並刪除待歸檔項目")
         except Exception as e:
             log(f"  待歸檔執行失敗：{e}")
             return f"⚠️ 執行失敗：{e}"
+
+    def submit_pending_folder_name(self, scope_id: str, folder_name: str) -> str:
+        pending = self.get_pending(scope_id)
+        if not pending or pending.get("status") != "awaiting_folder_name":
+            return ""
+        # NA → 取消並刪除待歸檔項目
+        if folder_name.strip().upper() == "NA":
+            count = len(pending.get("items", []))
+            self.clear_pending(scope_id, remove_file=True)
+            return f"🗑️ 已取消歸檔，刪除 {count} 個待歸檔項目。"
+        # 從輸入末尾解析日期（今日/昨日/YYYY-MM-DD/YYYYMMDD）
+        tokens = folder_name.strip().split()
+        input_date = ""
+        if tokens:
+            parsed = _parse_archive_date(tokens[-1])
+            if parsed:
+                input_date = parsed
+                folder_name = " ".join(tokens[:-1]).strip()
+
+        safe_folder = _safe_folder_name(folder_name)
+        if not safe_folder:
+            return "目錄名稱不可空白，請重新輸入"
+        option = pending.get("selected_option") or {}
+        action = option.get("action", "archive")
+        mode = option.get("mode", "一般歸檔")
+        person = option.get("person", "")
+        label = option.get("label", mode)
+        # 使用者輸入的日期優先，其次用模式預設日期，最後用今日
+        date_str = input_date or self.get_mode().get("archive_date", "")
+        try:
+            if action == "calendar_image":
+                image_items = [item for item in pending.get("items", []) if item.get("source_type") == "image"]
+                if not image_items:
+                    return "這個選項只適用於圖片，請改選其他歸檔項目。"
+                image_item = image_items[-1]
+                result = self._process_calendar_image(
+                    Path(image_item["pending_path"]).read_bytes(),
+                    image_item["filename"],
+                )
+                saved = self._archive_pending_items(
+                    mode, person, pending.get("items", []),
+                    custom_dir=safe_folder, date_str=date_str,
+                )
+                self.clear_pending(scope_id, remove_file=True)
+                return f"已執行：{label}\n已歸檔到 {safe_folder} 目錄\n共 {len(saved)} 個項目\n{result}"
+
+            if action == "calendar_text":
+                saved = self._archive_pending_items(
+                    mode, person, pending.get("items", []),
+                    fixed_subdir="manual_add", custom_dir=safe_folder, date_str=date_str,
+                )
+                self.clear_pending(scope_id, remove_file=True)
+                return (
+                    f"已執行：{label}\n"
+                    f"已歸檔到 {safe_folder} 目錄\n"
+                    f"共 {len(saved)} 個項目\n"
+                    "接著可輸入：小幫手 新增行事曆 YYYY-MM-DD [HH:MM] 標題 | 備註"
+                )
+
+            for item in pending.get("items", []):
+                if mode == "整理會議心得" and item.get("source_type") == "image":
+                    self._archive_training_image(
+                        Path(item["pending_path"]).read_bytes(),
+                        item["filename"],
+                    )
+            saved = self._archive_pending_items(
+                mode, person, pending.get("items", []),
+                custom_dir=safe_folder, date_str=date_str,
+            )
+            self.clear_pending(scope_id, remove_file=True)
+            date_label = date_str or datetime.now().strftime("%Y%m%d")
+            return f"已執行：{label}\n已歸檔到 {safe_folder} 目錄\n📅 日期：{date_label}\n共 {len(saved)} 個項目"
+        except Exception as e:
+            log(f"  自訂目錄歸檔失敗：{e}")
+            return f"歸檔失敗：{e}"
+
+    def _archive_pending_items(self, mode: str, person: str, items: list[dict],
+                               fixed_subdir: str = "", custom_dir: str = "",
+                               date_str: str = "") -> list[str]:
+        saved: list[str] = []
+        for item in items:
+            source_type = item.get("source_type", "file")
+            if source_type == "text":
+                text = Path(item["pending_path"]).read_text(encoding="utf-8").strip()
+                if custom_dir:
+                    self._archive_custom_text(mode, person, custom_dir, text, date_str)
+                else:
+                    self.archive_text(text, mode, person, date_str)
+                saved.append(item["filename"])
+                continue
+            data = Path(item["pending_path"]).read_bytes()
+            if custom_dir:
+                saved_path = self._archive_to_custom_dir(
+                    mode,
+                    person,
+                    custom_dir,
+                    item["filename"],
+                    data,
+                    fixed_subdir or self._pending_subdir(source_type),
+                    date_str,
+                )
+            else:
+                saved_path = self.archive_file(
+                    data,
+                    item["filename"],
+                    mode,
+                    fixed_subdir or self._pending_subdir(source_type),
+                    person,
+                    date_str,
+                )
+            saved.append(saved_path.name)
+        return saved
+
+    def _custom_archive_dir(self, mode: str, person: str, folder_name: str,
+                            date_str: str = "") -> Path:
+        date = date_str or datetime.now().strftime("%Y%m%d")
+        if person:
+            dest = CLASSIFIED_DIR / person / mode / folder_name / date
+        else:
+            dest = CLASSIFIED_DIR / mode / folder_name / date
+        dest.mkdir(parents=True, exist_ok=True)
+        return dest
+
+    def _archive_custom_text(self, mode: str, person: str, folder_name: str,
+                             text: str, date_str: str = ""):
+        notes_file = self._custom_archive_dir(mode, person, folder_name, date_str) / "notes.txt"
+        with open(notes_file, "a", encoding="utf-8") as f:
+            f.write(text.strip() + "\n\n")
+
+    def _archive_to_custom_dir(self, mode: str, person: str, folder_name: str,
+                               filename: str, data: bytes, subdir: str,
+                               date_str: str = "") -> Path:
+        dest_dir = self._custom_archive_dir(mode, person, folder_name, date_str)
+        if subdir and subdir != "notes":
+            dest_dir = dest_dir / subdir
+            dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / filename
+        dest.write_bytes(data)
+        log(f"  自訂目錄歸檔：{dest}")
+        return dest
 
     def _archive_training_image(self, data: bytes, filename: str):
         import importlib.util as _ilu
@@ -496,22 +787,23 @@ class ClassifierAgent:
     # 歸檔工具
     # -------------------------------------------------------
 
-    def _today_dir(self, mode: str, person: str = "") -> Path:
+    def _today_dir(self, mode: str, person: str = "", date_str: str = "") -> Path:
         """
         有人員 → classified/{person}/{mode}/{YYYYMMDD}/
         無人員 → classified/{mode}/{YYYYMMDD}/
+        date_str 可指定歸檔日期（YYYYMMDD），空白則用今日
         """
-        today = datetime.now().strftime("%Y%m%d")
+        date = date_str or datetime.now().strftime("%Y%m%d")
         if person:
-            d = CLASSIFIED_DIR / person / mode / today
+            d = CLASSIFIED_DIR / person / mode / date
         else:
-            d = CLASSIFIED_DIR / mode / today
+            d = CLASSIFIED_DIR / mode / date
         d.mkdir(parents=True, exist_ok=True)
         return d
 
     def archive_file(self, data: bytes, filename: str, mode: str,
-                     subdir: str = "", person: str = "") -> Path:
-        dest_dir = self._today_dir(mode, person)
+                     subdir: str = "", person: str = "", date_str: str = "") -> Path:
+        dest_dir = self._today_dir(mode, person, date_str)
         if subdir:
             dest_dir = dest_dir / subdir
             dest_dir.mkdir(parents=True, exist_ok=True)
@@ -520,8 +812,8 @@ class ClassifierAgent:
         log(f"  歸檔：{dest}")
         return dest
 
-    def archive_text(self, text: str, mode: str, person: str = "") -> str:
-        dest_dir = self._today_dir(mode, person)
+    def archive_text(self, text: str, mode: str, person: str = "", date_str: str = "") -> str:
+        dest_dir = self._today_dir(mode, person, date_str)
         notes_file = dest_dir / "notes.txt"
         ts = datetime.now().strftime("%H:%M:%S")
         with open(notes_file, "a", encoding="utf-8") as f:
