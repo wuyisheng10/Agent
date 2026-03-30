@@ -159,12 +159,18 @@ HELP_TEXT += """
   刪除行事曆 EVT-xxxx
 
 📷 行事曆圖片
-  若上傳的是行事曆，會自動整理今天之後的活動。
+  上傳圖片/檔案後會先進待歸檔目錄，再回傳數字選單
+  回覆「13」可執行行事曆圖檔整理
 """
 
 HELP_TEXT += """
 
 📂 歸類模式（Content Router）
+  上傳圖片 / 音檔 / 影片 / 檔案
+    → 先進待歸檔目錄，系統回傳數字選單
+    → 直接回數字即可執行，例如回 7 = 第 7 個歸檔項目
+  待歸檔 / 查詢待歸檔
+    → 重新查看目前待歸檔選單
   歸類模式
     → 查詢目前模式與可用模式清單
   歸類模式 [模式名稱]
@@ -180,10 +186,7 @@ HELP_TEXT += """
     → 查詢指定人員的所有歸檔（含網頁連結可查看圖片/檔案）
 
   在歸類模式下，不需觸發詞，直接傳：
-    🖼️ 圖片 → 自動歸入對應功能
-    🎤 音檔 → 儲存至模式資料夾
-    🎬 影片 → 儲存至模式資料夾
-    📄 PDF / PPTX / XLSX → 儲存至模式資料夾
+    🖼️ 圖片 / 🎤 音檔 / 🎬 影片 / 📄 檔案 → 先暫存並回傳歸檔選單
     💬 文字 → 記入今日備註（行事曆/夥伴跟進模式會嘗試解析）
 """
 
@@ -353,105 +356,94 @@ def _download_line_content(msg_id: str, timeout: int = 30) -> bytes | None:
 
 
 def handle_image_message(event: dict, mode_info: dict = None, clf=None):
-    """接收圖片 → 依歸類模式路由；無模式時自動偵測行事曆或訓練記錄"""
+    """接收圖片 → 先暫存至待歸檔，再由使用者回覆數字執行歸類"""
     msg_id      = event["message"]["id"]
     reply_token = event["replyToken"]
     user_id     = event.get("source", {}).get("userId", "")
     group_id    = event.get("source", {}).get("groupId", "")
-    push_target = group_id or user_id
-    date_str    = datetime.now().strftime("%Y%m%d")
+    scope_id    = group_id or user_id
 
     img_bytes = _download_line_content(msg_id)
     if img_bytes is None:
         reply_message(reply_token, "⚠️ 圖片下載失敗，請重試")
         return
 
-    mode = (mode_info or {}).get("mode", "auto")
-
-    # ── 歸類模式：交給 ClassifierAgent 路由 ──────────────────
-    if mode != "auto" and clf is not None:
-        person = (mode_info or {}).get("person", "")
-        clf.route_image(
-            img_bytes, msg_id, mode, person,
-            reply_message, push_message, reply_token, push_target
+    if clf is not None:
+        menu = clf.stage_file(
+            img_bytes,
+            f"image_{msg_id}.jpg",
+            "image",
+            scope_id,
+            content_type="image/jpeg",
+            source_name=event.get("message", {}).get("type", "image"),
         )
+        reply_message(reply_token, menu)
         return
 
-    # ── 自動模式：原有邏輯（行事曆偵測 → 訓練圖庫） ──────────
+    date_str = datetime.now().strftime("%Y%m%d")
     tl  = _load_training()
-    cal = _load_calendar()
-    try:
-        result = cal.process_calendar_image(img_bytes, msg_id)
-    except Exception as e:
-        log(f"  行事曆整理失敗：{repr(e)}")
-        result = {"is_calendar": False}
-
-    if result.get("is_calendar"):
-        reply_message(reply_token, result["message"])
-    else:
-        filename = f"image_{msg_id}.jpg"
-        tl.archive_image(img_bytes, filename, date_str)
-        reply_message(reply_token, f"📸 圖片已歸檔（{date_str}）\n若這是行事曆，請上傳更清楚的整張截圖。")
+    filename = f"image_{msg_id}.jpg"
+    tl.archive_image(img_bytes, filename, date_str)
+    reply_message(reply_token, f"📸 圖片已歸檔（{date_str}）")
 
 
 def handle_audio_message(event: dict, mode_info: dict, clf):
-    """接收音檔 → 儲存至歸類模式資料夾"""
+    """接收音檔 → 先暫存至待歸檔"""
     msg_id      = event["message"]["id"]
     reply_token = event["replyToken"]
-    mode        = mode_info.get("mode", "一般歸檔")
-    if mode == "auto":
-        mode = "一般歸檔"
+    user_id     = event.get("source", {}).get("userId", "")
+    group_id    = event.get("source", {}).get("groupId", "")
+    scope_id    = group_id or user_id
 
     data = _download_line_content(msg_id, timeout=60)
     if data is None:
         reply_message(reply_token, "⚠️ 音檔下載失敗，請重試")
         return
 
-    duration = event["message"].get("duration", 0)
-    filename = f"audio_{msg_id}.m4a"
-    person = mode_info.get("person", "")
-    saved = clf.archive_file(data, filename, mode, "audio", person)
-    icon = {"會議記錄": "📝", "一般歸檔": "📁"}.get(mode, "🎤")
-    dur_s = f"{duration//1000}秒" if duration else ""
-    reply_message(
-        reply_token,
-        f"{icon} 音檔已歸入「{mode}」{dur_s}\n檔名：{saved.name}"
+    menu = clf.stage_file(
+        data,
+        f"audio_{msg_id}.m4a",
+        "audio",
+        scope_id,
+        content_type="audio/m4a",
+        source_name=event.get("message", {}).get("type", "audio"),
     )
+    reply_message(reply_token, menu)
 
 
 def handle_video_message(event: dict, mode_info: dict, clf):
-    """接收影片 → 儲存至歸類模式資料夾"""
+    """接收影片 → 先暫存至待歸檔"""
     msg_id      = event["message"]["id"]
     reply_token = event["replyToken"]
-    mode        = mode_info.get("mode", "一般歸檔")
-    if mode == "auto":
-        mode = "一般歸檔"
+    user_id     = event.get("source", {}).get("userId", "")
+    group_id    = event.get("source", {}).get("groupId", "")
+    scope_id    = group_id or user_id
 
     data = _download_line_content(msg_id, timeout=120)
     if data is None:
         reply_message(reply_token, "⚠️ 影片下載失敗，請重試")
         return
 
-    filename = f"video_{msg_id}.mp4"
-    person = mode_info.get("person", "")
-    saved = clf.archive_file(data, filename, mode, "videos", person)
-    icon = {"會議記錄": "📝", "一般歸檔": "📁"}.get(mode, "🎬")
-    reply_message(
-        reply_token,
-        f"{icon} 影片已歸入「{mode}」\n檔名：{saved.name}"
+    menu = clf.stage_file(
+        data,
+        f"video_{msg_id}.mp4",
+        "video",
+        scope_id,
+        content_type="video/mp4",
+        source_name=event.get("message", {}).get("type", "video"),
     )
+    reply_message(reply_token, menu)
 
 
 def handle_file_message(event: dict, mode_info: dict, clf):
-    """接收檔案（PDF/PPTX/XLSX/其他）→ 儲存至歸類模式資料夾"""
+    """接收檔案（PDF/PPTX/XLSX/其他）→ 先暫存至待歸檔"""
     msg_id      = event["message"]["id"]
     reply_token = event["replyToken"]
-    mode        = mode_info.get("mode", "一般歸檔")
-    if mode == "auto":
-        mode = "一般歸檔"
+    user_id     = event.get("source", {}).get("userId", "")
+    group_id    = event.get("source", {}).get("groupId", "")
+    scope_id    = group_id or user_id
 
     orig_name = event["message"].get("fileName", "")
-    file_size = event["message"].get("fileSize", 0)
     # 安全化檔名
     safe = "".join(c for c in orig_name if c.isalnum() or c in "._- ()[]") or f"file_{msg_id}"
 
@@ -460,14 +452,15 @@ def handle_file_message(event: dict, mode_info: dict, clf):
         reply_message(reply_token, "⚠️ 檔案下載失敗，請重試")
         return
 
-    person = mode_info.get("person", "")
-    saved = clf.archive_file(data, safe, mode, "files", person)
-    icon = {"培訓資料": "📚", "市場開發": "🎯", "一般歸檔": "📁"}.get(mode, "📄")
-    size_kb = f"{file_size//1024}KB" if file_size else ""
-    reply_message(
-        reply_token,
-        f"{icon} 檔案已歸入「{mode}」{size_kb}\n檔名：{saved.name}"
+    menu = clf.stage_file(
+        data,
+        safe,
+        "file",
+        scope_id,
+        content_type=event.get("message", {}).get("fileName", ""),
+        source_name=orig_name,
     )
+    reply_message(reply_token, menu)
 
 
 def handle_training_command(user_msg: str, reply_token: str,
@@ -722,6 +715,18 @@ def webhook():
 
         user_msg = event["message"]["text"]
         log(f"📨 收到訊息 from {user_id[:8]}：{user_msg[:50]}")
+
+        if _clf_agent:
+            pending_scope = group_id or user_id
+            pending = _clf_agent.get_pending(pending_scope)
+            if pending and user_msg.strip().isdigit():
+                choice = int(user_msg.strip())
+                log(f"  待歸檔選擇：{choice}")
+                reply_message(reply_token, _clf_agent.execute_pending_option(pending_scope, choice))
+                continue
+            if pending and user_msg.strip() in {"待歸檔", "查詢待歸檔"}:
+                reply_message(reply_token, _clf_agent.format_pending_menu(pending_scope))
+                continue
 
         # ── 觸發詞檢查 ─────────────────────────────────────────
         content = extract_trigger(user_msg)

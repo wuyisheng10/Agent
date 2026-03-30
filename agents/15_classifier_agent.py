@@ -1,7 +1,7 @@
 """
 歸類 Agent
 File: C:/Users/user/claude AI_Agent/agents/15_classifier_agent.py
-Function: 歸類模式管理 — 支援「人員 + 模式」雙維度，所有上傳內容自動歸類
+Function: 歸類模式管理 — 支援「人員 + 模式」雙維度，所有上傳內容先暫存、再選項執行
 State:   output/classification_mode.json
 Archive:
   有指定人員 → output/classified/{人員}/{模式}/{YYYYMMDD}/{subdir}/
@@ -24,12 +24,21 @@ from pathlib import Path
 BASE_DIR        = Path(r"C:\Users\user\claude AI_Agent")
 MODE_FILE       = BASE_DIR / "output" / "classification_mode.json"
 CLASSIFIED_DIR  = BASE_DIR / "output" / "classified"
+PENDING_DIR     = BASE_DIR / "output" / "pending_archive"
+PENDING_FILE_DIR = PENDING_DIR / "files"
+PENDING_STATE_DIR = PENDING_DIR / "states"
 
-AVAILABLE_MODES = ["會議記錄", "行事曆", "夥伴跟進", "市場開發", "培訓資料", "一般歸檔"]
+AVAILABLE_MODES = [
+    "會議記錄", "行事曆", "夥伴跟進", "市場開發", "培訓資料", "一般歸檔",
+    "整理會議心得", "歸檔會議紀錄", "歸檔行動紀錄", "歸檔文件",
+]
+PENDING_ARCHIVE_MODES = ["整理會議心得", "歸檔會議紀錄", "歸檔行動紀錄", "歸檔文件"]
+SPECIAL_PENDING_ACTIONS = ["行事曆圖檔", "行事曆文字新增"]
 
 MODE_ICON = {
     "會議記錄": "📝", "行事曆": "🗓️", "夥伴跟進": "🤝",
     "市場開發": "🎯", "培訓資料": "📚", "一般歸檔": "📁", "auto": "🤖",
+    "整理會議心得": "🧠", "歸檔會議紀錄": "📝", "歸檔行動紀錄": "✅", "歸檔文件": "📄",
 }
 MODE_DESC = {
     "會議記錄": "圖片→訓練歸檔 ／ 音檔→音訊資料夾 ／ 影片→影片資料夾 ／ PDF/PPTX→檔案資料夾 ／ 文字→備註",
@@ -38,6 +47,10 @@ MODE_DESC = {
     "市場開發": "文字→潛在客戶備註 ／ 圖片＆檔案→市場資料夾",
     "培訓資料": "所有內容→培訓素材資料夾",
     "一般歸檔": "所有內容→今日日期資料夾",
+    "整理會議心得": "先保存素材，後續可再搭配逐字稿整理心得",
+    "歸檔會議紀錄": "歸入會議資料夾，保留圖檔、音檔、影片與文件",
+    "歸檔行動紀錄": "歸入行動追蹤資料夾，集中保存執行與跟進素材",
+    "歸檔文件": "歸入一般文件資料夾",
 }
 
 
@@ -63,11 +76,20 @@ def _fuzzy_mode(text: str) -> str | None:
     return next((m for m in AVAILABLE_MODES if text in m or m in text), None)
 
 
+def _safe_name(name: str) -> str:
+    cleaned = "".join(c for c in (name or "") if c.isalnum() or c in "._- ()[]")
+    return cleaned.strip() or f"file_{datetime.now().strftime('%H%M%S')}"
+
+
 # ============================================================
 # 主要 Agent 類別
 # ============================================================
 
 class ClassifierAgent:
+
+    def __init__(self):
+        PENDING_FILE_DIR.mkdir(parents=True, exist_ok=True)
+        PENDING_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
     # -------------------------------------------------------
     # 模式讀寫
@@ -113,7 +135,7 @@ class ClassifierAgent:
     def clear_mode(self) -> str:
         if MODE_FILE.exists():
             MODE_FILE.unlink()
-        return "🤖 已關閉歸類模式，回到自動判斷。\n\n圖片自動偵測行事曆或訓練記錄，文字需加觸發詞（小幫手）。"
+        return "🤖 已關閉歸類模式，回到預設流程。\n\n上傳內容會先進待歸檔目錄，文字仍需加觸發詞（小幫手）。"
 
     def get_status_text(self) -> str:
         info = self.get_mode()
@@ -124,7 +146,7 @@ class ClassifierAgent:
         if mode == "auto":
             modes_list = "\n".join(f"  • {m}" for m in AVAILABLE_MODES)
             return (
-                f"🤖 目前模式：自動判斷\n\n"
+                f"🤖 目前模式：預設流程\n\n"
                 f"可設定的歸類模式：\n{modes_list}\n\n"
                 f"指令：\n"
                 f"  小幫手 歸類模式 [模式]\n"
@@ -290,6 +312,185 @@ class ClassifierAgent:
     def _query_person_brief(self, person: str) -> str:
         """簡短查詢一個人的近況（用於 歸類模式 [人名] 指令）"""
         return self._list_person_content(person)
+
+    # -------------------------------------------------------
+    # 待歸檔兩階段流程
+    # -------------------------------------------------------
+
+    def _pending_state_path(self, scope_id: str) -> Path:
+        safe_scope = _safe_name(scope_id or "default")
+        return PENDING_STATE_DIR / f"{safe_scope}.json"
+
+    def get_pending(self, scope_id: str) -> dict | None:
+        path = self._pending_state_path(scope_id)
+        if not path.exists():
+            return None
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return None
+        file_path = Path(data.get("pending_path", ""))
+        if not file_path.exists():
+            try:
+                path.unlink()
+            except Exception:
+                pass
+            return None
+        return data
+
+    def clear_pending(self, scope_id: str, remove_file: bool = True) -> bool:
+        pending = self.get_pending(scope_id)
+        path = self._pending_state_path(scope_id)
+        if remove_file and pending:
+            try:
+                Path(pending["pending_path"]).unlink(missing_ok=True)
+            except Exception:
+                pass
+        if path.exists():
+            try:
+                path.unlink()
+            except Exception:
+                pass
+        return True
+
+    def _list_person_options(self) -> list[str]:
+        names: list[str] = []
+        if CLASSIFIED_DIR.exists():
+            for item in sorted(CLASSIFIED_DIR.iterdir()):
+                if item.is_dir() and item.name not in AVAILABLE_MODES:
+                    names.append(item.name)
+        current_person = self.get_mode().get("person", "")
+        if current_person and current_person not in names:
+            names.append(current_person)
+        return names
+
+    def _build_pending_options(self) -> list[dict]:
+        options: list[dict] = []
+        for person in self._list_person_options():
+            for mode in PENDING_ARCHIVE_MODES:
+                options.append({"label": f"{person} {mode}", "person": person, "mode": mode, "action": "archive"})
+        for mode in PENDING_ARCHIVE_MODES:
+            options.append({"label": mode, "person": "", "mode": mode, "action": "archive"})
+        options.append({"label": "行事曆圖檔", "person": "", "mode": "行事曆", "action": "calendar_image"})
+        options.append({"label": "行事曆文字新增", "person": "", "mode": "行事曆", "action": "calendar_text"})
+        return options
+
+    def _pending_subdir(self, source_type: str) -> str:
+        return {
+            "image": "images",
+            "audio": "audio",
+            "video": "videos",
+            "file": "files",
+        }.get(source_type, "files")
+
+    def stage_file(self, data: bytes, filename: str, source_type: str, scope_id: str,
+                   content_type: str = "", source_name: str = "") -> str:
+        self.clear_pending(scope_id, remove_file=True)
+        safe_name = _safe_name(filename)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        pending_path = PENDING_FILE_DIR / f"{stamp}_{safe_name}"
+        pending_path.write_bytes(data)
+
+        payload = {
+            "scope_id": scope_id,
+            "filename": safe_name,
+            "source_type": source_type,
+            "content_type": content_type,
+            "source_name": source_name,
+            "pending_path": str(pending_path),
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        with open(self._pending_state_path(scope_id), "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        log(f"  待歸檔暫存：{pending_path}")
+        return self.format_pending_menu(scope_id)
+
+    def format_pending_menu(self, scope_id: str) -> str:
+        pending = self.get_pending(scope_id)
+        if not pending:
+            return "目前沒有待歸檔項目。"
+
+        lines = [
+            "📥 已收到檔案，先放入待歸檔目錄。",
+            f"檔名：{pending.get('filename', '-')}",
+            f"類型：{pending.get('source_type', '-')}",
+            "",
+            "請直接回覆數字執行：",
+        ]
+        for idx, option in enumerate(self._build_pending_options(), start=1):
+            lines.append(f"{idx}. {option['label']}")
+        lines.append("")
+        lines.append("例如回覆 7，就會執行第 7 個選項。")
+        return "\n".join(lines)
+
+    def execute_pending_option(self, scope_id: str, choice: int) -> str:
+        pending = self.get_pending(scope_id)
+        if not pending:
+            return "目前沒有待歸檔項目。"
+
+        options = self._build_pending_options()
+        if choice < 1 or choice > len(options):
+            return f"請輸入 1 到 {len(options)} 的數字。"
+
+        option = options[choice - 1]
+        data = Path(pending["pending_path"]).read_bytes()
+        filename = pending["filename"]
+        source_type = pending.get("source_type", "file")
+        person = option.get("person", "")
+        label = option["label"]
+
+        try:
+            if option["action"] == "calendar_image":
+                if source_type != "image":
+                    return "這個選項只適用於圖片，請改選其他歸檔項目。"
+                result = self._process_calendar_image(data, filename)
+                self.clear_pending(scope_id, remove_file=True)
+                return f"已執行：{label}\n{result}"
+
+            if option["action"] == "calendar_text":
+                saved = self.archive_file(data, filename, "行事曆", "manual_add", person)
+                self.clear_pending(scope_id, remove_file=True)
+                return (
+                    f"已執行：{label}\n"
+                    f"附件已存入：{saved.name}\n"
+                    "接著可輸入：小幫手 新增行事曆 YYYY-MM-DD [HH:MM] 標題 | 備註"
+                )
+
+            mode = option["mode"]
+            if mode == "整理會議心得" and source_type == "image":
+                self._archive_training_image(data, filename)
+            saved = self.archive_file(data, filename, mode, self._pending_subdir(source_type), person)
+            self.clear_pending(scope_id, remove_file=True)
+            person_tag = f"{person} " if person else ""
+            return f"已執行：{person_tag}{mode}\n檔名：{saved.name}"
+        except Exception as e:
+            log(f"  待歸檔執行失敗：{e}")
+            return f"⚠️ 執行失敗：{e}"
+
+    def _archive_training_image(self, data: bytes, filename: str):
+        import importlib.util as _ilu
+
+        spec = _ilu.spec_from_file_location(
+            "training_log",
+            str(BASE_DIR / "agents" / "07_training_log.py")
+        )
+        m = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        date_str = datetime.now().strftime("%Y%m%d")
+        m.archive_image(data, filename, date_str)
+
+    def _process_calendar_image(self, data: bytes, message_id: str) -> str:
+        import importlib.util as _ilu
+
+        spec = _ilu.spec_from_file_location(
+            "calendar_manager",
+            str(BASE_DIR / "agents" / "08_calendar_manager.py")
+        )
+        m = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        result = m.process_calendar_image(data, message_id)
+        return result.get("message", "已完成行事曆整理。")
 
     # -------------------------------------------------------
     # 歸檔工具
