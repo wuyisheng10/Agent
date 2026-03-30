@@ -5,7 +5,7 @@ Function: 陌生名單評分 → 生成開場話術 → 追蹤接觸狀態
 Data:  output/csv_data/market_list.csv（本地 CSV，不需 Google Cloud）
 Trigger:
   - 每日 09:00 自動掃描（由 10_orchestrator.py 呼叫）
-  - LINE 輸入「小幫手 新增潛在客戶 姓名|職業|接觸管道|備註」
+  - LINE 輸入「小幫手 新增潛在家人 姓名|職業|接觸管道|備註」
 CSV 欄位:
   姓名|電話|職業|接觸管道|備註|AI評分|需求標籤|話術_健康型|話術_收入型|話術_好奇型|接觸狀態|最後更新|下次跟進日
 """
@@ -15,6 +15,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -87,20 +88,41 @@ def log(msg: str):
 
 
 def run_claude(prompt: str, timeout: int = 60) -> str:
-    result = subprocess.run(
-        ["cmd", "/c", "claude", "-p", "--output-format", "text"],
-        input=prompt,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=timeout,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "claude CLI 回傳非零")
-    out = result.stdout.strip()
-    if not out:
-        raise RuntimeError("claude CLI 未回傳內容")
-    return out
+    # 優先：Codex CLI
+    response_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".txt",
+            delete=False, dir=str(BASE_DIR / "logs")
+        ) as f:
+            response_path = f.name
+        result = subprocess.run(
+            ["cmd", "/c", "codex", "exec",
+             "--skip-git-repo-check", "--sandbox", "read-only",
+             "--color", "never", "-C", str(BASE_DIR),
+             "-o", response_path, "-"],
+            input=prompt, capture_output=True, text=True,
+            encoding="utf-8", timeout=timeout,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "codex CLI 回傳非零")
+        out = ""
+        if response_path and os.path.exists(response_path):
+            with open(response_path, "r", encoding="utf-8") as f:
+                out = f.read().strip()
+        if not out:
+            out = result.stdout.strip()
+        if out:
+            return out
+        raise RuntimeError("codex CLI 未回傳內容")
+    except Exception:
+        raise
+    finally:
+        if response_path and os.path.exists(response_path):
+            try:
+                os.unlink(response_path)
+            except Exception:
+                pass
 
 
 def extract_json(text: str) -> dict:
@@ -129,9 +151,9 @@ def push_line(message: str):
 # ============================================================
 
 def score_prospect(row: dict) -> dict:
-    prompt = f"""你是 Amway 市場開發顧問。請評估以下潛在客戶，給出 JSON 格式回應。
+    prompt = f"""你是 Amway 市場開發顧問。請評估以下潛在家人，給出 JSON 格式回應。
 
-潛在客戶資料：
+潛在家人資料：
 姓名：{row.get('姓名', '')}
 職業：{row.get('職業', '')}
 接觸管道：{row.get('接觸管道', '')}
@@ -155,9 +177,9 @@ def score_prospect(row: dict) -> dict:
 
 
 def generate_scripts(row: dict, need_tag: str) -> dict:
-    prompt = f"""你是 Amway 市場開發顧問。請為以下潛在客戶生成三版開場話術。
+    prompt = f"""你是 Amway 市場開發顧問。請為以下潛在家人生成三版開場話術。
 
-潛在客戶：
+潛在家人：
 姓名：{row.get('姓名', '')}
 職業：{row.get('職業', '')}
 需求標籤：{need_tag}
@@ -182,13 +204,13 @@ def generate_scripts(row: dict, need_tag: str) -> dict:
 class MarketDevAgent:
 
     def run(self):
-        """掃描並評分所有未評分潛在客戶"""
+        """掃描並評分所有未評分潛在家人"""
         log("=== 市場開發 Agent 啟動 ===")
         rows = read_csv()
 
         if not rows:
             log(f"  名單為空（{MARKET_CSV}）")
-            log("  可手動新增：小幫手 新增潛在客戶 姓名|職業|接觸管道|備註")
+            log("  可手動新增：小幫手 新增潛在家人 姓名|職業|接觸管道|備註")
             return
 
         scored_count = 0
@@ -237,12 +259,12 @@ class MarketDevAgent:
         if scored_count > 0:
             self._send_summary(scored_count, results)
         else:
-            log("  今日無新潛在客戶需評分")
+            log("  今日無新潛在家人需評分")
 
         log(f"=== 市場開發完成，共評分 {scored_count} 筆 ===")
 
     def _send_summary(self, count: int, results: list):
-        lines = [f"🎯 今日市場開發摘要\n共評分 {count} 位潛在客戶\n"]
+        lines = [f"🎯 今日市場開發摘要\n共評分 {count} 位潛在家人\n"]
         for r in results:
             star = "⭐" * int(r["評分"]) if r["評分"].isdigit() else ""
             lines.append(f"• {r['姓名']} — {r['評分']}分 {star}\n  標籤：{r['標籤']}")
@@ -250,15 +272,15 @@ class MarketDevAgent:
         push_line("\n".join(lines))
 
     def handle_add_prospect(self, msg: str) -> str:
-        """LINE 指令：新增潛在客戶 姓名|職業|接觸管道|備註"""
-        content = msg.replace("新增潛在客戶", "", 1).strip()
+        """LINE 指令：新增潛在家人 姓名|職業|接觸管道|備註"""
+        content = msg.replace("新增潛在家人", "", 1).strip()
         parts = [p.strip() for p in content.split("|")]
         while len(parts) < 4:
             parts.append("")
         name, job, channel, note = parts[0], parts[1], parts[2], parts[3]
 
         if not name:
-            return "⚠️ 格式：新增潛在客戶 姓名|職業|接觸管道|備註"
+            return "⚠️ 格式：新增潛在家人 姓名|職業|接觸管道|備註"
 
         today = datetime.now().strftime("%Y-%m-%d")
         new_row = {f: "" for f in FIELDNAMES}
@@ -294,7 +316,7 @@ class MarketDevAgent:
             i = scripts.get("收入型", "")[:60]
             c = scripts.get("好奇型", "")[:60]
             return (
-                f"✅ 潛在客戶已新增並評分\n\n"
+                f"✅ 潛在家人已新增並評分\n\n"
                 f"姓名：{name}\n職業：{job}\n"
                 f"AI評分：{score}分 {star}\n需求標籤：{tag}\n\n"
                 f"📝 健康型：{h}{'...' if len(scripts.get('健康型',''))>60 else ''}\n"
@@ -304,6 +326,35 @@ class MarketDevAgent:
         except Exception as e:
             log(f"  評分失敗：{e}")
             return f"✅ {name} 已新增至名單（評分稍後自動執行）"
+
+    def list_prospects(self, keyword: str = "") -> list[dict]:
+        """回傳所有（或關鍵字篩選）潛在家人 row list"""
+        rows = read_csv()
+        if keyword:
+            rows = [r for r in rows if keyword in r.get("姓名", "")]
+        return rows
+
+    def handle_query_prospect(self, msg: str) -> str:
+        """LINE 指令：查詢潛在家人 [姓名（可省略）]"""
+        keyword = msg.replace("查詢潛在家人", "", 1).strip()
+        rows = read_csv()
+        if not rows:
+            return "📋 目前名單是空的。\n新增：小幫手 新增潛在家人 姓名|職業|管道|備註"
+
+        if keyword:
+            rows = [r for r in rows if keyword in r.get("姓名", "")]
+            if not rows:
+                return f"🔍 找不到「{keyword}」"
+
+        lines = [f"📋 潛在家人名單（共 {len(rows)} 筆）\n"]
+        for r in rows:
+            star = "⭐" * int(r["AI評分"]) if r.get("AI評分", "").isdigit() else ""
+            lines.append(
+                f"👤 {r['姓名']}　{r.get('職業','')}　{star}\n"
+                f"   管道：{r.get('接觸管道','')}　狀態：{r.get('接觸狀態','')}\n"
+                f"   備註：{r.get('備註','')[:30]}"
+            )
+        return "\n".join(lines)
 
 
 if __name__ == "__main__":

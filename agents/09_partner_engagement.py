@@ -524,7 +524,7 @@ def delete_partner(command: str) -> str:
 def query_partner(command: str) -> str:
     msg = command.strip()
     if msg == "查詢夥伴":
-        return list_partners("夥伴清單", upcoming_partners() or load_partners())
+        return list_partners("夥伴清單", sorted(load_partners(), key=_sort_key))
     if msg == "查詢待跟進夥伴":
         return list_partners("待跟進夥伴", due_partners())
     m = re.fullmatch(r"查詢夥伴\s+(.+)", msg)
