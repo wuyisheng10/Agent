@@ -244,6 +244,7 @@ EXEC_MENU_ITEMS = {
     1:  {"label": "新增潛在家人",       "cmd": None,
          "prompt": "請複製後修改再送出：\n小幫手 新增潛在家人 姓名|職業|管道|備註\n\n查詢名單：小幫手 查詢潛在家人\n上傳照片：小幫手 潛在家人資料 姓名"},
     32: {"label": "查詢潛在家人",       "cmd": "查詢潛在家人",  "prompt": None},
+    33: {"label": "加入潛在家人資訊",   "prospect_file": True,  "prompt": None},
     2:  {"label": "查詢培訓進度",       "cmd": None,
          "prompt": "請複製後修改再送出：\n小幫手 培訓 夥伴名"},
     3:  {"label": "跟進報告",           "cmd": "跟進報告",       "prompt": None},
@@ -297,6 +298,7 @@ EXEC_MENU_TEXT = """\
 🎯 市場開發
   1. 新增潛在家人
  32. 查詢潛在家人 ▶
+ 33. 加入潛在家人資訊 ▶
 
 📚 培訓系統
   2. 查詢培訓進度
@@ -356,6 +358,8 @@ _awaiting_person_for_mode: dict = {}
 _awaiting_exec_input: dict = {}
 # 追蹤哪些 scope 正在等待潛在家人編號選擇（scope_id → list[dict]）
 _awaiting_prospect_selection: dict = {}
+# 追蹤哪些 scope 正在等待選擇要歸檔的潛在家人（scope_id → list[dict]）
+_awaiting_prospect_file: dict = {}
 
 
 def _format_prospect_detail(r: dict) -> str:
@@ -963,15 +967,32 @@ def webhook():
         _scope = group_id or user_id
         if user_msg.strip().upper() == "NA" and (
             _awaiting_person_for_mode.get(_scope) or _awaiting_exec_input.get(_scope)
-            or _awaiting_prospect_selection.get(_scope)
+            or _awaiting_prospect_selection.get(_scope) or _awaiting_prospect_file.get(_scope)
         ):
             _awaiting_person_for_mode.pop(_scope, None)
             _awaiting_exec_input.pop(_scope, None)
             _awaiting_prospect_selection.pop(_scope, None)
+            _awaiting_prospect_file.pop(_scope, None)
             reply_message(reply_token, "↩️ 已取消，返回待機。")
             continue
 
-        # ── 潛在家人編號選擇 ──────────────────────────────────────
+        # ── 加入潛在家人資訊：選擇人員後設定歸檔模式 ────────────────
+        if _awaiting_prospect_file.get(_scope) and user_msg.strip().isdigit():
+            rows = _awaiting_prospect_file.pop(_scope)
+            idx = int(user_msg.strip())
+            if 1 <= idx <= len(rows):
+                person_name = rows[idx - 1].get("姓名", "")
+                try:
+                    clf_mod = _load_classifier()
+                    result = clf_mod.ClassifierAgent().set_mode("市場開發", person_name)
+                    reply_message(reply_token, result + "\n\n📸 現在直接上傳照片或檔案，會自動歸入該潛在家人資料夾。")
+                except Exception as e:
+                    reply_message(reply_token, f"⚠️ 設定失敗：{e}")
+            else:
+                reply_message(reply_token, f"⚠️ 請輸入 1～{len(rows)} 的編號，NA 取消")
+            continue
+
+        # ── 潛在家人編號選擇（查詢詳情）──────────────────────────────
         if _awaiting_prospect_selection.get(_scope) and user_msg.strip().isdigit():
             rows = _awaiting_prospect_selection[_scope]
             idx = int(user_msg.strip())
@@ -1029,6 +1050,22 @@ def webhook():
                 # 需要先輸入人物名稱再設定模式
                 _awaiting_person_for_mode[_exec_scope] = item["ask_person"]
                 reply_message(reply_token, f"👤 請輸入人物名稱：")
+            elif item.get("prospect_file"):
+                # 顯示潛在家人編號清單，等待使用者選擇後設定歸檔模式
+                try:
+                    market = _load_market_dev()
+                    rows = market.MarketDevAgent().list_prospects()
+                    if not rows:
+                        reply_message(reply_token, "📋 目前沒有潛在家人資料。\n請先新增：小幫手 新增潛在家人 姓名|職業|管道|備註")
+                    else:
+                        _awaiting_prospect_file[_exec_scope] = rows
+                        lines = ["📂 選擇要歸檔的潛在家人\n輸入編號後直接上傳照片或檔案，NA 取消\n"]
+                        for i, r in enumerate(rows, 1):
+                            star = "⭐" * int(r["AI評分"]) if r.get("AI評分", "").isdigit() else "─"
+                            lines.append(f"{i}. {r.get('姓名','')}　{r.get('職業','')}　{star}")
+                        reply_message(reply_token, "\n".join(lines))
+                except Exception as e:
+                    reply_message(reply_token, f"⚠️ 載入名單失敗：{e}")
             elif item.get("reset_person"):
                 # 安麗產品分類：直接設定模式，不繼承目前人員
                 try:
