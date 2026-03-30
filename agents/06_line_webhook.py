@@ -739,7 +739,7 @@ def handle_training_command(user_msg: str, reply_token: str,
             if not rows:
                 reply_message(reply_token, "📋 目前名單是空的。\n新增：小幫手 新增潛在家人 姓名|職業|管道|備註")
                 return True
-            _awaiting_prospect_selection[pending_scope] = rows
+            _awaiting_prospect_selection[group_id or user_id] = rows
             lines = [f"📋 潛在家人名單（共 {len(rows)} 位）\n輸入編號查看詳細資料，NA 取消\n"]
             for i, r in enumerate(rows, 1):
                 star = "⭐" * int(r["AI評分"]) if r.get("AI評分", "").isdigit() else "─"
