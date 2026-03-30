@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amway AI Agent — 專案架構</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+    header {
+      background: linear-gradient(135deg, #1a1f2e 0%, #16213e 100%);
+      border-bottom: 1px solid #2d3748;
+      padding: 32px 48px;
+    }
+    header h1 { font-size: 2rem; font-weight: 700; color: #63b3ed; letter-spacing: 0.02em; }
+    header p { margin-top: 8px; color: #718096; font-size: 0.95rem; }
+    header .badges { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .badge {
+      display: inline-block; padding: 4px 12px; border-radius: 20px;
+      font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em;
+    }
+    .badge-blue   { background: #1a365d; color: #63b3ed; border: 1px solid #2b6cb0; }
+    .badge-green  { background: #1c4532; color: #68d391; border: 1px solid #276749; }
+    .badge-purple { background: #322659; color: #b794f4; border: 1px solid #553c9a; }
+    .badge-orange { background: #3d2c07; color: #f6ad55; border: 1px solid #744210; }
+
+    main { padding: 40px 48px; max-width: 1400px; margin: 0 auto; }
+
+    /* Section titles */
+    .section-title {
+      font-size: 1.15rem; font-weight: 700; color: #a0aec0;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 20px; margin-top: 40px;
+      padding-bottom: 8px; border-bottom: 1px solid #2d3748;
+    }
+
+    /* Pipeline */
+    .pipeline {
+      display: flex; align-items: stretch; gap: 0;
+      overflow-x: auto; padding-bottom: 8px;
+    }
+    .pipeline-step {
+      background: #1a202c; border: 1px solid #2d3748; border-radius: 12px;
+      padding: 20px 18px; min-width: 160px; flex: 1;
+      position: relative;
+    }
+    .pipeline-step + .pipeline-step { margin-left: 4px; }
+    .pipeline-arrow {
+      display: flex; align-items: center; padding: 0 4px;
+      color: #4a5568; font-size: 1.4rem; flex-shrink: 0;
+    }
+    .step-num { font-size: 0.72rem; color: #63b3ed; font-weight: 700; letter-spacing: 0.06em; }
+    .step-file { font-size: 0.88rem; color: #90cdf4; font-family: 'Consolas', monospace; margin: 4px 0; }
+    .step-desc { font-size: 0.78rem; color: #718096; line-height: 1.5; }
+    .step-tech { margin-top: 10px; }
+    .step-tech span {
+      display: inline-block; padding: 2px 7px; background: #2d3748;
+      border-radius: 4px; font-size: 0.7rem; color: #a0aec0; margin: 2px 2px 0 0;
+    }
+
+    /* Cards grid */
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+    .card {
+      background: #1a202c; border: 1px solid #2d3748; border-radius: 12px;
+      padding: 24px; transition: border-color 0.2s;
+    }
+    .card:hover { border-color: #4a5568; }
+    .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .card-icon { font-size: 1.5rem; }
+    .card-title { font-size: 1rem; font-weight: 700; color: #e2e8f0; }
+    .card-subtitle { font-size: 0.78rem; color: #718096; margin-top: 2px; }
+    .file-list { list-style: none; }
+    .file-list li {
+      padding: 7px 0; border-bottom: 1px solid #2d3748;
+      display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .file-list li:last-child { border-bottom: none; }
+    .file-name { font-family: 'Consolas', monospace; font-size: 0.82rem; color: #90cdf4; }
+    .file-desc { font-size: 0.75rem; color: #718096; text-align: right; max-width: 55%; }
+
+    /* Tech stack table */
+    .tech-table { width: 100%; border-collapse: collapse; }
+    .tech-table th {
+      text-align: left; padding: 10px 16px;
+      background: #171923; color: #718096;
+      font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em;
+      border-bottom: 1px solid #2d3748;
+    }
+    .tech-table td { padding: 12px 16px; border-bottom: 1px solid #1a202c; font-size: 0.88rem; }
+    .tech-table tr:last-child td { border-bottom: none; }
+    .tech-table tr:hover td { background: #1a202c; }
+    .tech-layer { color: #a0aec0; font-weight: 600; }
+    .tech-items { color: #e2e8f0; }
+    .tech-role { color: #718096; font-size: 0.8rem; }
+
+    /* Scheduler table */
+    .sched-table { width: 100%; border-collapse: collapse; }
+    .sched-table th {
+      text-align: left; padding: 10px 16px;
+      background: #171923; color: #718096;
+      font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em;
+      border-bottom: 1px solid #2d3748;
+    }
+    .sched-table td { padding: 11px 16px; border-bottom: 1px solid #1a202c; font-size: 0.86rem; }
+    .sched-table tr:last-child td { border-bottom: none; }
+    .sched-table tr:hover td { background: #1a202c; }
+    .sched-time { font-family: 'Consolas', monospace; color: #68d391; font-weight: 600; }
+    .sched-name { color: #90cdf4; font-family: 'Consolas', monospace; }
+    .sched-desc { color: #a0aec0; }
+
+    /* Directory tree */
+    .tree {
+      background: #171923; border: 1px solid #2d3748; border-radius: 12px;
+      padding: 24px 28px; font-family: 'Consolas', monospace; font-size: 0.84rem;
+      line-height: 1.9; overflow-x: auto;
+    }
+    .tree .dir  { color: #63b3ed; font-weight: 600; }
+    .tree .file { color: #e2e8f0; }
+    .tree .comment { color: #4a5568; }
+    .tree .secret { color: #f6ad55; }
+    .tree .entry { color: #68d391; }
+
+    /* Data flow */
+    .flow-container {
+      background: #171923; border: 1px solid #2d3748; border-radius: 12px; padding: 32px;
+    }
+    .flow-row { display: flex; align-items: center; margin: 6px 0; }
+    .flow-box {
+      background: #1a202c; border: 1px solid #2d3748; border-radius: 8px;
+      padding: 10px 18px; font-size: 0.85rem; min-width: 220px; text-align: center;
+    }
+    .flow-box .fb-file { font-family: 'Consolas', monospace; color: #90cdf4; font-size: 0.9rem; font-weight: 600; }
+    .flow-box .fb-desc { color: #718096; font-size: 0.75rem; margin-top: 3px; }
+    .flow-down { color: #4a5568; font-size: 1.2rem; margin: 0 auto; display: block; text-align: center; padding: 2px 0; }
+    .flow-indent { padding-left: 48px; }
+    .flow-branch { color: #4a5568; margin-right: 8px; }
+
+    /* Git info */
+    .git-box {
+      background: #171923; border: 1px solid #2d3748; border-radius: 12px; padding: 24px 28px;
+    }
+    .git-branch { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .git-label { font-size: 0.78rem; color: #718096; text-transform: uppercase; letter-spacing: 0.06em; }
+    .git-val { font-family: 'Consolas', monospace; color: #68d391; font-size: 0.92rem; }
+    .commit-list { list-style: none; }
+    .commit-list li {
+      padding: 8px 0; border-bottom: 1px solid #1a202c;
+      display: flex; gap: 12px; align-items: baseline; font-size: 0.84rem;
+    }
+    .commit-list li:last-child { border-bottom: none; }
+    .commit-hash { font-family: 'Consolas', monospace; color: #63b3ed; flex-shrink: 0; }
+    .commit-msg { color: #a0aec0; }
+
+    /* New Agent System */
+    .new-system-banner {
+      background: linear-gradient(135deg, #1a2744 0%, #162032 100%);
+      border: 1px solid #2b4a8a; border-radius: 12px;
+      padding: 20px 28px; margin-bottom: 24px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .new-system-banner .banner-icon { font-size: 2rem; }
+    .new-system-banner h2 { font-size: 1.2rem; color: #63b3ed; font-weight: 700; }
+    .new-system-banner p { font-size: 0.85rem; color: #718096; margin-top: 4px; }
+
+    .agent-arch {
+      display: grid; grid-template-columns: 1fr; gap: 0;
+      background: #171923; border: 1px solid #2d3748; border-radius: 12px;
+      overflow: hidden;
+    }
+    .arch-orchestrator {
+      background: #1a2744; padding: 20px 24px;
+      border-bottom: 2px solid #2b4a8a;
+      text-align: center;
+    }
+    .arch-orchestrator .orch-label { font-size: 0.72rem; color: #63b3ed; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+    .arch-orchestrator .orch-file { font-family: 'Consolas', monospace; font-size: 1rem; color: #90cdf4; font-weight: 600; margin: 6px 0; }
+    .arch-orchestrator .orch-modes { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+    .arch-orchestrator .mode-chip {
+      background: #2d3748; border-radius: 6px; padding: 3px 10px;
+      font-size: 0.72rem; color: #a0aec0; font-family: 'Consolas', monospace;
+    }
+    .arch-agents { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .arch-agent {
+      padding: 20px 24px; border-right: 1px solid #2d3748;
+      border-top: 1px solid #2d3748;
+    }
+    .arch-agent:last-child { border-right: none; }
+    .agent-num { font-size: 0.68rem; color: #4a5568; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+    .agent-name { font-size: 1rem; font-weight: 700; margin: 4px 0; }
+    .agent-file { font-family: 'Consolas', monospace; font-size: 0.78rem; color: #90cdf4; margin-bottom: 10px; }
+    .agent-trigger { font-size: 0.75rem; color: #718096; margin-bottom: 10px; line-height: 1.6; }
+    .agent-steps { list-style: none; }
+    .agent-steps li { font-size: 0.78rem; color: #a0aec0; padding: 3px 0; border-bottom: 1px solid #1a202c; }
+    .agent-steps li:last-child { border-bottom: none; }
+    .agent-steps li::before { content: "→ "; color: #4a5568; }
+
+    .sheets-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .sheet-card {
+      background: #1a202c; border: 1px solid #2d3748; border-radius: 10px; padding: 20px;
+    }
+    .sheet-name { font-size: 0.9rem; font-weight: 700; color: #68d391; margin-bottom: 12px; }
+    .sheet-cols { display: flex; flex-wrap: wrap; gap: 6px; }
+    .col-chip {
+      background: #2d3748; border-radius: 4px; padding: 2px 8px;
+      font-size: 0.7rem; color: #a0aec0; font-family: 'Consolas', monospace;
+    }
+
+    .new-cmd-list { list-style: none; }
+    .new-cmd-list li {
+      padding: 10px 0; border-bottom: 1px solid #2d3748;
+      display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap;
+    }
+    .new-cmd-list li:last-child { border-bottom: none; }
+    .cmd-text { font-family: 'Consolas', monospace; font-size: 0.82rem; color: #f6ad55; }
+    .cmd-desc { font-size: 0.78rem; color: #718096; }
+
+    footer {
+      margin-top: 60px; padding: 24px 48px;
+      border-top: 1px solid #2d3748; text-align: center;
+      color: #4a5568; font-size: 0.8rem;
+    }
+
+    @media (max-width: 768px) {
+      header, main { padding: 24px 20px; }
+      .pipeline { flex-direction: column; }
+      .pipeline-arrow { transform: rotate(90deg); align-self: center; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Amway AI Agent System</h1>
+  <p>自動化多代理潛在客戶開發與 LINE Bot 跟進系統 — 台灣市場</p>
+  <div class="badges">
+    <span class="badge badge-blue">Python 3</span>
+    <span class="badge badge-green">CrewAI</span>
+    <span class="badge badge-purple">Anthropic Claude</span>
+    <span class="badge badge-orange">LINE Bot</span>
+    <span class="badge badge-blue">C# .NET 8</span>
+    <span class="badge badge-green">Flask</span>
+    <span class="badge badge-purple">Tavily</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Pipeline -->
+  <div class="section-title">執行 Pipeline</div>
+  <div class="pipeline">
+
+    <div class="pipeline-step">
+      <div class="step-num">STEP 01</div>
+      <div class="step-file">01_scraper.py</div>
+      <div class="step-desc">網路爬蟲<br>關鍵字搜尋潛在名單</div>
+      <div class="step-tech"><span>Tavily API</span><span>Dcard</span></div>
+    </div>
+    <div class="pipeline-arrow">→</div>
+
+    <div class="pipeline-step">
+      <div class="step-num">STEP 02</div>
+      <div class="step-file">02_scoring.py</div>
+      <div class="step-desc">AI 評分篩選<br>三重備援模型</div>
+      <div class="step-tech"><span>Claude</span><span>Gemini</span><span>Codex</span></div>
+    </div>
+    <div class="pipeline-arrow">→</div>
+
+    <div class="pipeline-step">
+      <div class="step-num">STEP 03</div>
+      <div class="step-file">03_templates.py</div>
+      <div class="step-desc">個人化訊息生成<br>針對每位潛在客戶</div>
+      <div class="step-tech"><span>Claude API</span></div>
+    </div>
+    <div class="pipeline-arrow">→</div>
+
+    <div class="pipeline-step">
+      <div class="step-num">MONITOR</div>
+      <div class="step-file">AmwayWatcher.cs</div>
+      <div class="step-desc">C# 偵測新 JSON<br>觸發後續發送</div>
+      <div class="step-tech"><span>.NET 8</span><span>FileSystemWatcher</span></div>
+    </div>
+    <div class="pipeline-arrow">→</div>
+
+    <div class="pipeline-step">
+      <div class="step-num">STEP 05</div>
+      <div class="step-file">05_line_bot.py</div>
+      <div class="step-desc">LINE 推播<br>Day 1 / 3 / 7 追蹤</div>
+      <div class="step-tech"><span>LINE API</span></div>
+    </div>
+    <div class="pipeline-arrow">→</div>
+
+    <div class="pipeline-step">
+      <div class="step-num">WEBHOOK</div>
+      <div class="step-file">06_line_webhook.py</div>
+      <div class="step-desc">Flask 伺服器<br>處理入站訊息</div>
+      <div class="step-tech"><span>Flask</span><span>ngrok</span></div>
+    </div>
+
+  </div>
+
+  <!-- Directory Structure -->
+  <div class="section-title">目錄結構</div>
+  <div class="tree">
+<span class="dir">claude AI_Agent/</span><br>
+├── <span class="dir">agents/</span>                    <span class="comment"># 核心 Python 代理模組</span><br>
+│   ├── <span class="file">01_scraper.py</span>          <span class="comment"># 網路爬蟲 (Tavily + Dcard)</span><br>
+│   ├── <span class="file">02_scoring.py</span>          <span class="comment"># AI 評分篩選 (Claude/Gemini/Codex)</span><br>
+│   ├── <span class="file">03_templates.py</span>        <span class="comment"># 個人化訊息生成 (Claude API)</span><br>
+│   ├── <span class="file">04_crew_main.py</span>        <span class="comment"># CrewAI 多代理協調器</span><br>
+│   ├── <span class="file">05_line_bot.py</span>         <span class="comment"># LINE 訊息發送 (Day 1/3/7)</span><br>
+│   ├── <span class="file">06_line_webhook.py</span>     <span class="comment"># Flask Webhook 伺服器</span><br>
+│   ├── <span class="file">07_training_log.py</span>     <span class="comment"># 訓練記錄存檔 (base64 圖片)</span><br>
+│   ├── <span class="file">08_calendar_manager.py</span> <span class="comment"># 行事曆圖片解析 (Claude Vision)</span><br>
+│   ├── <span class="file">09_partner_engagement.py</span><span class="comment"># 夥伴名冊管理與消費追蹤</span><br>
+│   └── <span class="file">email_notify.py</span>        <span class="comment"># Gmail SMTP 通知</span><br>
+├── <span class="dir">config/</span><br>
+│   └── <span class="file">settings.json</span>          <span class="comment"># 全域設定 (關鍵字、地區、評分門檻)</span><br>
+├── <span class="dir">monitor/</span><br>
+│   ├── <span class="file">AmwayWatcher.cs</span>        <span class="comment"># C# .NET 8 檔案監控</span><br>
+│   └── <span class="file">AmwayWatcher.csproj</span>    <span class="comment"># .NET 專案設定</span><br>
+├── <span class="dir">output/</span>                    <span class="comment"># 執行輸出資料 (gitignore)</span><br>
+│   ├── <span class="dir">prospects_raw/</span>         <span class="comment"># 原始爬蟲 JSON</span><br>
+│   ├── <span class="dir">prospects_scored/</span>      <span class="comment"># AI 評分後 JSON</span><br>
+│   ├── <span class="dir">messages/</span>              <span class="comment"># 生成的訊息 JSON</span><br>
+│   ├── <span class="dir">calendar/</span>              <span class="comment"># 行事曆事件與圖片</span><br>
+│   ├── <span class="dir">training/</span>              <span class="comment"># 訓練逐字稿 (依日期索引)</span><br>
+│   ├── <span class="dir">partners/</span>              <span class="comment"># 夥伴名冊 (partners.json)</span><br>
+│   └── <span class="file">sent_log.json</span>          <span class="comment"># 已發送訊息紀錄</span><br>
+├── <span class="dir">logs/</span>                      <span class="comment"># 執行日誌 (gitignore)</span><br>
+├── <span class="dir">.claude/</span>                   <span class="comment"># Claude Code CLI 設定</span><br>
+├── <span class="secret">.env</span>                       <span class="comment"># API 金鑰 (secrets, gitignore)</span><br>
+├── <span class="entry">setup_scheduler.ps1</span>        <span class="comment"># Windows 排程器設定腳本</span><br>
+├── <span class="file">tasks.json</span>                 <span class="comment"># VS Code 任務定義</span><br>
+└── <span class="file">ngrok.exe</span>                  <span class="comment"># HTTPS 隧道工具</span>
+  </div>
+
+  <!-- Agent Modules -->
+  <div class="section-title">代理模組詳細</div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🔍</div>
+        <div>
+          <div class="card-title">資料採集層</div>
+          <div class="card-subtitle">Scraping & Input</div>
+        </div>
+      </div>
+      <ul class="file-list">
+        <li><span class="file-name">01_scraper.py</span><span class="file-desc">Tavily + Dcard 爬蟲</span></li>
+        <li><span class="file-name">08_calendar_manager.py</span><span class="file-desc">行事曆圖片解析</span></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🧠</div>
+        <div>
+          <div class="card-title">AI 處理層</div>
+          <div class="card-subtitle">Scoring & Generation</div>
+        </div>
+      </div>
+      <ul class="file-list">
+        <li><span class="file-name">02_scoring.py</span><span class="file-desc">多模型評分 (門檻 70/40)</span></li>
+        <li><span class="file-name">03_templates.py</span><span class="file-desc">個人化訊息生成</span></li>
+        <li><span class="file-name">04_crew_main.py</span><span class="file-desc">CrewAI 多代理協調</span></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📱</div>
+        <div>
+          <div class="card-title">通訊層</div>
+          <div class="card-subtitle">Messaging & Webhook</div>
+        </div>
+      </div>
+      <ul class="file-list">
+        <li><span class="file-name">05_line_bot.py</span><span class="file-desc">LINE 推播 Day 1/3/7</span></li>
+        <li><span class="file-name">06_line_webhook.py</span><span class="file-desc">Flask 入站處理</span></li>
+        <li><span class="file-name">email_notify.py</span><span class="file-desc">Gmail SMTP 通知</span></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📊</div>
+        <div>
+          <div class="card-title">管理層</div>
+          <div class="card-subtitle">Partner & Training</div>
+        </div>
+      </div>
+      <ul class="file-list">
+        <li><span class="file-name">09_partner_engagement.py</span><span class="file-desc">夥伴名冊與消費追蹤</span></li>
+        <li><span class="file-name">07_training_log.py</span><span class="file-desc">訓練記錄存檔</span></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🖥️</div>
+        <div>
+          <div class="card-title">系統監控層</div>
+          <div class="card-subtitle">C# .NET Monitor</div>
+        </div>
+      </div>
+      <ul class="file-list">
+        <li><span class="file-name">AmwayWatcher.cs</span><span class="file-desc">檔案系統監控</span></li>
+        <li><span class="file-name">AmwayWatcher.csproj</span><span class="file-desc">.NET 8 專案設定</span></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">⚙️</div>
+        <div>
+          <div class="card-title">設定與工具</div>
+          <div class="card-subtitle">Config & Tooling</div>
+        </div>
+      </div>
+      <ul class="file-list">
+        <li><span class="file-name">config/settings.json</span><span class="file-desc">全域設定</span></li>
+        <li><span class="file-name">setup_scheduler.ps1</span><span class="file-desc">Windows 排程器</span></li>
+        <li><span class="file-name">tasks.json</span><span class="file-desc">VS Code 任務</span></li>
+        <li><span class="file-name">ngrok.exe</span><span class="file-desc">HTTPS 隧道</span></li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- Tech Stack -->
+  <div class="section-title">技術堆疊</div>
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <table class="tech-table">
+      <thead>
+        <tr>
+          <th style="width:20%">層級</th>
+          <th style="width:35%">技術 / 工具</th>
+          <th>說明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="tech-layer">AI 核心</td>
+          <td class="tech-items">Anthropic Claude API</td>
+          <td class="tech-role">Sonnet / Opus — 評分、訊息生成、圖片解析</td>
+        </tr>
+        <tr>
+          <td class="tech-layer">多代理框架</td>
+          <td class="tech-items">CrewAI</td>
+          <td class="tech-role">多代理協調，週報深度分析</td>
+        </tr>
+        <tr>
+          <td class="tech-layer">AI 備援</td>
+          <td class="tech-items">Gemini CLI → Codex CLI</td>
+          <td class="tech-role">Claude 失敗時自動切換，三重備援機制</td>
+        </tr>
+        <tr>
+          <td class="tech-layer">搜尋引擎</td>
+          <td class="tech-items">Tavily API</td>
+          <td class="tech-role">關鍵字搜尋潛在客戶 + 內容爬取</td>
+        </tr>
+        <tr>
+          <td class="tech-layer">Web 框架</td>
+          <td class="tech-items">Flask</td>
+          <td class="tech-role">LINE Bot Webhook HTTP 伺服器</td>
+        </tr>
+        <tr>
+          <td class="tech-layer">通訊</td>
+          <td class="tech-items">LINE Messaging API</td>
+          <td class="tech-role">推播訊息、接收回覆、觸發代理</td>
+        </tr>
+        <tr>
+          <td class="tech-layer">通知</td>
+          <td class="tech-items">Gmail SMTP</td>
+          <td class="tech-role">異常告警與執行報告</td>
+        </tr>
+        <tr>
+          <td class="tech-layer">系統監控</td>
+          <td class="tech-items">C# .NET 8</td>
+          <td class="tech-role">FileSystemWatcher 偵測新 JSON 觸發發送</td>
+        </tr>
+        <tr>
+          <td class="tech-layer">排程</td>
+          <td class="tech-items">Windows Task Scheduler</td>
+          <td class="tech-role">5 個定時/開機任務自動執行</td>
+        </tr>
+        <tr>
+          <td class="tech-layer">隧道</td>
+          <td class="tech-items">ngrok</td>
+          <td class="tech-role">本機 Flask → 公開 HTTPS Webhook URL</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Scheduler -->
+  <div class="section-title">Windows 排程任務</div>
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <table class="sched-table">
+      <thead>
+        <tr>
+          <th style="width:20%">時間</th>
+          <th style="width:30%">任務名稱</th>
+          <th>說明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="sched-time">08:00 每日</td>
+          <td class="sched-name">DailyPipeline</td>
+          <td class="sched-desc">完整 pipeline (scraper → scoring → templates)</td>
+        </tr>
+        <tr>
+          <td class="sched-time">09:00 每日</td>
+          <td class="sched-name">LineSend</td>
+          <td class="sched-desc">LINE 推播發送 Day 1/3/7 追蹤訊息</td>
+        </tr>
+        <tr>
+          <td class="sched-time">開機啟動</td>
+          <td class="sched-name">LineWebhook</td>
+          <td class="sched-desc">Flask Webhook 伺服器常駐 (06_line_webhook.py)</td>
+        </tr>
+        <tr>
+          <td class="sched-time">開機啟動</td>
+          <td class="sched-name">CSharpWatcher</td>
+          <td class="sched-desc">C# 檔案監控常駐 (AmwayWatcher.exe)</td>
+        </tr>
+        <tr>
+          <td class="sched-time">週一 07:30</td>
+          <td class="sched-name">WeeklyReport</td>
+          <td class="sched-desc">CrewAI 深度分析週報 (--mode crew)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Data Flow -->
+  <div class="section-title">資料流向</div>
+  <div class="flow-container">
+    <div style="text-align:center">
+      <div class="flow-box" style="display:inline-block">
+        <div class="fb-file">Windows Task Scheduler / VS Code</div>
+        <div class="fb-desc">觸發器</div>
+      </div>
+    </div>
+    <div class="flow-down">↓</div>
+    <div style="text-align:center">
+      <div class="flow-box" style="display:inline-block">
+        <div class="fb-file">01_scraper.py</div>
+        <div class="fb-desc">output/prospects_raw/YYYYMMDD.json</div>
+      </div>
+    </div>
+    <div class="flow-down">↓</div>
+    <div style="text-align:center">
+      <div class="flow-box" style="display:inline-block">
+        <div class="fb-file">02_scoring.py</div>
+        <div class="fb-desc">output/prospects_scored/YYYYMMDD.json (high ≥70 / mid ≥40)</div>
+      </div>
+    </div>
+    <div class="flow-down">↓</div>
+    <div style="text-align:center">
+      <div class="flow-box" style="display:inline-block">
+        <div class="fb-file">03_templates.py</div>
+        <div class="fb-desc">output/messages/YYYYMMDD.json</div>
+      </div>
+    </div>
+    <div class="flow-down">↓</div>
+    <div style="text-align:center">
+      <div class="flow-box" style="display:inline-block">
+        <div class="fb-file">AmwayWatcher.cs</div>
+        <div class="fb-desc">偵測新 JSON → 觸發 LINE 發送</div>
+      </div>
+    </div>
+    <div class="flow-down">↓</div>
+    <div style="text-align:center">
+      <div class="flow-box" style="display:inline-block">
+        <div class="fb-file">05_line_bot.py</div>
+        <div class="fb-desc">LINE API 推播 + sent_log.json 更新</div>
+      </div>
+    </div>
+    <div class="flow-down">↓</div>
+    <div style="text-align:center">
+      <div class="flow-box" style="display:inline-block">
+        <div class="fb-file">06_line_webhook.py (常駐)</div>
+        <div class="fb-desc">處理入站訊息，分派給子代理</div>
+      </div>
+    </div>
+    <div class="flow-down">↓</div>
+    <div style="display:flex; justify-content:center; gap:20px; flex-wrap:wrap; margin-top:8px">
+      <div class="flow-box">
+        <div class="fb-file">07_training_log.py</div>
+        <div class="fb-desc">訓練記錄存檔</div>
+      </div>
+      <div class="flow-box">
+        <div class="fb-file">08_calendar_manager.py</div>
+        <div class="fb-desc">行事曆解析</div>
+      </div>
+      <div class="flow-box">
+        <div class="fb-file">09_partner_engagement.py</div>
+        <div class="fb-desc">夥伴管理</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Git Status -->
+  <div class="section-title">Git 狀態</div>
+  <div class="git-box">
+    <div class="git-branch">
+      <span class="git-label">目前分支</span>
+      <span class="git-val">feature/training-log</span>
+      <span class="git-label" style="margin-left:24px">主分支</span>
+      <span class="git-val">master</span>
+    </div>
+    <div class="git-label" style="margin-bottom:10px">最近提交</div>
+    <ul class="commit-list">
+      <li><span class="commit-hash">29222be</span><span class="commit-msg">Add partner management and roster fields</span></li>
+      <li><span class="commit-hash">ecf7009</span><span class="commit-msg">Add calendar image parsing and improve training summaries</span></li>
+      <li><span class="commit-hash">ae30cc3</span><span class="commit-msg">fix: Claude CLI prompt 確保 100% ASCII，加入非 ASCII 檢查與 ANSI strip</span></li>
+      <li><span class="commit-hash">ff643f3</span><span class="commit-msg">fix: Claude CLI 逐字稿改用 base64 編碼繞過 gRPC ByteString 限制</span></li>
+      <li><span class="commit-hash">84172b6</span><span class="commit-msg">feat: Claude CLI 改用直接引數模式優先，移除 pipe/stdin 避免 ByteString 問題</span></li>
+    </ul>
+  </div>
+
+</main>
+
+  <!-- New Agent System -->
+  <div class="section-title" style="margin-top:60px">新增系統：市場開發 / 培訓 / 跟進 / 激勵</div>
+
+  <div class="new-system-banner">
+    <div class="banner-icon">🤖</div>
+    <div>
+      <h2>四大 Agent + Orchestrator 架構</h2>
+      <p>Google Sheets 為主資料庫 · Claude CLI 驅動 · LINE Bot 為唯一操作介面 · 需安裝：<code style="color:#68d391">pip install gspread google-auth</code></p>
+    </div>
+  </div>
+
+  <!-- Architecture -->
+  <div class="section-title">Agent 架構圖</div>
+  <div class="agent-arch">
+    <div class="arch-orchestrator">
+      <div class="orch-label">Orchestrator</div>
+      <div class="orch-file">10_orchestrator.py</div>
+      <div style="font-size:0.8rem; color:#718096; margin-bottom:8px">統一調度，協調四大 Agent</div>
+      <div class="orch-modes">
+        <span class="mode-chip">--mode morning</span>
+        <span class="mode-chip">--mode evening</span>
+        <span class="mode-chip">--mode market</span>
+        <span class="mode-chip">--mode training</span>
+        <span class="mode-chip">--mode followup</span>
+        <span class="mode-chip">--mode motivation</span>
+      </div>
+    </div>
+    <div class="arch-agents">
+      <div class="arch-agent">
+        <div class="agent-num">Agent 1</div>
+        <div class="agent-name" style="color:#63b3ed">🎯 市場開發</div>
+        <div class="agent-file">11_market_dev_agent.py</div>
+        <div class="agent-trigger">
+          ⏰ 09:00 自動掃描<br>
+          💬 小幫手 新增潛在客戶
+        </div>
+        <ul class="agent-steps">
+          <li>讀取未評分名單</li>
+          <li>Claude CLI → 評分 1-5</li>
+          <li>Claude CLI → 三版話術</li>
+          <li>寫回 Google Sheets</li>
+          <li>LINE 推播摘要</li>
+        </ul>
+      </div>
+      <div class="arch-agent">
+        <div class="agent-num">Agent 2</div>
+        <div class="agent-name" style="color:#68d391">📚 培訓</div>
+        <div class="agent-file">12_training_agent.py</div>
+        <div class="agent-trigger">
+          ⏰ 09:00 自動執行<br>
+          💬 小幫手 培訓 夥伴名
+        </div>
+        <ul class="agent-steps">
+          <li>計算加入天數</li>
+          <li>Day 1/3/5/7/14/30 觸發</li>
+          <li>Claude CLI → 個人化訊息</li>
+          <li>LINE Push 到夥伴</li>
+          <li>更新培訓進度</li>
+        </ul>
+      </div>
+      <div class="arch-agent">
+        <div class="agent-num">Agent 3</div>
+        <div class="agent-name" style="color:#f6ad55">🔗 夥伴跟進</div>
+        <div class="agent-file">13_followup_agent.py</div>
+        <div class="agent-trigger">
+          ⏰ 17:00 自動執行<br>
+          💬 小幫手 跟進報告
+        </div>
+        <ul class="agent-steps">
+          <li>掃描所有夥伴狀態</li>
+          <li>🔴🟡🟢 三色風險分層</li>
+          <li>Claude CLI → 關懷草稿</li>
+          <li>更新 Sheets 風險等級</li>
+          <li>LINE 推播日報告</li>
+        </ul>
+      </div>
+      <div class="arch-agent">
+        <div class="agent-num">Agent 4</div>
+        <div class="agent-name" style="color:#fc8181">🔥 夥伴激勵</div>
+        <div class="agent-file">14_motivation_agent.py</div>
+        <div class="agent-trigger">
+          ⏰ 09:00 排程（沉默夥伴）<br>
+          💬 小幫手 激勵 / 里程碑
+        </div>
+        <ul class="agent-steps">
+          <li>情緒關鍵字偵測</li>
+          <li>里程碑達成偵測</li>
+          <li>Claude CLI → 個人化激勵</li>
+          <li>沉默夥伴輕鬆開場話</li>
+          <li>寫回激勵紀錄 Sheet</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Sheets Structure -->
+  <div class="section-title">Google Sheets 資料庫結構</div>
+  <div class="sheets-grid">
+    <div class="sheet-card">
+      <div class="sheet-name">📊 市場名單</div>
+      <div class="sheet-cols">
+        <span class="col-chip">姓名</span><span class="col-chip">電話</span>
+        <span class="col-chip">職業</span><span class="col-chip">接觸管道</span>
+        <span class="col-chip">備註</span><span class="col-chip" style="color:#63b3ed">AI評分</span>
+        <span class="col-chip" style="color:#63b3ed">需求標籤</span>
+        <span class="col-chip" style="color:#68d391">話術_健康型</span>
+        <span class="col-chip" style="color:#68d391">話術_收入型</span>
+        <span class="col-chip" style="color:#68d391">話術_好奇型</span>
+        <span class="col-chip">接觸狀態</span><span class="col-chip">最後更新</span>
+        <span class="col-chip">下次跟進日</span>
+      </div>
+    </div>
+    <div class="sheet-card">
+      <div class="sheet-name">👥 夥伴名冊</div>
+      <div class="sheet-cols">
+        <span class="col-chip">姓名</span><span class="col-chip">LINE_UID</span>
+        <span class="col-chip">電話</span><span class="col-chip">加入日期</span>
+        <span class="col-chip" style="color:#63b3ed">已完成培訓天</span>
+        <span class="col-chip">最後培訓推播日</span>
+        <span class="col-chip">最後聯絡日</span>
+        <span class="col-chip">本週動作數</span>
+        <span class="col-chip" style="color:#fc8181">風險等級</span>
+        <span class="col-chip" style="color:#f6ad55">里程碑</span>
+        <span class="col-chip">備註</span>
+      </div>
+    </div>
+    <div class="sheet-card">
+      <div class="sheet-name">💪 激勵紀錄</div>
+      <div class="sheet-cols">
+        <span class="col-chip">日期時間</span><span class="col-chip">夥伴姓名</span>
+        <span class="col-chip">觸發類型</span><span class="col-chip">觸發內容</span>
+        <span class="col-chip">AI回應摘要</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- New LINE Commands -->
+  <div class="section-title">新增 LINE 指令</div>
+  <div class="card" style="padding: 24px 28px;">
+    <ul class="new-cmd-list">
+      <li>
+        <span class="cmd-text">小幫手 新增潛在客戶 姓名|職業|接觸管道|備註</span>
+        <span class="cmd-desc">→ 新增至 Sheets + 立即 AI 評分 + 生成三版話術</span>
+      </li>
+      <li>
+        <span class="cmd-text">小幫手 培訓 夥伴名</span>
+        <span class="cmd-desc">→ 查詢該夥伴培訓進度（加入天數 / 下一個培訓日）</span>
+      </li>
+      <li>
+        <span class="cmd-text">小幫手 跟進報告</span>
+        <span class="cmd-desc">→ 即時生成 🔴🟡🟢 風險報告 + 關懷草稿推播</span>
+      </li>
+      <li>
+        <span class="cmd-text">小幫手 激勵 夥伴名 [情境]</span>
+        <span class="cmd-desc">→ 個人化鼓勵文 + 相似案例 + 今日小目標</span>
+      </li>
+      <li>
+        <span class="cmd-text">小幫手 里程碑 夥伴名 [成就描述]</span>
+        <span class="cmd-desc">→ 慶賀訊息 + 更新 Sheets 里程碑 + 提示下一目標</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- New Scheduler -->
+  <div class="section-title">新增排程任務</div>
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <table class="sched-table">
+      <thead>
+        <tr><th style="width:20%">時間</th><th style="width:35%">任務名稱</th><th>說明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="sched-time">09:00 每日</td>
+          <td class="sched-name">MorningOrchestrator</td>
+          <td class="sched-desc">市場開發評分 + 培訓推播 + 激勵排程（沉默夥伴）</td>
+        </tr>
+        <tr>
+          <td class="sched-time">17:00 每日</td>
+          <td class="sched-name">EveningFollowup</td>
+          <td class="sched-desc">夥伴風險報告 + 關懷草稿推播</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- New Data Flow -->
+  <div class="section-title">新系統資料流向</div>
+  <div class="flow-container">
+    <div style="text-align:center">
+      <div class="flow-box" style="display:inline-block; border-color:#2b4a8a;">
+        <div class="fb-file" style="color:#68d391">Google Sheets</div>
+        <div class="fb-desc">市場名單 / 夥伴名冊 / 激勵紀錄</div>
+      </div>
+    </div>
+    <div class="flow-down">↕</div>
+    <div style="text-align:center">
+      <div class="flow-box" style="display:inline-block; border-color:#2b4a8a;">
+        <div class="fb-file" style="color:#90cdf4">10_orchestrator.py</div>
+        <div class="fb-desc">09:00 morning / 17:00 evening</div>
+      </div>
+    </div>
+    <div class="flow-down">↓</div>
+    <div style="display:flex; justify-content:center; gap:16px; flex-wrap:wrap;">
+      <div class="flow-box" style="border-color:#2b4a8a">
+        <div class="fb-file" style="color:#63b3ed">11 市場開發</div>
+        <div class="fb-desc">評分 + 話術</div>
+      </div>
+      <div class="flow-box" style="border-color:#276749">
+        <div class="fb-file" style="color:#68d391">12 培訓</div>
+        <div class="fb-desc">七天法則推播</div>
+      </div>
+      <div class="flow-box" style="border-color:#744210">
+        <div class="fb-file" style="color:#f6ad55">13 跟進</div>
+        <div class="fb-desc">風險報告</div>
+      </div>
+      <div class="flow-box" style="border-color:#742a2a">
+        <div class="fb-file" style="color:#fc8181">14 激勵</div>
+        <div class="fb-desc">激勵 + 里程碑</div>
+      </div>
+    </div>
+    <div class="flow-down">↓</div>
+    <div style="text-align:center">
+      <div class="flow-box" style="display:inline-block; border-color:#276749">
+        <div class="fb-file" style="color:#68d391">LINE Bot</div>
+        <div class="fb-desc">老闆唯一操作介面 → 確認後轉發夥伴</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Sheets Setup -->
+  <div class="section-title">Google Sheets 初始化步驟</div>
+  <div class="tree">
+<span class="entry">1.</span> <span class="dir">Google Cloud Console</span> → 建立 Service Account<br>
+   &nbsp;&nbsp;&nbsp;啟用 <span class="file">Google Sheets API</span> + <span class="file">Google Drive API</span><br>
+<span class="entry">2.</span> 下載 JSON 金鑰 → 存為 <span class="secret">config/google_credentials.json</span><br>
+<span class="entry">3.</span> 建立 Google Sheets 試算表，新增三張工作表：<br>
+   &nbsp;&nbsp;&nbsp;<span class="dir">市場名單</span> / <span class="dir">夥伴名冊</span> / <span class="dir">激勵紀錄</span><br>
+<span class="entry">4.</span> 將試算表共用給 Service Account email（編輯者）<br>
+<span class="entry">5.</span> 複製試算表 ID → 填入 <span class="file">config/settings.json</span><br>
+   &nbsp;&nbsp;&nbsp;<span class="comment"># URL: docs.google.com/spreadsheets/d/[這段ID]/edit</span><br>
+<span class="entry">6.</span> 安裝相依套件：<span class="secret">pip install gspread google-auth</span><br>
+<span class="entry">7.</span> 執行排程設定：<span class="entry">powershell -ExecutionPolicy Bypass -File setup_scheduler.ps1</span>
+  </div>
+
+</main>
+
+<footer>
+  Generated by Claude Code &nbsp;·&nbsp; 2026-03-30 &nbsp;·&nbsp; claude AI_Agent / project_structure.html
+</footer>
+
+</body>
+</html>
