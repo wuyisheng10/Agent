@@ -199,8 +199,12 @@ HELP_TEXT += """
 HELP_TEXT += """
 
 🎯 市場開發（新系統）
-  新增潛在客戶 姓名|職業|接觸管道|備註
+  新增潛在家人 姓名|職業|接觸管道|備註
     → 新增至本地清單並立即 AI 評分 + 生成三種接觸話術
+  查詢潛在家人 [姓名]
+    → 列出所有潛在家人（可加姓名篩選）
+  潛在家人資料 姓名
+    → 設定歸檔模式，後續上傳的照片/檔案自動歸入該人員資料夾
 
 📚 培訓系統（新系統）
   培訓 夥伴名
@@ -237,8 +241,8 @@ HELP_TEXT += """
 # ============================================================
 
 EXEC_MENU_ITEMS = {
-    1:  {"label": "新增潛在客戶",       "cmd": None,
-         "prompt": "請複製後修改再送出：\n小幫手 新增潛在客戶 姓名|職業|管道|備註"},
+    1:  {"label": "新增潛在家人",       "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 新增潛在家人 姓名|職業|管道|備註\n\n查詢名單：小幫手 查詢潛在家人\n上傳照片：小幫手 潛在家人資料 姓名"},
     2:  {"label": "查詢培訓進度",       "cmd": None,
          "prompt": "請複製後修改再送出：\n小幫手 培訓 夥伴名"},
     3:  {"label": "跟進報告",           "cmd": "跟進報告",       "prompt": None},
@@ -290,7 +294,7 @@ EXEC_MENU_TEXT = """\
 📋 小幫手執行選單
 ══════════════════
 🎯 市場開發
-  1. 新增潛在客戶
+  1. 新增潛在家人
 
 📚 培訓系統
   2. 查詢培訓進度
@@ -695,16 +699,39 @@ def handle_training_command(user_msg: str, reply_token: str,
 
     # === 新系統：市場開發 / 培訓 / 跟進 / 激勵 ===
 
-    if msg.startswith("新增潛在客戶"):
+    if msg.startswith("新增潛在家人"):
         def _run_market():
             try:
                 market = _load_market_dev()
                 result = market.MarketDevAgent().handle_add_prospect(msg)
                 push_message(push_target, result)
             except Exception as e:
-                push_message(push_target, f"✗ 新增潛在客戶失敗：{e}")
+                push_message(push_target, f"✗ 新增潛在家人失敗：{e}")
         reply_message(reply_token, "⏳ 正在新增並 AI 評分，請稍候...")
         threading.Thread(target=_run_market, daemon=True).start()
+        return True
+
+    if msg.startswith("查詢潛在家人"):
+        try:
+            market = _load_market_dev()
+            result = market.MarketDevAgent().handle_query_prospect(msg)
+            reply_message(reply_token, result)
+        except Exception as e:
+            reply_message(reply_token, f"✗ 查詢失敗：{e}")
+        return True
+
+    if msg.startswith("潛在家人資料"):
+        # 設定歸類模式為「市場開發」並指定人員，後續上傳的圖片/檔案歸入該人員資料夾
+        person_name = msg.replace("潛在家人資料", "", 1).strip()
+        if not person_name:
+            reply_message(reply_token, "⚠️ 格式：小幫手 潛在家人資料 姓名\n設定後直接上傳照片或檔案即可歸檔")
+            return True
+        try:
+            clf_mod = _load_classifier()
+            result = clf_mod.ClassifierAgent().set_mode("市場開發", person_name)
+            reply_message(reply_token, result + "\n\n📸 現在直接上傳照片或檔案，會自動歸入該潛在家人資料夾。")
+        except Exception as e:
+            reply_message(reply_token, f"✗ 設定失敗：{e}")
         return True
 
     if msg.startswith("培訓"):
