@@ -100,6 +100,16 @@ def _load_classifier():
     spec.loader.exec_module(m)
     return m
 
+
+def _load_course_invite():
+    spec = _ilu.spec_from_file_location(
+        "course_invite_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "16_course_invite_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
 load_dotenv(dotenv_path=r"C:\Users\user\claude AI_Agent\.env")
 
 BASE_DIR        = Path(r"C:\Users\user\claude AI_Agent")
@@ -223,9 +233,36 @@ HELP_TEXT += """
 
 HELP_TEXT += """
 
+🎓 課程會議邀約
+  新增課程會議 YYYY-MM-DD [HH:MM] 標題|地點|說明
+    → 手動新增課程會議
+  查詢課程會議
+    → 查詢接下來的所有課程
+  刪除課程會議 COURSE-XXXX
+    → 刪除指定課程會議
+  從行事曆加入課程 [關鍵字]
+    → 從行事曆匯入課程活動（可加關鍵字篩選）
+  新增課程文宣 標題|內文
+    → 新增課程宣傳文案
+  查詢課程文宣
+    → 列出所有課程文宣
+  優化課程文宣 PROMO-XXXX
+    → 透過 AI 優化指定文宣
+  邀約文宣 潛在家人 [姓名]
+    → 透過 AI 產生潛在家人課程邀約（不填姓名＝通用邀約）
+  邀約文宣 跟進夥伴 [姓名]
+    → 先選 A/B/C 分類，再選夥伴，再選會議，最後產生邀約文宣
+  查詢已產生的今日之後會議邀約文宣
+    → 查詢所有未過期的已產生邀約文宣
+  修改已產生的今日之後會議邀約文宣 COURSE-XXXX | 姓名 | 新內容
+    → 修改指定邀約文宣
+"""
+
+HELP_TEXT += """
+
 🤝 夥伴經營
-  新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註
-  更新夥伴 姓名 | 層級 | 近況 | 下次跟進日期 | 聯絡資訊 | 備註 | 類型 | 編號 | 合夥人 | 推薦人 | 到期日 | 年月 | 一年內新上獎銜 | 首次獎金% | 現金抵用券 | 購物積點 | 優惠券 | 本月購貨 | 上月購貨 | 前2月購貨 | 前3月購貨
+  新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註 | 分類
+  更新夥伴 姓名 | 層級 | 近況 | 下次跟進日期 | 聯絡資訊 | 備註 | 類型 | 編號 | 合夥人 | 推薦人 | 到期日 | 年月 | 一年內新上獎銜 | 首次獎金% | 現金抵用券 | 購物積點 | 優惠券 | 本月購貨 | 上月購貨 | 前2月購貨 | 前3月購貨 | 分類
   邀約夥伴 姓名 | 活動名稱 | 下次跟進日期 | 備註
   跟進夥伴 姓名 | 狀態 | 下次跟進日期 | 備註
   激勵夥伴 姓名
@@ -234,6 +271,7 @@ HELP_TEXT += """
   查詢夥伴 姓名
   刪除夥伴 姓名
   匯入夥伴名單
+  分類建議：A / B / C
 """
 
 # ============================================================
@@ -273,7 +311,7 @@ EXEC_MENU_ITEMS = {
          "prompt": "請複製後修改再送出：\n小幫手 查詢歸檔 [人員名稱]"},
     17: {"label": "整理今日培訓記錄",   "cmd": "整理",           "prompt": None},
     18: {"label": "新增夥伴",           "cmd": None,
-         "prompt": "請複製後修改再送出：\n小幫手 新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註"},
+         "prompt": "請複製後修改再送出：\n小幫手 新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註 | 分類"},
     19: {"label": "跟進夥伴",           "cmd": None,
          "prompt": "請複製後修改再送出：\n小幫手 跟進夥伴 姓名 | 狀態 | 下次跟進日期 | 備註"},
     20: {"label": "顯示所有指令",       "cmd": "指令集",         "prompt": None},
@@ -290,6 +328,26 @@ EXEC_MENU_ITEMS = {
     # 故事分類
     30: {"label": "👤 人物故事歸檔",              "cmd": None, "prompt": None, "ask_person": "人物故事歸檔"},
     31: {"label": "📖 產品故事歸檔",              "cmd": "產品故事歸檔", "prompt": None, "reset_person": True},
+    # 課程會議邀約
+    34: {"label": "查詢課程會議",     "cmd": "查詢課程會議",  "prompt": None},
+    35: {"label": "新增課程會議",     "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 新增課程會議 YYYY-MM-DD HH:MM 標題|地點|說明\n\n範例：\n小幫手 新增課程會議 2026-04-10 19:00 四月OPP說明會|台中大里店|歡迎帶朋友"},
+    36: {"label": "從行事曆加入課程", "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 從行事曆加入課程 [關鍵字]\n\n範例：\n小幫手 從行事曆加入課程 OPP"},
+    37: {"label": "刪除課程會議",     "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 刪除課程會議 COURSE-XXXX\n先查詢：小幫手 查詢課程會議"},
+    38: {"label": "查詢課程文宣",     "cmd": "查詢課程文宣",  "prompt": None},
+    39: {"label": "新增課程文宣",     "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 新增課程文宣 標題|內文"},
+    40: {"label": "優化課程文宣",     "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 優化課程文宣 PROMO-XXXX\n先查詢：小幫手 查詢課程文宣"},
+    41: {"label": "邀約文宣－潛在家人", "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 邀約文宣 潛在家人 [姓名]\n\n不填姓名＝通用邀約\n範例：\n小幫手 邀約文宣 潛在家人 Amy"},
+    42: {"label": "邀約文宣－跟進夥伴", "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 邀約文宣 跟進夥伴 [姓名]\n\n不填姓名＝通用邀約\n範例：\n小幫手 邀約文宣 跟進夥伴 建德"},
+    43: {"label": "查詢已產生的邀約文宣", "cmd": "查詢已產生的今日之後會議邀約文宣", "prompt": None},
+    44: {"label": "修改已產生的邀約文宣", "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 修改已產生的今日之後會議邀約文宣 COURSE-XXXX | 姓名 | 新內容"},
 }
 
 EXEC_MENU_TEXT = """\
@@ -346,6 +404,19 @@ EXEC_MENU_TEXT = """\
  30. 👤 人物故事歸檔 ▶
  31. 📖 產品故事歸檔 ▶
 
+🎓 課程會議邀約
+ 34. 查詢課程會議 ▶
+ 35. 新增課程會議
+ 36. 從行事曆加入課程
+ 37. 刪除課程會議
+ 38. 查詢課程文宣 ▶
+ 39. 新增課程文宣
+ 40. 優化課程文宣（AI）
+ 41. 邀約文宣－潛在家人（AI）
+ 42. 邀約文宣－跟進夥伴（AI）
+ 43. 查詢已產生的邀約文宣 ▶
+ 44. 修改已產生的邀約文宣
+
 ══════════════════
 ▶ 直接執行　其餘顯示輸入範本
 回覆數字即可　NA = 取消返回"""
@@ -360,6 +431,24 @@ _awaiting_exec_input: dict = {}
 _awaiting_prospect_selection: dict = {}
 # 追蹤哪些 scope 正在等待選擇要歸檔的潛在家人（scope_id → list[dict]）
 _awaiting_prospect_file: dict = {}
+# 追蹤哪些 scope 正在等待邀約組合編號選擇（scope_id → list[{name, role, meeting}]）
+_awaiting_invite_selection: dict = {}
+# 跟進夥伴邀約三段式：先選分類（scope_id → True）
+_awaiting_partner_invite_category: dict = {}
+# 跟進夥伴邀約三段式：再選人（scope_id → list[dict]）
+_awaiting_partner_invite_person: dict = {}
+# 跟進夥伴邀約三段式：最後選會議（scope_id → {name, meetings})
+_awaiting_partner_invite_meeting: dict = {}
+# 已產生邀約文宣管理：先選文宣（scope_id → list[dict]）
+_awaiting_invite_manage_select: dict = {}
+# 已產生邀約文宣管理：再選操作（scope_id → dict）
+_awaiting_invite_manage_action: dict = {}
+# 已產生邀約文宣管理：等待輸入新內容（scope_id → dict）
+_awaiting_invite_manage_edit: dict = {}
+# 網頁邀約組合清單暫存（"web" → list[{name, role, meeting}]）
+_web_invite_combos: dict = {}
+_web_partner_invite_state: dict = {}
+_web_invite_manage_state: dict = {}
 
 
 def _format_prospect_detail(r: dict) -> str:
@@ -400,6 +489,114 @@ def _format_prospect_detail(r: dict) -> str:
         if val:
             lines.append(f"{label}：{val}")
     return "\n".join(lines)
+
+
+def _load_partner_rows() -> list[dict]:
+    partners_json = BASE_DIR / "output" / "partners" / "partners.json"
+    if not partners_json.exists():
+        return []
+    try:
+        with open(partners_json, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def _partners_by_category(category: str) -> list[dict]:
+    category = (category or "").strip().upper()
+    rows = [p for p in _load_partner_rows() if (p.get("category", "") or "").upper() == category and p.get("name")]
+    rows.sort(key=lambda p: (p.get("level", ""), p.get("name", "")))
+    return rows
+
+
+def _partner_category_menu() -> str:
+    return (
+        "📋 請先選擇夥伴分類屬性\n"
+        "1. A 類：持續有使用產品、有積分額、且有聽過鐘老師演講\n"
+        "2. B 類：偶爾使用產品，或有聽過鐘老師演講\n"
+        "3. C 類：即將開始了解，或即將聽鐘老師演講\n\n"
+        "請輸入 1、2、3 或 A、B、C，NA 取消"
+    )
+
+
+def _normalize_partner_category_choice(raw: str) -> str:
+    raw = (raw or "").strip().upper()
+    return {"1": "A", "2": "B", "3": "C", "A": "A", "B": "B", "C": "C"}.get(raw, "")
+
+
+def _format_partner_choice_menu(category: str, people: list[dict]) -> str:
+    lines = [f"📋 {category} 類夥伴清單（共 {len(people)} 位）", "輸入編號選人，NA 取消", ""]
+    for i, p in enumerate(people[:30], 1):
+        line = f"{i}. {p.get('name','')}"
+        if p.get("level"):
+            line += f"｜層級{p.get('level','')}"
+        if p.get("stage"):
+            line += f"｜{p.get('stage','')}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _format_meeting_choice_menu(name: str, meetings: list[dict]) -> str:
+    lines = [f"📋 {name} 的可邀約會議（共 {len(meetings)} 場）", "輸入編號產生邀約文宣，NA 取消", ""]
+    for i, m in enumerate(meetings, 1):
+        when = m["date"] + (f" {m['time']}" if m.get("time") else "")
+        lines.append(f"{i}. {m['title']}（{when}）")
+    return "\n".join(lines)
+
+
+def _format_invite_manage_list(rows: list[dict]) -> str:
+    if not rows:
+        return "目前沒有今日之後已產生的會議邀約文宣。"
+    lines = ["📨 今日之後已產生的會議邀約文宣：", "輸入編號管理該筆文宣，NA 取消", ""]
+    for i, rec in enumerate(rows, 1):
+        meeting = rec["meeting"]
+        when = meeting["date"] + (f" {meeting['time']}" if meeting.get("time") else "")
+        lines.append(f"{i}. {meeting['id']}｜{rec.get('name','')}｜{meeting['title']}｜{when}")
+    return "\n".join(lines)
+
+
+def _format_invite_manage_actions(rec: dict) -> str:
+    meeting = rec["meeting"]
+    when = meeting["date"] + (f" {meeting['time']}" if meeting.get("time") else "")
+    return (
+        "🛠️ 邀約文宣管理\n"
+        f"{meeting['id']}｜{rec.get('name','')}｜{meeting['title']}｜{when}\n\n"
+        "1. 修改已產生文宣\n"
+        "2. 強制重新產生\n\n"
+        "請輸入 1 或 2，NA 取消"
+    )
+
+
+def _format_invite_edit_confirm(rec: dict) -> str:
+    meeting = rec["meeting"]
+    when = meeting["date"] + (f" {meeting['time']}" if meeting.get("time") else "")
+    content = (rec.get("content", "") or "").strip()
+    if not content:
+        content = "（目前沒有已產生內容）"
+    return (
+        "📝 是否修改這份邀約文宣？\n"
+        f"{meeting['id']}｜{rec.get('name','')}｜{meeting['title']}｜{when}\n\n"
+        f"目前內容：\n{content}\n\n"
+        "1. 確定修改\n"
+        "2. 取消\n\n"
+        "請輸入 1 或 2，NA 取消"
+    )
+
+
+def _looks_like_explicit_command(msg: str) -> bool:
+    text = (msg or "").strip()
+    if not text:
+        return False
+    prefixes = (
+        "查詢", "新增", "更新", "修改", "刪除", "整理", "再次整理",
+        "邀約文宣", "邀約夥伴", "跟進夥伴", "激勵夥伴", "里程碑", "培訓",
+        "歸類模式", "關閉歸類模式", "潛在家人資料", "新增體驗", "換濾心",
+        "執行選單", "指令集", "課程", "MTG-",
+    )
+    for prefix in prefixes:
+        if text.startswith(prefix):
+            return True
+    return False
 
 app = Flask(__name__)
 
@@ -863,6 +1060,86 @@ def handle_training_command(user_msg: str, reply_token: str,
             reply_message(reply_token, f"✗ 換濾心記錄失敗：{e}")
         return True
 
+    # === 課程會議邀約 ===
+
+    # 邀約文宣 潛在家人（無姓名）→ 列出組合清單
+    if msg.strip() == "邀約文宣 潛在家人":
+        try:
+            course = _load_course_invite()
+            market = _load_market_dev()
+            meetings = course.list_meetings()
+            if not meetings:
+                reply_message(reply_token, "⚠️ 目前沒有排定的課程會議，請先新增課程會議。")
+                return True
+            prospects = market.MarketDevAgent().list_prospects()
+            if not prospects:
+                reply_message(reply_token, "⚠️ 目前沒有潛在家人資料，請先新增。")
+                return True
+            combos = []
+            for p in prospects:
+                for m in meetings:
+                    combos.append({"name": p.get("姓名", ""), "role": "prospect", "meeting": m})
+                    if len(combos) >= 20:
+                        break
+                if len(combos) >= 20:
+                    break
+            _awaiting_invite_selection[group_id or user_id] = combos
+            lines = [f"📋 邀約組合清單（共 {len(combos)} 組）\n輸入編號產生邀約文宣，NA 取消\n"]
+            for i, c in enumerate(combos, 1):
+                when = c["meeting"]["date"] + (f" {c['meeting']['time']}" if c["meeting"].get("time") else "")
+                lines.append(f"{i}. {c['name']} × {c['meeting']['title']}（{when}）")
+            reply_message(reply_token, "\n".join(lines))
+        except Exception as e:
+            reply_message(reply_token, f"✗ 邀約清單失敗：{e}")
+        return True
+
+    # 邀約文宣 跟進夥伴（無姓名）→ 列出組合清單
+    if msg.strip() == "邀約文宣 跟進夥伴":
+        _awaiting_partner_invite_category[group_id or user_id] = True
+        reply_message(reply_token, _partner_category_menu())
+        return True
+
+    if msg.strip() == "查詢已產生的今日之後會議邀約文宣":
+        try:
+            course = _load_course_invite()
+            rows = course.list_upcoming_invites(today_only_after=True)
+            if not rows:
+                reply_message(reply_token, "目前沒有今日之後已產生的會議邀約文宣。")
+                return True
+            _awaiting_invite_manage_select[group_id or user_id] = rows
+            reply_message(reply_token, _format_invite_manage_list(rows))
+        except Exception as e:
+            reply_message(reply_token, f"✗ 查詢已產生邀約文宣失敗：{e}")
+        return True
+
+    _course_cmds = (
+        "新增課程會議", "查詢課程會議", "刪除課程會議", "修改課程會議", "從行事曆加入課程",
+        "新增課程文宣", "查詢課程文宣", "優化課程文宣",
+        "查詢已產生的今日之後會議邀約文宣", "修改已產生的今日之後會議邀約文宣",
+        "邀約文宣 潛在家人", "邀約文宣 跟進夥伴",
+        "課程會議", "課程文宣", "課程",
+    )
+    if any(msg.startswith(c) for c in _course_cmds):
+        _is_async_course = msg.startswith("優化課程文宣") or msg.startswith("邀約文宣")
+        if _is_async_course:
+            def _run_course():
+                try:
+                    course = _load_course_invite()
+                    result = course.CourseInviteAgent().handle_command(msg)
+                    push_message(push_target, result if result else "⚠️ 課程指令無結果")
+                except Exception as e:
+                    push_message(push_target, f"✗ 課程邀約失敗：{e}")
+            reply_message(reply_token, "⏳ 正在透過 AI 產生課程文宣，請稍候...")
+            threading.Thread(target=_run_course, daemon=True).start()
+        else:
+            try:
+                course = _load_course_invite()
+                result = course.CourseInviteAgent().handle_command(msg)
+                reply_message(reply_token, result if result else "⚠️ 課程指令無結果")
+            except Exception as e:
+                reply_message(reply_token, f"✗ 課程指令失敗：{e}")
+        return True
+
     if msg.startswith("培訓"):
         try:
             training = _load_training_agent()
@@ -1059,17 +1336,184 @@ def webhook():
                 reply_message(reply_token, f"🗑️ 已取消歸檔，刪除 {count} 個待歸檔項目。")
                 continue
 
-        # ── 等待執行選單後續輸入時，NA 可取消 ────────────────────────
+        # ── 999 / 5168 快捷鍵優先（不被任何 awaiting 狀態攔截）──────
         _scope = group_id or user_id
+        if user_msg.strip() == "999":
+            if _clf_agent:
+                result = _clf_agent.clear_mode()
+                reply_message(reply_token, result)
+            else:
+                reply_message(reply_token, "⚠️ 歸類模式功能暫時無法使用")
+            continue
+        if user_msg.strip() == "5168":
+            _exec_menu_active[_scope] = True
+            # 清除所有等待狀態，避免殘留
+            _awaiting_person_for_mode.pop(_scope, None)
+            _awaiting_exec_input.pop(_scope, None)
+            _awaiting_prospect_selection.pop(_scope, None)
+            _awaiting_prospect_file.pop(_scope, None)
+            _awaiting_invite_selection.pop(_scope, None)
+            _awaiting_partner_invite_category.pop(_scope, None)
+            _awaiting_partner_invite_person.pop(_scope, None)
+            _awaiting_partner_invite_meeting.pop(_scope, None)
+            _awaiting_invite_manage_select.pop(_scope, None)
+            _awaiting_invite_manage_action.pop(_scope, None)
+            _awaiting_invite_manage_edit.pop(_scope, None)
+            reply_message(reply_token, EXEC_MENU_TEXT)
+            continue
+
+        # ── 等待執行選單後續輸入時，NA 可取消 ────────────────────────
         if user_msg.strip().upper() == "NA" and (
             _awaiting_person_for_mode.get(_scope) or _awaiting_exec_input.get(_scope)
             or _awaiting_prospect_selection.get(_scope) or _awaiting_prospect_file.get(_scope)
+            or _awaiting_invite_selection.get(_scope)
+            or _awaiting_partner_invite_category.get(_scope)
+            or _awaiting_partner_invite_person.get(_scope)
+            or _awaiting_partner_invite_meeting.get(_scope)
+            or _awaiting_invite_manage_select.get(_scope)
+            or _awaiting_invite_manage_action.get(_scope)
+            or _awaiting_invite_manage_edit.get(_scope)
         ):
             _awaiting_person_for_mode.pop(_scope, None)
             _awaiting_exec_input.pop(_scope, None)
             _awaiting_prospect_selection.pop(_scope, None)
             _awaiting_prospect_file.pop(_scope, None)
+            _awaiting_invite_selection.pop(_scope, None)
+            _awaiting_partner_invite_category.pop(_scope, None)
+            _awaiting_partner_invite_person.pop(_scope, None)
+            _awaiting_partner_invite_meeting.pop(_scope, None)
+            _awaiting_invite_manage_select.pop(_scope, None)
+            _awaiting_invite_manage_action.pop(_scope, None)
+            _awaiting_invite_manage_edit.pop(_scope, None)
             reply_message(reply_token, "↩️ 已取消，返回待機。")
+            continue
+
+        if _looks_like_explicit_command(user_msg) and (
+            _awaiting_partner_invite_category.get(_scope)
+            or _awaiting_partner_invite_person.get(_scope)
+            or _awaiting_partner_invite_meeting.get(_scope)
+        ):
+            _awaiting_partner_invite_category.pop(_scope, None)
+            _awaiting_partner_invite_person.pop(_scope, None)
+            _awaiting_partner_invite_meeting.pop(_scope, None)
+            _awaiting_invite_manage_select.pop(_scope, None)
+            _awaiting_invite_manage_action.pop(_scope, None)
+            _awaiting_invite_manage_edit.pop(_scope, None)
+
+        if _awaiting_invite_manage_edit.get(_scope):
+            state = _awaiting_invite_manage_edit[_scope]
+            if state.get("step") == "confirm" and user_msg.strip().isdigit():
+                choice = int(user_msg.strip())
+                if choice == 1:
+                    _awaiting_invite_manage_edit[_scope] = {"step": "edit", "record": state["record"]}
+                    reply_message(reply_token, "📝 請直接輸入新的邀約文宣內容，NA 取消")
+                    continue
+                _awaiting_invite_manage_edit.pop(_scope, None)
+                reply_message(reply_token, "已取消修改邀約文宣")
+                continue
+            if state.get("step") == "confirm":
+                reply_message(reply_token, "⚠️ 請輸入 1 或 2，NA 取消")
+                continue
+
+            rec = state["record"]
+            _awaiting_invite_manage_edit.pop(_scope, None)
+            new_content = user_msg.strip()
+            if not new_content:
+                reply_message(reply_token, "⚠️ 新內容不可空白，NA 取消")
+                continue
+            course = _load_course_invite()
+            ok = course.update_invite(rec["meeting"]["id"], rec.get("name", ""), new_content)
+            reply_message(reply_token, "✅ 已更新邀約文宣" if ok else "⚠️ 找不到該筆邀約文宣")
+            continue
+
+        if _awaiting_invite_manage_action.get(_scope) and user_msg.strip().isdigit():
+            rec = _awaiting_invite_manage_action.pop(_scope)
+            choice = int(user_msg.strip())
+            if choice == 1:
+                _awaiting_invite_manage_edit[_scope] = {"step": "confirm", "record": rec}
+                reply_message(reply_token, _format_invite_edit_confirm(rec))
+                continue
+            if choice == 2:
+                def _run_regen(rec=rec, push_target=push_target):
+                    try:
+                        course = _load_course_invite()
+                        if rec.get("role") == "prospect":
+                            result = course.generate_prospect_invite_for_meeting(rec["name"], rec["meeting"])
+                        else:
+                            result = course.generate_partner_invite_for_meeting(rec["name"], rec["meeting"])
+                        push_message(push_target, result if result else "⚠️ AI 無回應，請稍後再試")
+                    except Exception as e:
+                        push_message(push_target, f"✗ 強制重新產生失敗：{e}")
+                reply_message(reply_token, f"⏳ 正在強制重新產生「{rec['name']} × {rec['meeting']['title']}」邀約文宣...")
+                threading.Thread(target=_run_regen, daemon=True).start()
+                continue
+            reply_message(reply_token, "⚠️ 請輸入 1 或 2，NA 取消")
+            continue
+
+        if _awaiting_invite_manage_select.get(_scope) and user_msg.strip().isdigit():
+            rows = _awaiting_invite_manage_select.pop(_scope)
+            idx = int(user_msg.strip())
+            if not (1 <= idx <= len(rows)):
+                reply_message(reply_token, f"⚠️ 請輸入 1～{len(rows)} 的編號，NA 取消")
+                continue
+            rec = rows[idx - 1]
+            _awaiting_invite_manage_action[_scope] = rec
+            reply_message(reply_token, _format_invite_manage_actions(rec))
+            continue
+
+        if _awaiting_partner_invite_category.get(_scope):
+            if _looks_like_explicit_command(user_msg):
+                _awaiting_partner_invite_category.pop(_scope, None)
+            else:
+                category = _normalize_partner_category_choice(user_msg)
+                if not category:
+                    reply_message(reply_token, "⚠️ 請輸入 1、2、3 或 A、B、C，NA 取消")
+                    continue
+                people = _partners_by_category(category)
+                _awaiting_partner_invite_category.pop(_scope, None)
+                if not people:
+                    reply_message(reply_token, f"⚠️ 目前沒有分類 {category} 的夥伴。")
+                    continue
+                _awaiting_partner_invite_person[_scope] = {"category": category, "people": people}
+                reply_message(reply_token, _format_partner_choice_menu(category, people))
+                continue
+
+        if _awaiting_partner_invite_person.get(_scope) and user_msg.strip().isdigit():
+            state = _awaiting_partner_invite_person[_scope]
+            people = state["people"]
+            idx = int(user_msg.strip())
+            if not (1 <= idx <= len(people)):
+                reply_message(reply_token, f"⚠️ 請輸入 1～{len(people)} 的編號，NA 取消")
+                continue
+            person = people[idx - 1]
+            course = _load_course_invite()
+            meetings = course.list_meetings()
+            _awaiting_partner_invite_person.pop(_scope, None)
+            if not meetings:
+                reply_message(reply_token, "⚠️ 目前沒有排定的課程會議，請先新增課程會議。")
+                continue
+            _awaiting_partner_invite_meeting[_scope] = {"name": person.get("name", ""), "meetings": meetings}
+            reply_message(reply_token, _format_meeting_choice_menu(person.get("name", ""), meetings))
+            continue
+
+        if _awaiting_partner_invite_meeting.get(_scope) and user_msg.strip().isdigit():
+            state = _awaiting_partner_invite_meeting.pop(_scope)
+            meetings = state["meetings"]
+            idx = int(user_msg.strip())
+            if not (1 <= idx <= len(meetings)):
+                reply_message(reply_token, f"⚠️ 請輸入 1～{len(meetings)} 的編號，NA 取消")
+                continue
+            meeting = meetings[idx - 1]
+            person_name = state["name"]
+            def _run_partner_invite(name=person_name, meeting=meeting, push_target=push_target):
+                try:
+                    course = _load_course_invite()
+                    result = course.generate_partner_invite_for_meeting(name, meeting)
+                    push_message(push_target, result if result else "⚠️ AI 無回應，請稍後再試")
+                except Exception as e:
+                    push_message(push_target, f"✗ 邀約文宣產生失敗：{e}")
+            reply_message(reply_token, f"⏳ 正在為「{person_name} × {meeting['title']}」產生邀約文宣...")
+            threading.Thread(target=_run_partner_invite, daemon=True).start()
             continue
 
         # ── 加入潛在家人資訊：選擇人員後設定歸檔模式 ────────────────
@@ -1099,6 +1543,32 @@ def webhook():
                 reply_message(reply_token, f"⚠️ 請輸入 1～{len(rows)} 的編號，NA 取消")
             continue
 
+        # ── 邀約組合編號選擇 → 產生邀約文宣 ─────────────────────────
+        if _awaiting_invite_selection.get(_scope) and user_msg.strip().isdigit():
+            combos = _awaiting_invite_selection.pop(_scope)
+            idx = int(user_msg.strip())
+            if 1 <= idx <= len(combos):
+                combo = combos[idx - 1]
+                def _run_invite_combo(combo=combo, push_target=push_target):
+                    try:
+                        course = _load_course_invite()
+                        if combo["role"] == "prospect":
+                            result = course.generate_prospect_invite_for_meeting(
+                                combo["name"], combo["meeting"]
+                            )
+                        else:
+                            result = course.generate_partner_invite_for_meeting(
+                                combo["name"], combo["meeting"]
+                            )
+                        push_message(push_target, result if result else "⚠️ AI 無回應，請稍後再試")
+                    except Exception as e:
+                        push_message(push_target, f"✗ 邀約文宣產生失敗：{e}")
+                reply_message(reply_token, f"⏳ 正在為「{combo['name']} × {combo['meeting']['title']}」產生邀約文宣...")
+                threading.Thread(target=_run_invite_combo, daemon=True).start()
+            else:
+                reply_message(reply_token, f"⚠️ 請輸入 1～{len(combos)} 的編號，NA 取消")
+            continue
+
         # ── 等待人物名稱輸入 → 設定模式 ──────────────────────────────
         if _awaiting_person_for_mode.get(_scope):
             mode_name = _awaiting_person_for_mode.pop(_scope)
@@ -1111,21 +1581,7 @@ def webhook():
                 reply_message(reply_token, f"⚠️ 設定失敗：{e}")
             continue
 
-        # ── 999 快捷鍵 → 關閉歸類模式 ───────────────────────────────
-        if user_msg.strip() == "999":
-            if _clf_agent:
-                result = _clf_agent.clear_mode()
-                reply_message(reply_token, result)
-            else:
-                reply_message(reply_token, "⚠️ 歸類模式功能暫時無法使用")
-            continue
-
-        # ── 5168 快捷鍵 → 執行選單 ───────────────────────────────
-        if user_msg.strip() == "5168":
-            _exec_scope = group_id or user_id
-            _exec_menu_active[_exec_scope] = True
-            reply_message(reply_token, EXEC_MENU_TEXT)
-            continue
+        # (999 / 5168 已在上方優先處理)
 
         # ── 執行選單：數字選擇 / NA 取消 ─────────────────────────
         _exec_scope = group_id or user_id
@@ -1445,6 +1901,126 @@ def archive_browse(subpath):
 
 def process_web_command(cmd: str) -> str:
     """Handle all bot commands and return a string result (no LINE reply)."""
+    if cmd.strip().upper() == "NA":
+        _web_invite_combos.pop("web", None)
+        _web_partner_invite_state.pop("web", None)
+        _web_invite_manage_state.pop("web", None)
+        return "↩️ 已取消，返回待機。"
+
+    if _looks_like_explicit_command(cmd) and _web_partner_invite_state.get("web"):
+        _web_partner_invite_state.pop("web", None)
+    if _looks_like_explicit_command(cmd) and _web_invite_manage_state.get("web"):
+        _web_invite_manage_state.pop("web", None)
+
+    if _web_partner_invite_state.get("web"):
+        state = _web_partner_invite_state["web"]
+        if _looks_like_explicit_command(cmd):
+            _web_partner_invite_state.pop("web", None)
+            state = None
+        if not state:
+            pass
+        elif state.get("step") == "category":
+            category = _normalize_partner_category_choice(cmd)
+            if not category:
+                return "⚠️ 請輸入 1、2、3 或 A、B、C"
+            people = _partners_by_category(category)
+            if not people:
+                _web_partner_invite_state.pop("web", None)
+                return f"⚠️ 目前沒有分類 {category} 的夥伴。"
+            _web_partner_invite_state["web"] = {"step": "person", "category": category, "people": people}
+            return _format_partner_choice_menu(category, people)
+        elif state.get("step") == "person" and cmd.strip().isdigit():
+            people = state["people"]
+            idx = int(cmd.strip())
+            if not (1 <= idx <= len(people)):
+                return f"⚠️ 請輸入 1～{len(people)} 的編號"
+            course = _load_course_invite()
+            meetings = course.list_meetings()
+            if not meetings:
+                _web_partner_invite_state.pop("web", None)
+                return "⚠️ 目前沒有排定的課程會議，請先新增課程會議。"
+            person = people[idx - 1]
+            _web_partner_invite_state["web"] = {"step": "meeting", "name": person.get("name", ""), "meetings": meetings}
+            return _format_meeting_choice_menu(person.get("name", ""), meetings)
+        elif state.get("step") == "meeting" and cmd.strip().isdigit():
+            meetings = state["meetings"]
+            idx = int(cmd.strip())
+            if not (1 <= idx <= len(meetings)):
+                return f"⚠️ 請輸入 1～{len(meetings)} 的編號"
+            meeting = meetings[idx - 1]
+            name = state["name"]
+            _web_partner_invite_state.pop("web", None)
+            try:
+                course = _load_course_invite()
+                return course.generate_partner_invite_for_meeting(name, meeting)
+            except Exception as e:
+                return f"✗ 邀約文宣產生失敗：{e}"
+
+    # 邀約組合編號選擇（網頁版）
+    if _web_invite_combos.get("web") and cmd.strip().isdigit():
+        combos = _web_invite_combos.pop("web")
+        idx = int(cmd.strip())
+        if 1 <= idx <= len(combos):
+            combo = combos[idx - 1]
+            try:
+                course = _load_course_invite()
+                if combo["role"] == "prospect":
+                    return course.generate_prospect_invite_for_meeting(combo["name"], combo["meeting"])
+                else:
+                    return course.generate_partner_invite_for_meeting(combo["name"], combo["meeting"])
+            except Exception as e:
+                return f"✗ 邀約文宣產生失敗：{e}"
+        else:
+            return f"⚠️ 請輸入 1～{len(combos)} 的編號"
+
+    if _web_invite_manage_state.get("web"):
+        state = _web_invite_manage_state["web"]
+        if state.get("step") == "select" and cmd.strip().isdigit():
+            rows = state["rows"]
+            idx = int(cmd.strip())
+            if not (1 <= idx <= len(rows)):
+                return f"⚠️ 請輸入 1～{len(rows)} 的編號"
+            rec = rows[idx - 1]
+            _web_invite_manage_state["web"] = {"step": "action", "record": rec}
+            return _format_invite_manage_actions(rec)
+        if state.get("step") == "action" and cmd.strip().isdigit():
+            rec = state["record"]
+            choice = int(cmd.strip())
+            if choice == 1:
+                _web_invite_manage_state["web"] = {"step": "confirm_edit", "record": rec}
+                return _format_invite_edit_confirm(rec)
+            if choice == 2:
+                _web_invite_manage_state.pop("web", None)
+                try:
+                    course = _load_course_invite()
+                    if rec.get("role") == "prospect":
+                        return course.generate_prospect_invite_for_meeting(rec["name"], rec["meeting"])
+                    return course.generate_partner_invite_for_meeting(rec["name"], rec["meeting"])
+                except Exception as e:
+                    return f"✗ 強制重新產生失敗：{e}"
+            return "⚠️ 請輸入 1 或 2"
+        if state.get("step") == "confirm_edit" and cmd.strip().isdigit():
+            choice = int(cmd.strip())
+            if choice == 1:
+                _web_invite_manage_state["web"] = {"step": "edit", "record": state["record"]}
+                return "📝 請直接輸入新的邀約文宣內容，NA 取消"
+            _web_invite_manage_state.pop("web", None)
+            return "已取消修改邀約文宣"
+        if state.get("step") == "confirm_edit":
+            return "⚠️ 請輸入 1 或 2，NA 取消"
+        if state.get("step") == "edit":
+            rec = state["record"]
+            _web_invite_manage_state.pop("web", None)
+            new_content = cmd.strip()
+            if not new_content:
+                return "⚠️ 新內容不可空白"
+            try:
+                course = _load_course_invite()
+                ok = course.update_invite(rec["meeting"]["id"], rec["name"], new_content)
+                return "✅ 已更新邀約文宣" if ok else "⚠️ 找不到該筆邀約文宣"
+            except Exception as e:
+                return f"✗ 更新邀約文宣失敗：{e}"
+
     try:
         # Calendar
         cal = _load_calendar()
@@ -1523,6 +2099,77 @@ def process_web_command(cmd: str) -> str:
             return training.TrainingAgent().handle_query(cmd)
     except Exception as e:
         return f"⚠️ 培訓指令錯誤：{e}"
+
+    try:
+        # Course meeting & invite
+        _course_prefixes = (
+            "新增課程會議", "查詢課程會議", "刪除課程會議", "修改課程會議", "從行事曆加入課程",
+            "新增課程文宣", "查詢課程文宣", "優化課程文宣",
+            "查詢已產生的今日之後會議邀約文宣", "修改已產生的今日之後會議邀約文宣",
+            "邀約文宣 潛在家人", "邀約文宣 跟進夥伴",
+            "課程會議", "課程文宣", "課程",
+        )
+        if any(cmd.startswith(p) for p in _course_prefixes):
+            course = _load_course_invite()
+
+            if cmd.strip() == "查詢已產生的今日之後會議邀約文宣":
+                rows = course.list_upcoming_invites(today_only_after=True)
+                if not rows:
+                    return "目前沒有今日之後已產生的會議邀約文宣。"
+                _web_invite_manage_state["web"] = {"step": "select", "rows": rows}
+                return _format_invite_manage_list(rows)
+
+            # 無姓名 → 顯示組合清單
+            if cmd.strip() in ("邀約文宣 潛在家人", "邀約文宣 跟進夥伴"):
+                if cmd.strip() == "邀約文宣 跟進夥伴":
+                    _web_partner_invite_state["web"] = {"step": "category"}
+                    return _partner_category_menu()
+                role = "prospect" if "潛在家人" in cmd else "partner"
+                meetings = course.list_meetings()
+                if not meetings:
+                    return "⚠️ 目前沒有排定的課程會議，請先新增課程會議。"
+                import csv as _csv_web
+                if role == "prospect":
+                    prospects_csv = BASE_DIR / "output" / "csv_data" / "market_list.csv"
+                    person_key = "姓名"
+                    people = []
+                    if prospects_csv.exists():
+                        with open(prospects_csv, encoding="utf-8-sig", newline="") as _f:
+                            people = list(_csv_web.DictReader(_f))
+                    if not people:
+                        return "⚠️ 目前沒有潛在家人資料，請先新增。"
+                else:
+                    import json as _json_pw
+                    partners_json = BASE_DIR / "output" / "partners" / "partners.json"
+                    person_key = "姓名"
+                    raw_partners = []
+                    if partners_json.exists():
+                        with open(partners_json, encoding="utf-8") as _f:
+                            raw_partners = _json_pw.load(_f)
+                    people = [{"姓名": p.get("name", "")} for p in raw_partners if p.get("name")]
+                    if not people:
+                        return "⚠️ 目前沒有夥伴資料，請先新增夥伴。"
+                combos = []
+                for p in people:
+                    for m in meetings:
+                        combos.append({"name": p.get(person_key, ""), "role": role, "meeting": m})
+                        if len(combos) >= 20:
+                            break
+                    if len(combos) >= 20:
+                        break
+                _web_invite_combos["web"] = combos
+                lines = [f"📋 邀約組合清單（共 {len(combos)} 組）\n輸入編號產生邀約文宣，NA 取消\n"]
+                for i, c in enumerate(combos, 1):
+                    when = c["meeting"]["date"] + (f" {c['meeting']['time']}" if c["meeting"].get("time") else "")
+                    existing = course.get_invite(c["meeting"]["id"], c["name"])
+                    marker = f"[EXISTS:{c['meeting']['id']}:{c['name']}]" if existing else ""
+                    lines.append(f"{i}. {c['name']} × {c['meeting']['title']}（{when}）{marker}")
+                return "\n".join(lines)
+
+            result = course.CourseInviteAgent().handle_command(cmd)
+            return result if result else "⚠️ 課程指令無結果"
+    except Exception as e:
+        return f"⚠️ 課程邀約指令錯誤：{e}"
 
     try:
         # Followup
@@ -1805,6 +2452,7 @@ def _render_dashboard_html() -> str:
   <button class="tab-btn" onclick="openTab('培訓記錄')">📖 記錄</button>
   <button class="tab-btn" onclick="openTab('安麗產品歸檔')">🛍️ 安麗</button>
   <button class="tab-btn" onclick="openTab('故事分類')">📝 故事</button>
+  <button class="tab-btn" onclick="openTab('課程邀約')">🎓 課程</button>
   <button class="tab-btn" onclick="openTab('說明')">❓ 說明</button>
 </div>
 <div id="mobile-drawer"></div>
@@ -1861,7 +2509,8 @@ const MENU_GROUPS = [
       { label: "里程碑記錄", prompt: "里程碑 " },
       { label: "查詢所有夥伴", cmd: "查詢夥伴" },
       { label: "查詢待跟進夥伴", cmd: "查詢待跟進夥伴" },
-      { label: "新增夥伴", prompt: "新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註" },
+      { label: "新增夥伴", prompt: "新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註 | 分類" },
+      { label: "更新夥伴", prompt: "更新夥伴 姓名 | 層級 | 近況 | 下次跟進日期 | 聯絡資訊 | 備註 | 類型 | 編號 | 合夥人 | 推薦人 | 到期日 | 年月 | 一年內新上獎銜 | 首次獎金% | 現金抵用券 | 購物積點 | 優惠券 | 本月購貨 | 上月購貨 | 前2月購貨 | 前3月購貨 | 分類" },
       { label: "跟進夥伴", prompt: "跟進夥伴 姓名 | 狀態 | 下次跟進日期 | 備註" },
     ]
   },
@@ -1917,6 +2566,23 @@ const MENU_GROUPS = [
     ]
   },
   {
+    label: "🎓 課程邀約",
+    key: "課程邀約",
+    items: [
+      { label: "查詢課程會議", cmd: "查詢課程會議" },
+      { label: "新增課程會議", prompt: "新增課程會議 YYYY-MM-DD HH:MM 標題|地點|說明" },
+      { label: "從行事曆加入課程", prompt: "從行事曆加入課程 " },
+      { label: "刪除課程會議", prompt: "刪除課程會議 COURSE-" },
+      { label: "查詢課程文宣", cmd: "查詢課程文宣" },
+      { label: "新增課程文宣", prompt: "新增課程文宣 標題|內文" },
+      { label: "優化課程文宣", prompt: "優化課程文宣 PROMO-" },
+      { label: "邀約文宣－潛在家人", prompt: "邀約文宣 潛在家人 " },
+      { label: "邀約文宣－跟進夥伴", prompt: "邀約文宣 跟進夥伴 " },
+      { label: "查詢已產生的邀約文宣", cmd: "查詢已產生的今日之後會議邀約文宣" },
+      { label: "修改已產生的邀約文宣", prompt: "修改已產生的今日之後會議邀約文宣 COURSE-XXXX | 姓名 | 新內容" },
+    ]
+  },
+  {
     label: "❓ 說明",
     key: "說明",
     items: [
@@ -1968,7 +2634,7 @@ function openTab(key) {
   const activeBtn = [...document.querySelectorAll('.tab-btn')].find(b => b.textContent.includes(
     key === '市場開發' ? '市場' : key === '培訓系統' ? '培訓' : key === '夥伴陪伴' ? '夥伴' :
     key === '行事曆' ? '行事曆' : key === '歸類模式' ? '歸類' : key === '培訓記錄' ? '記錄' :
-    key === '安麗產品歸檔' ? '安麗' : key === '故事分類' ? '故事' : '說明'
+    key === '安麗產品歸檔' ? '安麗' : key === '故事分類' ? '故事' : key === '課程邀約' ? '課程' : '說明'
   ));
   if (activeBtn) activeBtn.classList.add('active');
 
@@ -2410,8 +3076,33 @@ const GROUPS=[
       fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"姓名"},
               {id:"g",lbl:"目標",type:"text",ph:"例：月入三萬"},
               {id:"d",lbl:"下次跟進日期",type:"date"},
-              {id:"r",lbl:"備註",type:"textarea",ph:"補充資訊"}],
-      build:function(v){return "新增夥伴 "+v.n+" | "+v.g+" | "+v.d+" | "+v.r;}}},
+              {id:"r",lbl:"備註",type:"textarea",ph:"補充資訊"},
+              {id:"c",lbl:"分類",type:"select",opts:["A","B","C"]}],
+      build:function(v){return "新增夥伴 "+v.n+" | "+v.g+" | "+v.d+" | "+v.r+" | "+v.c;}}},
+    {label:"更新夥伴",tag:"表單",form:{title:"更新夥伴",
+      fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"姓名"},
+              {id:"l",lbl:"層級",type:"text",ph:"例：1"},
+              {id:"s",lbl:"近況",type:"text",ph:"例：持續跟進"},
+              {id:"d",lbl:"下次跟進日期",type:"date"},
+              {id:"ci",lbl:"聯絡資訊",type:"text",ph:"例：LINE:abc123"},
+              {id:"r",lbl:"備註",type:"textarea",ph:"補充資訊"},
+              {id:"t",lbl:"類型",type:"text",ph:"例：直銷商"},
+              {id:"no",lbl:"編號",type:"text",ph:"例：7519213"},
+              {id:"p",lbl:"合夥人",type:"text",ph:"例：王小明"},
+              {id:"sp",lbl:"推薦人",type:"text",ph:"例：陳薾云"},
+              {id:"ed",lbl:"到期日",type:"date"},
+              {id:"ym",lbl:"年月",type:"text",ph:"例：2026-03"},
+              {id:"rt",lbl:"一年內新上獎銜",type:"text",ph:"例：翡翠"},
+              {id:"fb",lbl:"首次獎金%",type:"text",ph:"例：3%"},
+              {id:"cv",lbl:"現金抵用券",type:"text",ph:"例：有"},
+              {id:"sp2",lbl:"購物積點",type:"text",ph:"例：2821"},
+              {id:"cp",lbl:"優惠券",type:"text",ph:"例：有"},
+              {id:"m1",lbl:"本月購貨",type:"text",ph:"例：V"},
+              {id:"m2",lbl:"上月購貨",type:"text",ph:"例：V"},
+              {id:"m3",lbl:"前2月購貨",type:"text",ph:"例：V"},
+              {id:"m4",lbl:"前3月購貨",type:"text",ph:"例：V"},
+              {id:"cg",lbl:"分類",type:"select",opts:["","A","B","C"]}],
+      build:function(v){return "更新夥伴 "+v.n+" | "+v.l+" | "+v.s+" | "+v.d+" | "+v.ci+" | "+v.r+" | "+v.t+" | "+v.no+" | "+v.p+" | "+v.sp+" | "+v.ed+" | "+v.ym+" | "+v.rt+" | "+v.fb+" | "+v.cv+" | "+v.sp2+" | "+v.cp+" | "+v.m1+" | "+v.m2+" | "+v.m3+" | "+v.m4+" | "+v.cg;}}},
     {label:"跟進夥伴",tag:"表單",form:{title:"跟進夥伴",
       fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"姓名"},
               {id:"s",lbl:"狀態",type:"text",ph:"例：持續跟進"},
@@ -2469,6 +3160,69 @@ const GROUPS=[
       fields:[{id:"n",lbl:"人物名稱",type:"text",req:1,ph:"例：建德"}],
       build:function(v){return "潛在家人資料 "+v.n;}}},
     {label:"📖 產品故事歸檔",tag:"執行",cmd:"產品故事歸檔"},
+  ]},
+  {label:"🎓 課程邀約",items:[
+    {label:"查詢課程會議",tag:"執行",cmd:"查詢課程會議"},
+    {label:"新增課程會議",tag:"表單",form:{title:"新增課程會議",
+      fields:[{id:"d",lbl:"日期",type:"date",req:1},
+              {id:"t",lbl:"時間（選填）",type:"time"},
+              {id:"ti",lbl:"標題",type:"text",req:1,ph:"例：四月OPP說明會"},
+              {id:"lo",lbl:"地點（選填）",type:"text",ph:"例：台中大里店"},
+              {id:"r",lbl:"說明（選填）",type:"textarea",ph:"例：歡迎帶朋友"},
+              {id:"sp",lbl:"演講貴賓（選填）",type:"text",ph:"例：鑽石李大明"},
+              {id:"spb",lbl:"貴賓介紹（選填）",type:"textarea",ph:"例：20年資深鑽石，擅長事業說明與激勵"},
+              {id:"tp",lbl:"課程主題（選填）",type:"text",ph:"例：Amway事業機會介紹"},
+              {id:"tpd",lbl:"主題介紹（選填）",type:"textarea",ph:"例：從零到鑽石的實戰分享，含產品體驗與收入模型"}],
+      build:function(v){
+        var s="新增課程會議 "+v.d+(v.t?" "+v.t:"")+" "+v.ti;
+        var ext=[v.lo||"",v.r||"",v.sp||"",v.spb||"",v.tp||"",v.tpd||""];
+        var last=-1;
+        for(var i=ext.length-1;i>=0;i--){if(ext[i]){last=i;break;}}
+        if(last>=0){for(var i=0;i<=last;i++)s+="|"+(ext[i]||"");}
+        return s;}}},
+    {label:"從行事曆加入課程",tag:"表單",form:{title:"從行事曆加入課程",
+      fields:[{id:"k",lbl:"關鍵字（選填）",type:"text",ph:"例：OPP、培訓"}],
+      build:function(v){return "從行事曆加入課程"+(v.k?" "+v.k:"");}}},
+    {label:"修改課程會議",tag:"表單",form:{title:"修改課程會議",
+      fields:[{id:"id",lbl:"課程 ID（COURSE-XXXX）",type:"text",req:1,ph:"先查詢課程會議取得 ID"},
+              {id:"ti",lbl:"標題（選填）",type:"text",ph:"留空＝不修改"},
+              {id:"d",lbl:"日期（選填）",type:"date"},
+              {id:"t",lbl:"時間（選填）",type:"time"},
+              {id:"lo",lbl:"地點（選填）",type:"text",ph:"留空＝不修改"},
+              {id:"r",lbl:"說明（選填）",type:"textarea",ph:"留空＝不修改"},
+              {id:"sp",lbl:"演講貴賓（選填）",type:"text",ph:"留空＝不修改"},
+              {id:"spb",lbl:"貴賓介紹（選填）",type:"textarea",ph:"留空＝不修改"},
+              {id:"tp",lbl:"課程主題（選填）",type:"text",ph:"留空＝不修改"},
+              {id:"tpd",lbl:"主題介紹（選填）",type:"textarea",ph:"留空＝不修改"}],
+      build:function(v){
+        var MAP={ti:"標題",d:"日期",t:"時間",lo:"地點",r:"說明",sp:"演講貴賓",spb:"貴賓介紹",tp:"課程主題",tpd:"主題介紹"};
+        var pairs=[];
+        Object.keys(MAP).forEach(function(k){if(v[k])pairs.push(MAP[k]+":"+v[k]);});
+        if(!pairs.length)return "修改課程會議 "+v.id+" 標題:（請填寫至少一個欄位）";
+        return "修改課程會議 "+v.id+" "+pairs.join("|");}}},
+    {label:"刪除課程會議",tag:"表單",form:{title:"刪除課程會議",
+      fields:[{id:"id",lbl:"課程 ID（COURSE-XXXX）",type:"text",req:1,ph:"先查詢課程會議取得 ID"}],
+      build:function(v){return "刪除課程會議 "+v.id;}}},
+    {label:"查詢課程文宣",tag:"執行",cmd:"查詢課程文宣"},
+    {label:"新增課程文宣",tag:"表單",form:{title:"新增課程文宣",
+      fields:[{id:"ti",lbl:"標題",type:"text",req:1,ph:"例：四月OPP邀約文宣"},
+              {id:"c",lbl:"內文",type:"textarea",req:1,ph:"輸入文宣內容"}],
+      build:function(v){return "新增課程文宣 "+v.ti+"|"+v.c;}}},
+    {label:"優化課程文宣（AI）",tag:"表單",form:{title:"優化課程文宣",
+      fields:[{id:"id",lbl:"文宣 ID（PROMO-XXXX）",type:"text",req:1,ph:"先查詢課程文宣取得 ID"}],
+      build:function(v){return "優化課程文宣 "+v.id;}}},
+    {label:"邀約文宣－潛在家人（AI）",tag:"表單",form:{title:"潛在家人邀約文宣",
+      fields:[{id:"n",lbl:"姓名（選填，空白＝通用）",type:"text",ph:"例：Amy"}],
+      build:function(v){return "邀約文宣 潛在家人"+(v.n?" "+v.n:"");}}},
+    {label:"邀約文宣－跟進夥伴（AI）",tag:"表單",form:{title:"跟進夥伴邀約文宣",
+      fields:[{id:"n",lbl:"姓名（選填，空白＝通用）",type:"text",ph:"例：建德"}],
+      build:function(v){return "邀約文宣 跟進夥伴"+(v.n?" "+v.n:"");}}},
+    {label:"查詢已產生的邀約文宣",tag:"執行",cmd:"查詢已產生的今日之後會議邀約文宣"},
+    {label:"修改已產生的邀約文宣",tag:"表單",form:{title:"修改已產生的邀約文宣",
+      fields:[{id:"id",lbl:"課程 ID（COURSE-XXXX）",type:"text",req:1,ph:"先查詢已產生的邀約文宣取得 ID"},
+              {id:"n",lbl:"姓名",type:"text",req:1,ph:"例：吳建德"},
+              {id:"c",lbl:"新內容",type:"textarea",req:1,ph:"輸入修改後的邀約文宣"}],
+      build:function(v){return "修改已產生的今日之後會議邀約文宣 "+v.id+" | "+v.n+" | "+v.c;}}},
   ]},
   {label:"❓ 說明",items:[
     {label:"顯示所有指令",tag:"執行",cmd:"指令集"},
@@ -2599,10 +3353,60 @@ async function doSend(forced){
     var d=await r.json();sp.remove();
     var txt=d.result||"（無回應）";
     addMsg(txt,"b");
-    if(txt.startsWith("📋 潛在家人名單")){addListButtons(txt,"潛在家人詳情");}
+    if(txt.startsWith("📋 邀約組合清單")){addInviteComboButtons(txt);}
+    else if(txt.startsWith("📨 今日之後已產生的會議邀約文宣")){addInviteManageButtons(txt);}
+    else if(txt.startsWith("🛠️ 邀約文宣管理")){addInviteManageActionButtons();}
+    else if(txt.startsWith("📝 是否修改這份邀約文宣")){addInviteEditConfirmButtons();}
+    else if(txt.startsWith("📋 潛在家人名單")){addListButtons(txt,"潛在家人詳情");}
     else if(txt.startsWith("👤 ")){var nm=txt.split("\\n")[0].replace("👤 ","").split(/[\s　]/)[0];if(nm)addDetailButtons(nm);}
   }catch(e){sp.remove();addMsg("⚠️ 連線失敗："+e.message,"b");}
   finally{setBusy(false);}
+}
+function addInviteManageButtons(txt){
+  var chat=document.getElementById("chat");
+  var w=document.createElement("div");w.className="msg b";
+  var wrap=document.createElement("div");
+  wrap.style.cssText="display:flex;flex-direction:column;gap:6px;padding:4px 0";
+  txt.split("\\n").forEach(function(line){
+    var m=line.match(/^(\d+)\.\s+(.+)/);
+    if(!m)return;
+    var n=m[1],desc=m[2];
+    var b=document.createElement("button");
+    b.style.cssText="background:#007AFF;color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer;text-align:left;width:100%";
+    b.textContent=n+". "+desc+"  👉 管理這筆文宣";
+    (function(ni){b.onclick=function(){doSend(ni);};})(n);
+    wrap.appendChild(b);
+  });
+  if(wrap.children.length>0){w.appendChild(wrap);chat.appendChild(w);chat.scrollTop=chat.scrollHeight;}
+}
+function addInviteManageActionButtons(){
+  var chat=document.getElementById("chat");
+  var w=document.createElement("div");w.className="msg b";
+  var wrap=document.createElement("div");
+  wrap.style.cssText="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0";
+  [["1","📝 修改已產生文宣"],["2","🔁 強制重新產生"]].forEach(function(it){
+    var b=document.createElement("button");
+    b.style.cssText="background:#5856D6;color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer";
+    b.textContent=it[1];
+    b.onclick=function(){doSend(it[0]);};
+    wrap.appendChild(b);
+  });
+  w.appendChild(wrap);chat.appendChild(w);chat.scrollTop=chat.scrollHeight;
+}
+function addInviteEditConfirmButtons(){
+  var chat=document.getElementById("chat");
+  var w=document.createElement("div");w.className="msg b";
+  var wrap=document.createElement("div");
+  wrap.style.cssText="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0";
+  [["1","✅ 確定修改"],["2","取消"]].forEach(function(it){
+    var b=document.createElement("button");
+    b.style.cssText="background:#34C759;color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer";
+    if(it[0]==="2"){b.style.background="#8E8E93";}
+    b.textContent=it[1];
+    b.onclick=function(){doSend(it[0]);};
+    wrap.appendChild(b);
+  });
+  w.appendChild(wrap);chat.appendChild(w);chat.scrollTop=chat.scrollHeight;
 }
 function addDetailButtons(name){
   var chat=document.getElementById("chat");
@@ -2690,6 +3494,86 @@ function openAddExperience(name){
       var d=await r.json();sp.remove();addMsg(d.result||"（已記錄）","b");
     }catch(e){sp.remove();addMsg("⚠️ "+e.message,"b");}finally{setBusy(false);}
   };
+}
+function addInviteComboButtons(txt){
+  var chat=document.getElementById("chat");
+  var w=document.createElement("div");w.className="msg b";
+  var wrap=document.createElement("div");
+  wrap.style.cssText="display:flex;flex-direction:column;gap:6px;padding:4px 0";
+  txt.split("\\n").forEach(function(line){
+    var m=line.match(/^(\d+)\.\s+(.+)/);
+    if(!m)return;
+    var n=m[1];var rawDesc=m[2];
+    // Parse EXISTS marker
+    var existsMatch=rawDesc.match(/\[EXISTS:([^:]+):(.+)\]$/);
+    var hasInvite=!!existsMatch;
+    var meetingId=hasInvite?existsMatch[1]:"";
+    var personName=hasInvite?existsMatch[2]:"";
+    var desc=rawDesc.replace(/\[EXISTS:[^\]]+\]$/,"").trim();
+    var row=document.createElement("div");
+    row.style.cssText="display:flex;gap:6px;align-items:center";
+    var btn=document.createElement("button");
+    if(hasInvite){
+      btn.style.cssText="background:#34C759;color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer;text-align:left;flex:1";
+      btn.textContent=n+". "+desc+" 👉 觀看已產生的邀約文宣";
+      (function(mid,pname){
+        btn.onclick=function(){openInviteModal(mid,pname);};
+      })(meetingId,personName);
+      var genBtn=document.createElement("button");
+      genBtn.style.cssText="background:#5856D6;color:#fff;border:none;border-radius:10px;padding:9px 12px;font-size:12px;cursor:pointer;white-space:nowrap";
+      genBtn.textContent="重新產生";
+      (function(ni){genBtn.onclick=function(){doSend(ni);};})(n);
+      row.appendChild(btn);row.appendChild(genBtn);
+    } else {
+      btn.style.cssText="background:#5856D6;color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer;text-align:left;flex:1";
+      btn.textContent=n+". "+desc+" 👉 產生邀約文宣";
+      (function(ni){btn.onclick=function(){doSend(ni);};})(n);
+      row.appendChild(btn);
+    }
+    wrap.appendChild(row);
+  });
+  if(wrap.children.length>0){w.appendChild(wrap);chat.appendChild(w);chat.scrollTop=chat.scrollHeight;}
+}
+async function openInviteModal(meetingId,name){
+  var r=await fetch("/api/course-invite?id="+encodeURIComponent(meetingId)+"&name="+encodeURIComponent(name));
+  var d=await r.json();
+  if(!d.result){addMsg("⚠️ 找不到邀約記錄","b");return;}
+  var rec=d.result;
+  // Build modal
+  var ov=document.createElement("div");
+  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center";
+  var box=document.createElement("div");
+  box.style.cssText="background:#fff;border-radius:16px;padding:24px;width:min(92vw,560px);display:flex;flex-direction:column;gap:12px;max-height:80vh";
+  var title=document.createElement("div");
+  title.style.cssText="font-weight:700;font-size:16px;color:#1c1c1e";
+  title.textContent="邀約文宣 — "+name;
+  var ta=document.createElement("textarea");
+  ta.style.cssText="width:100%;flex:1;min-height:220px;border:1px solid #ddd;border-radius:10px;padding:10px;font-size:14px;resize:vertical;font-family:inherit;box-sizing:border-box";
+  ta.value=rec.content||"";
+  var meta=document.createElement("div");
+  meta.style.cssText="font-size:11px;color:#8e8e93";
+  meta.textContent="最後更新："+(rec.updated_at||"").replace("T"," ").slice(0,16);
+  var btns=document.createElement("div");
+  btns.style.cssText="display:flex;gap:10px;justify-content:flex-end";
+  var saveBtn=document.createElement("button");
+  saveBtn.style.cssText="background:#007AFF;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;cursor:pointer";
+  saveBtn.textContent="儲存修改";
+  saveBtn.onclick=async function(){
+    var res=await fetch("/api/course-invite/update",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({meeting_id:meetingId,name:name,content:ta.value.trim()})});
+    var rd=await res.json();
+    addMsg(rd.result||"✅ 已更新","b");
+    document.body.removeChild(ov);
+  };
+  var closeBtn=document.createElement("button");
+  closeBtn.style.cssText="background:#f2f2f7;color:#1c1c1e;border:none;border-radius:10px;padding:10px 20px;font-size:14px;cursor:pointer";
+  closeBtn.textContent="關閉";
+  closeBtn.onclick=function(){document.body.removeChild(ov);};
+  btns.appendChild(closeBtn);btns.appendChild(saveBtn);
+  box.appendChild(title);box.appendChild(ta);box.appendChild(meta);box.appendChild(btns);
+  ov.appendChild(box);
+  ov.onclick=function(e){if(e.target===ov)document.body.removeChild(ov);};
+  document.body.appendChild(ov);
+  setTimeout(function(){ta.focus();},100);
 }
 function addListButtons(txt,prefix){
   var chat=document.getElementById("chat");
@@ -2840,6 +3724,40 @@ def api_prospect_get(name):
         return {"result": None}, 404
     except Exception as e:
         return {"result": None, "error": str(e)}, 500
+
+
+@app.route("/api/course-invite", methods=["GET"])
+def api_course_invite_get():
+    try:
+        meeting_id = request.args.get("id", "").strip()
+        name = request.args.get("name", "").strip()
+        if not meeting_id or not name:
+            return {"result": None, "error": "缺少 id 或 name"}, 400
+        course = _load_course_invite()
+        rec = course.get_invite(meeting_id, name)
+        if rec:
+            return {"result": rec}
+        return {"result": None}, 404
+    except Exception as e:
+        return {"result": None, "error": str(e)}, 500
+
+
+@app.route("/api/course-invite/update", methods=["POST"])
+def api_course_invite_update():
+    try:
+        data = request.get_json(force=True) or {}
+        meeting_id = data.get("meeting_id", "").strip()
+        name = data.get("name", "").strip()
+        content = data.get("content", "").strip()
+        if not meeting_id or not name or not content:
+            return {"result": "⚠️ 缺少必要欄位"}, 400
+        course = _load_course_invite()
+        ok = course.update_invite(meeting_id, name, content)
+        if ok:
+            return {"result": "✅ 邀約文宣已更新"}
+        return {"result": "⚠️ 找不到該筆邀約，請先產生"}, 404
+    except Exception as e:
+        return {"result": f"⚠️ 更新失敗：{e}"}, 500
 
 
 @app.route("/api/prospect/update", methods=["POST"])

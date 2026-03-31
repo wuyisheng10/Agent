@@ -11,13 +11,16 @@ Usage:
 
 import argparse
 import importlib.util
-import sys
 from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-BASE_DIR = Path(r"C:\Users\user\claude AI_Agent")
+try:
+    from common_runtime import BASE_DIR
+except ModuleNotFoundError:
+    from agents.common_runtime import BASE_DIR
+
 LOG_FILE = BASE_DIR / "logs" / "orchestrator_log.txt"
 
 load_dotenv(dotenv_path=BASE_DIR / ".env")
@@ -36,6 +39,8 @@ def _load(name: str, filename: str):
     spec = importlib.util.spec_from_file_location(
         name, str(BASE_DIR / "agents" / filename)
     )
+    if spec is None or spec.loader is None:
+        raise ImportError(f"無法載入模組：{filename}")
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
