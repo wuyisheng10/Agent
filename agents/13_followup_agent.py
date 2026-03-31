@@ -13,20 +13,17 @@ Risk:
 """
 
 import csv
-import json
 import os
 from datetime import datetime, date
 from pathlib import Path
-import sys
 
 from dotenv import load_dotenv
 
-AGENTS_DIR = Path(__file__).resolve().parent
-if str(AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(AGENTS_DIR))
-from common_runtime import load_json_config, push_line_message, run_codex_cli
+try:
+    from common_runtime import BASE_DIR, load_json_config, push_line_message, run_codex_cli
+except ModuleNotFoundError:
+    from agents.common_runtime import BASE_DIR, load_json_config, push_line_message, run_codex_cli
 
-BASE_DIR     = Path(r"C:\Users\user\claude AI_Agent")
 CSV_DIR      = BASE_DIR / "output" / "csv_data"
 PARTNERS_CSV = CSV_DIR / "partners.csv"
 LOG_FILE     = BASE_DIR / "logs" / "followup_agent_log.txt"

@@ -16,16 +16,14 @@ import os
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-import sys
 
 from dotenv import load_dotenv
 
-AGENTS_DIR = Path(__file__).resolve().parent
-if str(AGENTS_DIR) not in sys.path:
-    sys.path.insert(0, str(AGENTS_DIR))
-from common_runtime import run_codex_cli, push_line_message
+try:
+    from common_runtime import BASE_DIR, run_codex_cli, push_line_message
+except ModuleNotFoundError:
+    from agents.common_runtime import BASE_DIR, run_codex_cli, push_line_message
 
-BASE_DIR   = Path(r"C:\Users\user\claude AI_Agent")
 CSV_DIR    = BASE_DIR / "output" / "csv_data"
 MARKET_CSV = CSV_DIR / "market_list.csv"
 LOG_FILE   = BASE_DIR / "logs" / "market_dev_log.txt"
