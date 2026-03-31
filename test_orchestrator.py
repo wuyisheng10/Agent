@@ -1,9 +1,15 @@
 """Local test: Orchestrator import and structure"""
 import sys, importlib.util as ilu
+import types
 from pathlib import Path
 sys.stdout.reconfigure(encoding='utf-8')
 
-BASE = Path(r"C:\Users\user\claude AI_Agent")
+BASE = Path(__file__).resolve().parent
+
+if "dotenv" not in sys.modules:
+    m = types.ModuleType("dotenv")
+    m.load_dotenv = lambda *args, **kwargs: None
+    sys.modules["dotenv"] = m
 
 results = []
 def chk(name, cond):

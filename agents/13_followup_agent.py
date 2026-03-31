@@ -106,7 +106,10 @@ def days_silent(date_str: str) -> int:
 
 def classify_risk(partner: dict, red_days: int, yellow_days: int) -> str:
     d      = days_silent(partner.get("最後聯絡日", ""))
-    weekly = int(partner.get("本週動作數", "0") or "0")
+    try:
+        weekly = int((partner.get("本週動作數", "0") or "0").strip())
+    except (ValueError, AttributeError):
+        weekly = 0
     if d >= red_days and weekly == 0:
         return "red"
     if d >= yellow_days:
