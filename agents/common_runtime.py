@@ -11,7 +11,11 @@ import tempfile
 from pathlib import Path
 
 
-BASE_DIR = Path(os.getenv("AMWAY_AGENT_BASE_DIR", r"C:\Users\user\claude AI_Agent"))
+def _default_base_dir() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+BASE_DIR = Path(os.getenv("AMWAY_AGENT_BASE_DIR", str(_default_base_dir())))
 LOGS_DIR = BASE_DIR / "logs"
 
 
@@ -34,7 +38,7 @@ def run_codex_cli(prompt: str, timeout: int = 60) -> str:
             response_path = f.name
 
         result = subprocess.run(
-            ["cmd", "/c", "codex", "exec",
+            ["codex", "exec",
              "--skip-git-repo-check", "--sandbox", "read-only",
              "--color", "never", "-C", str(BASE_DIR),
              "-o", response_path, "-"],
