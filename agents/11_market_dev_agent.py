@@ -36,6 +36,11 @@ FIELDNAMES = [
     "姓名", "電話", "職業", "接觸管道", "備註",
     "AI評分", "需求標籤", "話術_健康型", "話術_收入型", "話術_好奇型",
     "接觸狀態", "最後更新", "下次跟進日",
+    # 擴充欄位
+    "地區", "地址",
+    "使用產品",
+    "淨水器型號", "濾心上次換", "濾心下次換",
+    "體驗記錄",
 ]
 
 
@@ -333,6 +338,65 @@ class MarketDevAgent:
         if keyword:
             rows = [r for r in rows if keyword in r.get("姓名", "")]
         return rows
+
+    def get_prospect_by_name(self, name: str) -> dict | None:
+        """依姓名取得潛在家人完整資料"""
+        for row in read_csv():
+            if row.get("姓名", "") == name:
+                return row
+        return None
+
+    def update_prospect_fields(self, name: str, fields: dict) -> str:
+        """更新潛在家人的指定欄位（不覆蓋 AI 評分與話術）"""
+        _readonly = {"AI評分", "需求標籤", "話術_健康型", "話術_收入型", "話術_好奇型"}
+        rows = read_csv()
+        for row in rows:
+            if row.get("姓名", "") == name:
+                changed = []
+                for k, v in fields.items():
+                    if k in FIELDNAMES and k not in _readonly:
+                        row[k] = v
+                        changed.append(f"{k}：{v}")
+                row["最後更新"] = datetime.now().strftime("%Y-%m-%d")
+                write_csv(rows)
+                return "✅ " + name + " 資料已更新\n" + "\n".join(changed)
+        return f"⚠️ 找不到「{name}」"
+
+    def add_experience(self, name: str, product: str, note: str = "",
+                       filter_last: str = "", filter_next: str = "") -> str:
+        """新增產品體驗記錄，並更新淨水器濾心日期"""
+        rows = read_csv()
+        for row in rows:
+            if row.get("姓名", "") == name:
+                today = datetime.now().strftime("%Y-%m-%d")
+                existing = row.get("體驗記錄", "")
+                try:
+                    records = json.loads(existing) if existing else []
+                except Exception:
+                    records = []
+                entry = {"日期": today, "產品": product}
+                if note:
+                    entry["備註"] = note
+                records.append(entry)
+                row["體驗記錄"] = json.dumps(records, ensure_ascii=False)
+                # 更新使用產品彙總
+                all_prods = list(dict.fromkeys(r["產品"] for r in records if r.get("產品")))
+                row["使用產品"] = "、".join(all_prods)
+                if filter_last:
+                    row["濾心上次換"] = filter_last
+                if filter_next:
+                    row["濾心下次換"] = filter_next
+                row["最後更新"] = today
+                write_csv(rows)
+                msg = f"✅ 已為 {name} 新增體驗記錄：{product}"
+                if note:
+                    msg += f"\n備註：{note}"
+                if filter_last:
+                    msg += f"\n💧 上次換濾心：{filter_last}"
+                if filter_next:
+                    msg += f"\n💧 下次換濾心：{filter_next}"
+                return msg
+        return f"⚠️ 找不到「{name}」"
 
     def handle_query_prospect(self, msg: str) -> str:
         """LINE 指令：查詢潛在家人 [姓名（可省略）]"""

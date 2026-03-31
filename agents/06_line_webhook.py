@@ -363,14 +363,38 @@ _awaiting_prospect_file: dict = {}
 
 
 def _format_prospect_detail(r: dict) -> str:
+    import json as _json
     star = "⭐" * int(r["AI評分"]) if r.get("AI評分", "").isdigit() else ""
     lines = [
         f"👤 {r.get('姓名','')}　{r.get('職業','')}",
         f"AI評分：{r.get('AI評分','')} {star}　需求：{r.get('需求標籤','')}",
         f"管道：{r.get('接觸管道','')}",
         f"狀態：{r.get('接觸狀態','')}　下次跟進：{r.get('下次跟進日','')}",
-        f"備註：{r.get('備註','')}",
     ]
+    if r.get("電話"):
+        lines.append(f"📱 電話：{r.get('電話','')}")
+    if r.get("地區") or r.get("地址"):
+        lines.append(f"📍 地區：{r.get('地區','')}　地址：{r.get('地址','')}")
+    if r.get("備註"):
+        lines.append(f"備註：{r.get('備註','')}")
+    if r.get("使用產品"):
+        lines.append(f"🛍️ 使用產品：{r.get('使用產品','')}")
+    if r.get("淨水器型號"):
+        lines.append(f"💧 淨水器：{r.get('淨水器型號','')}")
+    if r.get("濾心上次換"):
+        lines.append(f"   上次換濾心：{r.get('濾心上次換','')}")
+    if r.get("濾心下次換"):
+        lines.append(f"   下次換濾心：{r.get('濾心下次換','')}")
+    exp_raw = r.get("體驗記錄", "")
+    if exp_raw:
+        try:
+            records = _json.loads(exp_raw)
+            if records:
+                lines.append(f"\n📋 體驗記錄（共 {len(records)} 筆）：")
+                for rec in records[-5:]:
+                    lines.append(f"  • {rec.get('日期','')} {rec.get('產品','')} {rec.get('備註','')}")
+        except Exception:
+            pass
     for key, label in [("話術_健康型", "🌿 健康型"), ("話術_收入型", "💰 收入型"), ("話術_好奇型", "🤔 好奇型")]:
         val = r.get(key, "")
         if val:
@@ -765,6 +789,78 @@ def handle_training_command(user_msg: str, reply_token: str,
             reply_message(reply_token, result + "\n\n📸 現在直接上傳照片或檔案，會自動歸入該潛在家人資料夾。")
         except Exception as e:
             reply_message(reply_token, f"✗ 設定失敗：{e}")
+        return True
+
+    if msg.startswith("更新潛在家人"):
+        # 格式：更新潛在家人 姓名|欄位:值|欄位:值
+        # 欄位：電話 地區 地址 接觸狀態 下次跟進日 使用產品 淨水器型號 備註
+        content = msg.replace("更新潛在家人", "", 1).strip()
+        parts = [p.strip() for p in content.split("|")]
+        name = parts[0] if parts else ""
+        if not name:
+            reply_message(reply_token,
+                "⚠️ 格式：\n小幫手 更新潛在家人 姓名|欄位:值|欄位:值\n\n"
+                "可用欄位：電話、地區、地址、接觸狀態、下次跟進日、使用產品、淨水器型號、備註\n\n"
+                "範例：\n小幫手 更新潛在家人 Amy|地區:台中西屯|地址:民生路123號|電話:0912345678")
+            return True
+        try:
+            fields = {}
+            for p in parts[1:]:
+                if ":" in p:
+                    k, v = p.split(":", 1)
+                    fields[k.strip()] = v.strip()
+            if not fields:
+                reply_message(reply_token, "⚠️ 請提供要更新的欄位，格式：欄位:值")
+                return True
+            market = _load_market_dev()
+            result = market.MarketDevAgent().update_prospect_fields(name, fields)
+            reply_message(reply_token, result)
+        except Exception as e:
+            reply_message(reply_token, f"✗ 更新失敗：{e}")
+        return True
+
+    if msg.startswith("新增體驗"):
+        # 格式：新增體驗 姓名|產品名稱|備註（選填）
+        content = msg.replace("新增體驗", "", 1).strip()
+        parts = [p.strip() for p in content.split("|")]
+        name    = parts[0] if len(parts) > 0 else ""
+        product = parts[1] if len(parts) > 1 else ""
+        note    = parts[2] if len(parts) > 2 else ""
+        if not name or not product:
+            reply_message(reply_token,
+                "⚠️ 格式：\n小幫手 新增體驗 姓名|產品名稱|備註（選填）\n\n"
+                "範例：\n小幫手 新增體驗 Amy|益生菌|每天早上服用2顆")
+            return True
+        try:
+            market = _load_market_dev()
+            result = market.MarketDevAgent().add_experience(name, product, note=note)
+            reply_message(reply_token, result)
+        except Exception as e:
+            reply_message(reply_token, f"✗ 新增體驗記錄失敗：{e}")
+        return True
+
+    if msg.startswith("換濾心"):
+        # 格式：換濾心 姓名|上次日期|下次日期
+        content = msg.replace("換濾心", "", 1).strip()
+        parts = [p.strip() for p in content.split("|")]
+        name       = parts[0] if len(parts) > 0 else ""
+        last_date  = parts[1] if len(parts) > 1 else ""
+        next_date  = parts[2] if len(parts) > 2 else ""
+        if not name or (not last_date and not next_date):
+            reply_message(reply_token,
+                "⚠️ 格式：\n小幫手 換濾心 姓名|上次換濾心日期|下次換濾心日期\n\n"
+                "範例：\n小幫手 換濾心 Amy|2026-03-31|2026-09-30")
+            return True
+        try:
+            market = _load_market_dev()
+            result = market.MarketDevAgent().add_experience(
+                name, "濾心更換",
+                note=f"上次：{last_date}　下次：{next_date}",
+                filter_last=last_date, filter_next=next_date,
+            )
+            reply_message(reply_token, result)
+        except Exception as e:
+            reply_message(reply_token, f"✗ 換濾心記錄失敗：{e}")
         return True
 
     if msg.startswith("培訓"):
@@ -1341,6 +1437,1443 @@ def archive_browse(subpath):
         return send_from_directory(str(target.parent), target.name)
     parts = list(Path(subpath).parts)
     return _render_archive_html(target, parts), 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+# ============================================================
+# 🌐 Web Dashboard
+# ============================================================
+
+def process_web_command(cmd: str) -> str:
+    """Handle all bot commands and return a string result (no LINE reply)."""
+    try:
+        # Calendar
+        cal = _load_calendar()
+        result = cal.handle_calendar_command(cmd)
+        if result:
+            return result
+    except Exception as e:
+        pass
+
+    try:
+        # Partner
+        partner = _load_partner()
+        result = partner.handle_partner_command(cmd)
+        if result:
+            return result
+    except Exception as e:
+        pass
+
+    try:
+        # Classifier modes / archive queries
+        clf_mod = _load_classifier()
+
+        if cmd.startswith("歸類模式") or cmd.startswith("關閉歸類模式"):
+            clf = clf_mod.ClassifierAgent()
+            return clf.handle_command(cmd)
+
+        if cmd.startswith("查詢歸檔"):
+            clf = clf_mod.ClassifierAgent()
+            person = cmd.replace("查詢歸檔", "").strip() or None
+            result = clf.query_archive(person)
+            if NGROK_URL:
+                result = f"{result}\n\n📁 歸檔瀏覽器：{NGROK_URL}/archive"
+            return result
+
+        if cmd.startswith("潛在家人資料"):
+            name = cmd.replace("潛在家人資料", "").strip()
+            if not name:
+                return "⚠️ 請提供人員名稱，例如：潛在家人資料 張三"
+            clf = clf_mod.ClassifierAgent()
+            return clf.set_mode("市場開發", name)
+    except Exception as e:
+        return f"⚠️ 歸類指令錯誤：{e}"
+
+    try:
+        # Market dev
+        market = _load_market_dev()
+
+        if cmd.startswith("新增潛在家人"):
+            return market.MarketDevAgent().handle_add_prospect(cmd)
+
+        if cmd.startswith("查詢潛在家人"):
+            keyword = cmd.replace("查詢潛在家人", "").strip() or None
+            rows = market.MarketDevAgent().list_prospects(keyword)
+            if not rows:
+                return "目前沒有潛在家人資料。"
+            lines = ["📋 潛在家人名單："]
+            for i, r in enumerate(rows, 1):
+                star = "⭐" * int(r["AI評分"]) if r.get("AI評分", "").isdigit() else ""
+                lines.append(f"{i}. {r.get('姓名','')}　{r.get('職業','')}　{star}")
+            return "\n".join(lines)
+
+        import re as _re_web
+        if _re_web.match(r'^潛在家人詳情\s+\d+$', cmd):
+            idx = int(cmd.split()[-1])
+            rows = market.MarketDevAgent().list_prospects()
+            if 1 <= idx <= len(rows):
+                return _format_prospect_detail(rows[idx - 1])
+            return f"⚠️ 無效編號 {idx}"
+    except Exception as e:
+        return f"⚠️ 市場開發指令錯誤：{e}"
+
+    try:
+        # Training agent
+        training = _load_training_agent()
+        if cmd.startswith("培訓"):
+            return training.TrainingAgent().handle_query(cmd)
+    except Exception as e:
+        return f"⚠️ 培訓指令錯誤：{e}"
+
+    try:
+        # Followup
+        followup = _load_followup()
+        if cmd.startswith("跟進報告"):
+            return followup.FollowupAgent().generate_report_text()
+    except Exception as e:
+        return f"⚠️ 跟進報告錯誤：{e}"
+
+    try:
+        # Motivation
+        motivation = _load_motivation()
+        if cmd.startswith("激勵") or cmd.startswith("里程碑"):
+            return motivation.MotivationAgent().handle_realtime(cmd)
+    except Exception as e:
+        return f"⚠️ 激勵指令錯誤：{e}"
+
+    try:
+        # Training log
+        tl = _load_training()
+
+        if cmd.upper().startswith("MTG-"):
+            result = tl.get_summary_by_key(cmd.upper())
+            return result if result else f"找不到記錄：{cmd.upper()}"
+
+        if cmd.startswith("再次整理") or cmd.startswith("整理"):
+            # Parse date and transcript from command
+            parts = cmd.split(None, 1)
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            transcript = cmd
+            if len(parts) >= 2:
+                rest = parts[1].strip()
+                # Try to extract YYYY-MM-DD
+                import re
+                date_match = re.match(r"(\d{4}-\d{2}-\d{2})", rest)
+                if date_match:
+                    date_str = date_match.group(1)
+                    transcript = rest[len(date_str):].strip()
+                else:
+                    transcript = rest
+            force = cmd.startswith("再次整理")
+            key, msg = tl.process_transcript(transcript, date_str, force=force)
+            if NGROK_URL:
+                msg = f"{NGROK_URL}/summary/{key}\n\n{msg}"
+            return msg
+    except Exception as e:
+        return f"⚠️ 培訓記錄指令錯誤：{e}"
+
+    # Exec menu
+    if cmd in ("執行選單", "選單"):
+        return EXEC_MENU_TEXT
+
+    # Help commands
+    if cmd in ("help", "指令集", "說明", "指令", "?", "？"):
+        return HELP_TEXT
+
+    # Fallback: intent analysis
+    try:
+        intent = analyze_intent(cmd)
+        return (
+            f"意圖：{intent['意圖']}\n"
+            f"情緒：{intent['情緒']}\n"
+            f"建議回覆：{intent['建議回覆']}\n"
+            f"建議行動：{intent['建議行動']}"
+        )
+    except Exception as e:
+        return f"⚠️ 無法分析指令：{e}"
+
+
+def _render_dashboard_html() -> str:
+    return """<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yisheng 助理</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --blue: #007AFF;
+    --blue-light: #E3F0FF;
+    --green: #34C759;
+    --green-light: #E6F9ED;
+    --bg: #F2F2F7;
+    --surface: #FFFFFF;
+    --border: #D1D1D6;
+    --text: #1C1C1E;
+    --text-secondary: #6C6C70;
+    --sidebar-width: 280px;
+    --header-height: 56px;
+    --bottom-bar-height: 64px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* Header */
+  #header {
+    position: sticky; top: 0; z-index: 100;
+    height: var(--header-height);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; padding: 0 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  #header h1 { font-size: 17px; font-weight: 600; flex: 1; }
+  #status-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 3px var(--green-light);
+    transition: background .3s;
+  }
+  #status-dot.loading { background: #FF9500; box-shadow: 0 0 0 3px #FFF3E0; }
+  #archive-btn {
+    font-size: 13px; color: var(--blue);
+    background: var(--blue-light); border: none; border-radius: 8px;
+    padding: 5px 10px; cursor: pointer; text-decoration: none;
+    display: flex; align-items: center; gap: 4px;
+  }
+  #archive-btn:hover { opacity: .85; }
+
+  /* Layout */
+  #layout { flex: 1; display: flex; overflow: hidden; }
+
+  /* Sidebar */
+  #sidebar {
+    width: var(--sidebar-width);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: flex; flex-direction: column;
+  }
+  .sidebar-section { border-bottom: 1px solid var(--border); }
+  .sidebar-section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; cursor: pointer;
+    font-size: 13px; font-weight: 600; color: var(--text-secondary);
+    user-select: none;
+    background: #FAFAFA;
+  }
+  .sidebar-section-header:hover { background: var(--blue-light); color: var(--blue); }
+  .sidebar-section-header .arrow { transition: transform .2s; font-size: 11px; }
+  .sidebar-section-header.open .arrow { transform: rotate(90deg); }
+  .sidebar-items { display: none; padding: 4px 0; }
+  .sidebar-items.open { display: block; }
+  .sidebar-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 18px; cursor: pointer;
+    font-size: 14px; border: none; background: transparent;
+    width: 100%; text-align: left; color: var(--text);
+    transition: background .15s;
+  }
+  .sidebar-item:hover { background: var(--blue-light); color: var(--blue); }
+  .sidebar-item.exec { color: var(--blue); font-weight: 500; }
+
+  /* Chat area */
+  #chat-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #chat {
+    flex: 1; overflow-y: auto; padding: 16px 12px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .msg { display: flex; max-width: 80%; animation: fadeIn .25s ease; }
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .msg.bot  { align-self: flex-start; }
+  .bubble {
+    padding: 10px 14px; border-radius: 16px;
+    font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.user .bubble { background: var(--blue); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.bot  .bubble { background: var(--blue-light); color: var(--text); border-bottom-left-radius: 4px; }
+  .msg-time { font-size: 11px; color: var(--text-secondary); margin: 4px 6px; align-self: flex-end; }
+
+  /* Pending menu */
+  #pending-panel {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 12px;
+    display: none;
+  }
+  #pending-panel.visible { display: block; }
+  #pending-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+  #pending-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pending-btn {
+    background: var(--blue); color: #fff;
+    border: none; border-radius: 8px; padding: 7px 12px;
+    font-size: 13px; cursor: pointer; transition: opacity .15s;
+  }
+  .pending-btn:hover { opacity: .85; }
+
+  /* Bottom bar */
+  #bottom-bar {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 8px 12px;
+    display: flex; gap: 8px; align-items: flex-end;
+    min-height: var(--bottom-bar-height);
+  }
+  #cmd-input {
+    flex: 1; border: 1.5px solid var(--border); border-radius: 12px;
+    padding: 9px 14px; font-size: 15px; background: var(--bg);
+    resize: none; outline: none; max-height: 120px; overflow-y: auto;
+    font-family: inherit; transition: border-color .2s;
+  }
+  #cmd-input:focus { border-color: var(--blue); }
+  #send-btn {
+    background: var(--blue); color: #fff; border: none;
+    border-radius: 50%; width: 40px; height: 40px;
+    font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: opacity .2s;
+  }
+  #send-btn:hover { opacity: .85; }
+  #send-btn:disabled { opacity: .4; cursor: default; }
+  #upload-btn {
+    background: var(--bg); border: 1.5px solid var(--border); color: var(--text-secondary);
+    border-radius: 50%; width: 40px; height: 40px;
+    font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: background .2s;
+  }
+  #upload-btn:hover { background: var(--blue-light); color: var(--blue); border-color: var(--blue); }
+  #file-input { display: none; }
+
+  /* Spinner */
+  .spinner-msg .bubble {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--bg); border: 1px solid var(--border);
+  }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid var(--border);
+    border-top-color: var(--blue); border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Mobile */
+  @media (max-width: 640px) {
+    #sidebar { display: none; }
+    #mobile-tabs {
+      display: flex; overflow-x: auto; background: var(--surface);
+      border-bottom: 1px solid var(--border); padding: 0 4px;
+      flex-shrink: 0; gap: 4px;
+    }
+    .tab-btn {
+      flex-shrink: 0; padding: 8px 12px; border: none; background: transparent;
+      font-size: 13px; color: var(--text-secondary); cursor: pointer; white-space: nowrap;
+      border-bottom: 2px solid transparent; transition: color .2s, border-color .2s;
+    }
+    .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+    #mobile-drawer {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 8px 0; display: none; max-height: 200px; overflow-y: auto;
+    }
+    #mobile-drawer.open { display: block; }
+    .drawer-item {
+      display: block; padding: 9px 18px; width: 100%; text-align: left;
+      border: none; background: transparent; font-size: 14px; cursor: pointer;
+    }
+    .drawer-item:hover { background: var(--blue-light); color: var(--blue); }
+  }
+  @media (min-width: 641px) {
+    #mobile-tabs, #mobile-drawer { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🤖 Yisheng 助理</h1>
+  <div id="status-dot" title="就緒"></div>
+  <a href="/archive" id="archive-btn" target="_blank">📁 歸檔</a>
+</div>
+
+<!-- Mobile tabs -->
+<div id="mobile-tabs">
+  <button class="tab-btn active" onclick="openTab('市場開發')">🎯 市場</button>
+  <button class="tab-btn" onclick="openTab('培訓系統')">📚 培訓</button>
+  <button class="tab-btn" onclick="openTab('夥伴陪伴')">🤝 夥伴</button>
+  <button class="tab-btn" onclick="openTab('行事曆')">🗓️ 行事曆</button>
+  <button class="tab-btn" onclick="openTab('歸類模式')">📂 歸類</button>
+  <button class="tab-btn" onclick="openTab('培訓記錄')">📖 記錄</button>
+  <button class="tab-btn" onclick="openTab('安麗產品歸檔')">🛍️ 安麗</button>
+  <button class="tab-btn" onclick="openTab('故事分類')">📝 故事</button>
+  <button class="tab-btn" onclick="openTab('說明')">❓ 說明</button>
+</div>
+<div id="mobile-drawer"></div>
+
+<div id="layout">
+  <!-- Sidebar -->
+  <div id="sidebar" id="sidebar-desktop"></div>
+
+  <!-- Chat + panels -->
+  <div id="chat-wrapper">
+    <div id="chat"></div>
+
+    <!-- Pending menu panel -->
+    <div id="pending-panel">
+      <div id="pending-title">📋 待處理選項</div>
+      <div id="pending-btns"></div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div id="bottom-bar">
+      <input type="file" id="file-input" accept="*/*">
+      <button id="upload-btn" title="上傳檔案" onclick="document.getElementById('file-input').click()">📎</button>
+      <textarea id="cmd-input" rows="1" placeholder="輸入指令…" onkeydown="handleKey(event)"></textarea>
+      <button id="send-btn" onclick="sendCommand()" title="送出">➤</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Menu data ──
+const MENU_GROUPS = [
+  {
+    label: "🎯 市場開發",
+    key: "市場開發",
+    items: [
+      { label: "新增潛在家人", prompt: "新增潛在家人 姓名|職業|管道|備註" },
+      { label: "查詢潛在家人", cmd: "查詢潛在家人" },
+      { label: "加入潛在家人資訊", prompt: "潛在家人資料 " },
+    ]
+  },
+  {
+    label: "📚 培訓系統",
+    key: "培訓系統",
+    items: [
+      { label: "查詢培訓進度", prompt: "培訓 " },
+    ]
+  },
+  {
+    label: "🤝 夥伴陪伴",
+    key: "夥伴陪伴",
+    items: [
+      { label: "跟進報告", cmd: "跟進報告" },
+      { label: "激勵夥伴", prompt: "激勵 " },
+      { label: "里程碑記錄", prompt: "里程碑 " },
+      { label: "查詢所有夥伴", cmd: "查詢夥伴" },
+      { label: "查詢待跟進夥伴", cmd: "查詢待跟進夥伴" },
+      { label: "新增夥伴", prompt: "新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註" },
+      { label: "跟進夥伴", prompt: "跟進夥伴 姓名 | 狀態 | 下次跟進日期 | 備註" },
+    ]
+  },
+  {
+    label: "🗓️ 行事曆",
+    key: "行事曆",
+    items: [
+      { label: "查詢今日行事曆", cmd: "查詢行事曆" },
+      { label: "查詢過往行事曆", cmd: "查詢過往行事曆" },
+      { label: "新增行事曆事件", prompt: "新增行事曆 YYYY-MM-DD HH:MM 標題 | 備註" },
+    ]
+  },
+  {
+    label: "📂 歸類模式",
+    key: "歸類模式",
+    items: [
+      { label: "查詢目前歸類模式", cmd: "歸類模式" },
+      { label: "設定歸類模式", prompt: "歸類模式 " },
+      { label: "關閉歸類模式", cmd: "關閉歸類模式" },
+      { label: "查詢所有歸檔", cmd: "查詢歸檔" },
+      { label: "查詢指定人員歸檔", prompt: "查詢歸檔 " },
+    ]
+  },
+  {
+    label: "📖 培訓記錄",
+    key: "培訓記錄",
+    items: [
+      { label: "整理今日培訓記錄", cmd: "整理" },
+      { label: "再次整理培訓記錄", cmd: "再次整理" },
+    ]
+  },
+  {
+    label: "🛍️ 安麗產品歸檔",
+    key: "安麗產品歸檔",
+    items: [
+      { label: "💊 營養保健 (Nutrilite)", cmd: "營養保健歸檔" },
+      { label: "💄 美容保養 (Artistry)", cmd: "美容保養歸檔" },
+      { label: "🧹 居家清潔 (Amway Home)", cmd: "居家清潔歸檔" },
+      { label: "🪥 個人護理 (Glister)", cmd: "個人護理歸檔" },
+      { label: "🍳 廚具與生活用品", cmd: "廚具生活歸檔" },
+      { label: "💧 空氣與水處理設備", cmd: "空水設備歸檔" },
+      { label: "⚖️ 體重管理與運動營養", cmd: "體重管理歸檔" },
+      { label: "🌸 香氛與個人風格", cmd: "香氛風格歸檔" },
+      { label: "🛠️ 事業工具與教育系統", cmd: "事業工具歸檔" },
+    ]
+  },
+  {
+    label: "📝 故事分類",
+    key: "故事分類",
+    items: [
+      { label: "👤 人物故事歸檔", prompt: "潛在家人資料 " },
+      { label: "📖 產品故事歸檔", cmd: "產品故事歸檔" },
+    ]
+  },
+  {
+    label: "❓ 說明",
+    key: "說明",
+    items: [
+      { label: "顯示所有指令", cmd: "指令集" },
+      { label: "執行選單", cmd: "執行選單" },
+    ]
+  },
+];
+
+// ── Build sidebar ──
+function buildSidebar(container) {
+  container.innerHTML = '';
+  MENU_GROUPS.forEach((group, gi) => {
+    const section = document.createElement('div');
+    section.className = 'sidebar-section';
+
+    const hdr = document.createElement('div');
+    hdr.className = 'sidebar-section-header';
+    hdr.innerHTML = `${group.label} <span class="arrow">▶</span>`;
+    hdr.onclick = () => {
+      hdr.classList.toggle('open');
+      items.classList.toggle('open');
+      // Update mobile tabs active state
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    };
+
+    const items = document.createElement('div');
+    items.className = 'sidebar-items';
+    group.items.forEach(item => {
+      const btn = document.createElement('button');
+      btn.className = 'sidebar-item' + (item.cmd && !item.prompt ? ' exec' : '');
+      btn.textContent = item.label;
+      btn.onclick = () => clickMenuItem(item);
+      items.appendChild(btn);
+    });
+
+    section.appendChild(hdr);
+    section.appendChild(items);
+    container.appendChild(section);
+  });
+}
+
+buildSidebar(document.getElementById('sidebar'));
+
+// ── Mobile tabs ──
+let currentTab = null;
+function openTab(key) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const activeBtn = [...document.querySelectorAll('.tab-btn')].find(b => b.textContent.includes(
+    key === '市場開發' ? '市場' : key === '培訓系統' ? '培訓' : key === '夥伴陪伴' ? '夥伴' :
+    key === '行事曆' ? '行事曆' : key === '歸類模式' ? '歸類' : key === '培訓記錄' ? '記錄' :
+    key === '安麗產品歸檔' ? '安麗' : key === '故事分類' ? '故事' : '說明'
+  ));
+  if (activeBtn) activeBtn.classList.add('active');
+
+  const drawer = document.getElementById('mobile-drawer');
+  if (currentTab === key) {
+    drawer.classList.remove('open');
+    currentTab = null;
+    return;
+  }
+  currentTab = key;
+  drawer.innerHTML = '';
+  const group = MENU_GROUPS.find(g => g.key === key);
+  if (!group) return;
+  group.items.forEach(item => {
+    const btn = document.createElement('button');
+    btn.className = 'drawer-item';
+    btn.textContent = item.label;
+    btn.onclick = () => { drawer.classList.remove('open'); currentTab = null; clickMenuItem(item); };
+    drawer.appendChild(btn);
+  });
+  drawer.classList.add('open');
+}
+
+// ── Menu item click ──
+function clickMenuItem(item) {
+  if (item.cmd && !item.prompt) {
+    sendCommand(item.cmd);
+  } else if (item.prompt) {
+    const input = document.getElementById('cmd-input');
+    input.value = item.prompt;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+    autoResize(input);
+  }
+}
+
+// ── Chat helpers ──
+function now() {
+  return new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+}
+
+function addMessage(text, role) {
+  const chat = document.getElementById('chat');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  const time = document.createElement('div');
+  time.className = 'msg-time';
+  time.textContent = now();
+  wrap.appendChild(bubble);
+  wrap.appendChild(time);
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+  return wrap;
+}
+
+function addSpinner() {
+  const chat = document.getElementById('chat');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg bot spinner-msg';
+  wrap.innerHTML = '<div class="bubble"><div class="spinner"></div><span>處理中…</span></div>';
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+  return wrap;
+}
+
+function setLoading(on) {
+  const dot = document.getElementById('status-dot');
+  const btn = document.getElementById('send-btn');
+  const inp = document.getElementById('cmd-input');
+  dot.className = on ? 'loading' : '';
+  btn.disabled = on;
+  inp.disabled = on;
+}
+
+// ── Send command ──
+async function sendCommand(forcedCmd) {
+  const input = document.getElementById('cmd-input');
+  const cmd = (forcedCmd !== undefined ? forcedCmd : input.value).trim();
+  if (!cmd) return;
+
+  if (!forcedCmd) input.value = '';
+  autoResize(input);
+  addMessage(cmd, 'user');
+  setLoading(true);
+  const spinner = addSpinner();
+
+  try {
+    const res = await fetch('/api/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: cmd })
+    });
+    const data = await res.json();
+    spinner.remove();
+    addMessage(data.result || '（無回應）', 'bot');
+  } catch(e) {
+    spinner.remove();
+    addMessage('⚠️ 連線失敗：' + e.message, 'bot');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── File upload ──
+document.getElementById('file-input').addEventListener('change', async function() {
+  const file = this.files[0];
+  if (!file) return;
+  this.value = '';
+  await handleFileUpload(file);
+});
+
+async function handleFileUpload(file) {
+  addMessage('📎 上傳：' + file.name, 'user');
+  setLoading(true);
+  const spinner = addSpinner();
+  const fd = new FormData();
+  fd.append('file', file, file.name);
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    spinner.remove();
+    if (data.result) {
+      addMessage(data.result, 'bot');
+      await refreshPending();
+    } else {
+      addMessage('（上傳完成，無待處理選項）', 'bot');
+    }
+  } catch(e) {
+    spinner.remove();
+    addMessage('⚠️ 上傳失敗：' + e.message, 'bot');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── Pending menu ──
+async function refreshPending() {
+  try {
+    const res = await fetch('/api/pending');
+    const data = await res.json();
+    if (data.result) {
+      showPendingMenu(data.result);
+    } else {
+      hidePendingMenu();
+    }
+  } catch(e) {}
+}
+
+function showPendingMenu(menuText) {
+  const panel = document.getElementById('pending-panel');
+  const btns = document.getElementById('pending-btns');
+  btns.innerHTML = '';
+  // Parse numbered options from menu text
+  const lines = menuText.split('\\n');
+  lines.forEach(line => {
+    const m = line.match(/^(\\d+)[.)、]/);
+    if (m) {
+      const choice = parseInt(m[1]);
+      const btn = document.createElement('button');
+      btn.className = 'pending-btn';
+      btn.textContent = line.trim();
+      btn.onclick = () => executePending(choice);
+      btns.appendChild(btn);
+    }
+  });
+  // Also add a cancel button
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'pending-btn';
+  cancelBtn.style.background = '#8E8E93';
+  cancelBtn.textContent = '✕ 取消';
+  cancelBtn.onclick = () => { executePending(0); hidePendingMenu(); };
+  btns.appendChild(cancelBtn);
+  panel.classList.add('visible');
+}
+
+function hidePendingMenu() {
+  document.getElementById('pending-panel').classList.remove('visible');
+  document.getElementById('pending-btns').innerHTML = '';
+}
+
+async function executePending(choice) {
+  setLoading(true);
+  const spinner = addSpinner();
+  try {
+    const res = await fetch('/api/pending/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ choice: choice })
+    });
+    const data = await res.json();
+    spinner.remove();
+    addMessage(data.result || '（已執行）', 'bot');
+    hidePendingMenu();
+  } catch(e) {
+    spinner.remove();
+    addMessage('⚠️ 執行失敗：' + e.message, 'bot');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── Input helpers ──
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendCommand();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+document.getElementById('cmd-input').addEventListener('input', function() {
+  autoResize(this);
+});
+
+// ── Init ──
+addMessage('你好！我是 Yisheng 助理 🤖 請使用左側選單或直接輸入指令。', 'bot');
+refreshPending();
+</script>
+</body>
+</html>"""
+
+
+def _render_dashboard_html_v2() -> str:
+    return """<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Yisheng 助理</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#007AFF;--blue-lt:#E3F0FF;--green:#34C759;--green-lt:#E6F9ED;
+  --red:#FF3B30;--gray:#8E8E93;--bg:#F2F2F7;--surface:#FFF;
+  --border:#D1D1D6;--text:#1C1C1E;--text2:#6C6C70;--radius:12px;
+  --sidebar:270px;--hdr:52px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:var(--bg);color:var(--text);height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+#hdr{height:var(--hdr);background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;padding:0 16px;
+  box-shadow:0 1px 3px rgba(0,0,0,.07);flex-shrink:0;z-index:50}
+#hdr h1{font-size:16px;font-weight:700;flex:1}
+.hbtn{font-size:12px;color:var(--blue);background:var(--blue-lt);
+  border:none;border-radius:8px;padding:5px 10px;cursor:pointer;text-decoration:none}
+#dot{width:9px;height:9px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 0 3px var(--green-lt);transition:all .3s;flex-shrink:0}
+#dot.busy{background:#FF9500;box-shadow:0 0 0 3px #FFF3E0}
+#body{flex:1;display:flex;overflow:hidden}
+#sidebar{width:var(--sidebar);background:var(--surface);
+  border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0}
+.sg{border-bottom:1px solid var(--border)}
+.sghdr{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;cursor:pointer;font-size:11px;font-weight:700;
+  color:var(--text2);text-transform:uppercase;letter-spacing:.4px;
+  background:#FAFAFA;user-select:none}
+.sghdr:hover,.sghdr.open{background:var(--blue-lt);color:var(--blue)}
+.sghdr .arr{font-size:10px;transition:transform .2s}
+.sghdr.open .arr{transform:rotate(90deg)}
+.sgitems{display:none;padding:3px 0}
+.sgitems.open{display:block}
+.sbtn{width:100%;text-align:left;border:none;background:transparent;
+  padding:9px 16px 9px 20px;font-size:13px;color:var(--text);cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;
+  transition:background .12s;gap:6px}
+.sbtn:hover{background:var(--blue-lt);color:var(--blue)}
+.sbtn.direct .lbl{color:var(--blue);font-weight:500}
+.sbtn .tag{font-size:10px;background:var(--blue);color:#fff;border-radius:4px;
+  padding:1px 6px;flex-shrink:0}
+.sbtn.form-btn .tag{background:var(--gray)}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#chat{flex:1;overflow-y:auto;padding:14px 10px;
+  display:flex;flex-direction:column;gap:8px}
+.msg{display:flex;max-width:88%;animation:fi .2s ease}
+.msg.u{align-self:flex-end;flex-direction:row-reverse}
+.msg.b{align-self:flex-start}
+.bbl{padding:9px 13px;border-radius:16px;font-size:14px;
+  line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.msg.u .bbl{background:var(--blue);color:#fff;border-bottom-right-radius:3px}
+.msg.b .bbl{background:var(--blue-lt);color:var(--text);border-bottom-left-radius:3px}
+.mt{font-size:10px;color:var(--text2);margin:3px 5px;align-self:flex-end}
+.smsg .bbl{background:var(--bg);border:1px solid var(--border);
+  display:flex;align-items:center;gap:7px}
+.spin{width:15px;height:15px;border:2px solid var(--border);
+  border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite;flex-shrink:0}
+#pend{background:var(--surface);border-top:2px solid var(--blue);
+  padding:10px 12px;display:none}
+#pend.on{display:block}
+#pendtitle{font-size:12px;font-weight:700;color:var(--blue);margin-bottom:8px}
+#pendbtns{display:flex;flex-wrap:wrap;gap:6px}
+.pbtn{background:var(--blue);color:#fff;border:none;border-radius:8px;
+  padding:7px 11px;font-size:12px;cursor:pointer}
+.pbtn:hover{opacity:.85}
+.pbtn.cancel{background:var(--gray)}
+#bar{background:var(--surface);border-top:1px solid var(--border);
+  padding:8px 10px;display:flex;gap:7px;align-items:center;flex-shrink:0}
+#upld{border:1.5px solid var(--border);border-radius:50%;width:38px;height:38px;
+  font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);color:var(--text2);flex-shrink:0}
+#upld:hover{background:var(--blue-lt);border-color:var(--blue);color:var(--blue)}
+#finput{display:none}
+#inp{flex:1;border:1.5px solid var(--border);border-radius:10px;
+  padding:8px 12px;font-size:14px;background:var(--bg);
+  outline:none;font-family:inherit;transition:border-color .2s}
+#inp:focus{border-color:var(--blue)}
+#sendbtn{background:var(--blue);color:#fff;border:none;border-radius:50%;
+  width:38px;height:38px;font-size:16px;cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center}
+#sendbtn:disabled{opacity:.35;cursor:default}
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);
+  z-index:200;display:none;align-items:flex-end;justify-content:center;padding:0}
+#overlay.on{display:flex}
+#mbox{background:var(--surface);border-radius:20px 20px 0 0;
+  width:100%;max-width:520px;max-height:90dvh;overflow-y:auto;
+  box-shadow:0 -4px 30px rgba(0,0,0,.2);animation:su .25s ease}
+#mtitle{font-size:15px;font-weight:700;padding:18px 18px 10px;
+  display:flex;align-items:center;justify-content:space-between}
+#mtitle button{border:none;background:var(--bg);border-radius:50%;
+  width:28px;height:28px;font-size:14px;cursor:pointer;color:var(--text2)}
+#mfields{padding:6px 18px 8px;display:flex;flex-direction:column;gap:12px}
+.mf label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:4px}
+.mf input,.mf select,.mf textarea{
+  width:100%;border:1.5px solid var(--border);border-radius:10px;
+  padding:9px 12px;font-size:14px;outline:none;font-family:inherit;
+  transition:border-color .2s;background:var(--bg)}
+.mf input:focus,.mf select:focus,.mf textarea:focus{border-color:var(--blue)}
+.mf textarea{resize:vertical;min-height:70px}
+.mf input.err,.mf select.err{border-color:var(--red)!important}
+#macts{display:flex;gap:8px;padding:12px 18px 20px}
+#mcancel{flex:1;padding:12px;border:1.5px solid var(--border);border-radius:10px;
+  background:transparent;font-size:14px;cursor:pointer;font-family:inherit}
+#mok{flex:2;padding:12px;background:var(--blue);color:#fff;
+  border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+#fab{display:none;position:fixed;bottom:72px;right:16px;z-index:100;
+  width:54px;height:54px;border-radius:50%;background:var(--blue);color:#fff;
+  border:none;font-size:24px;box-shadow:0 4px 16px rgba(0,0,0,.25);cursor:pointer;
+  align-items:center;justify-content:center}
+#mobmenu{position:fixed;inset:0;z-index:150;display:none;flex-direction:column}
+#mobmenu.on{display:flex}
+#mobbg{flex:0 0 80px;background:rgba(0,0,0,.45)}
+#mobsheet{flex:1;background:var(--surface);overflow-y:auto;
+  border-radius:20px 20px 0 0;padding-bottom:env(safe-area-inset-bottom,16px)}
+#mobclose{width:100%;padding:14px;border:none;background:transparent;
+  font-size:13px;color:var(--text2);cursor:pointer;border-bottom:1px solid var(--border)}
+.mgg{border-bottom:1px solid var(--border)}
+.mgghdr{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;
+  letter-spacing:.4px;padding:12px 18px 4px}
+.mgbtn{width:100%;text-align:left;border:none;background:transparent;
+  padding:12px 18px;font-size:14px;cursor:pointer;display:flex;align-items:center;
+  justify-content:space-between;border-bottom:1px solid #F2F2F7}
+.mgbtn:active,.mgbtn:hover{background:var(--blue-lt)}
+.mgbtn.direct .lbl{color:var(--blue);font-weight:500}
+.mgbtn .mtag{font-size:11px;color:var(--text2)}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes su{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(max-width:639px){#sidebar{display:none}#fab{display:flex}}
+@media(min-width:640px){#fab,#mobmenu{display:none!important}}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <h1>🤖 Yisheng 助理</h1>
+  <div id="dot"></div>
+  <a href="/archive" class="hbtn" target="_blank">📁 歸檔瀏覽器</a>
+</div>
+<div id="body">
+  <div id="sidebar"></div>
+  <div id="main">
+    <div id="chat"></div>
+    <div id="pend"><div id="pendtitle">📋 待歸檔選項</div><div id="pendbtns"></div></div>
+    <div id="bar">
+      <input type="file" id="finput" accept="*/*">
+      <button id="upld" title="上傳檔案" onclick="document.getElementById('finput').click()">📎</button>
+      <input id="inp" type="text" placeholder="或直接輸入指令…" onkeydown="if(event.key==='Enter')doSend()">
+      <button id="sendbtn" onclick="doSend()">➤</button>
+    </div>
+  </div>
+</div>
+<div id="overlay" onclick="if(event.target===this)closeModal()">
+  <div id="mbox">
+    <div id="mtitle"><span id="mtitletext"></span><button onclick="closeModal()">✕</button></div>
+    <div id="mfields"></div>
+    <div id="macts">
+      <button id="mcancel" onclick="closeModal()">取消</button>
+      <button id="mok" onclick="submitModal()">執行 ➤</button>
+    </div>
+  </div>
+</div>
+<button id="fab" onclick="openMob()">☰</button>
+<div id="mobmenu">
+  <div id="mobbg" onclick="closeMob()"></div>
+  <div id="mobsheet">
+    <button id="mobclose" onclick="closeMob()">✕ 關閉選單</button>
+    <div id="mobcont"></div>
+  </div>
+</div>
+<script>
+const AMODES=["會議記錄","行事曆","夥伴跟進","市場開發","培訓資料","一般歸檔",
+  "整理會議心得","歸檔會議紀錄","歸檔行動紀錄","歸檔文件","421故事歸檔","課程文宣歸檔"];
+const GROUPS=[
+  {label:"🎯 市場開發",items:[
+    {label:"新增潛在家人",tag:"表單",form:{title:"新增潛在家人",
+      fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"例：張三"},
+              {id:"j",lbl:"職業",type:"text",ph:"例：業務員"},
+              {id:"c",lbl:"接觸管道",type:"text",ph:"例：朋友介紹"},
+              {id:"r",lbl:"備註",type:"textarea",ph:"補充資訊"}],
+      build:function(v){return "新增潛在家人 "+v.n+"|"+v.j+"|"+v.c+"|"+v.r;}}},
+    {label:"查詢潛在家人",tag:"執行",cmd:"查詢潛在家人"},
+    {label:"加入潛在家人資訊",tag:"表單",form:{title:"加入潛在家人資訊",
+      fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"請輸入潛在家人姓名"}],
+      build:function(v){return "潛在家人資料 "+v.n;}}},
+  ]},
+  {label:"📚 培訓系統",items:[
+    {label:"查詢培訓進度",tag:"表單",form:{title:"查詢培訓進度",
+      fields:[{id:"n",lbl:"夥伴名稱",type:"text",req:1,ph:"例：建德"}],
+      build:function(v){return "培訓 "+v.n;}}},
+  ]},
+  {label:"🤝 夥伴陪伴",items:[
+    {label:"跟進報告",tag:"執行",cmd:"跟進報告"},
+    {label:"激勵夥伴",tag:"表單",form:{title:"激勵夥伴",
+      fields:[{id:"n",lbl:"夥伴名稱",type:"text",req:1,ph:"例：建德"},
+              {id:"s",lbl:"情境說明（選填）",type:"textarea",ph:"例：最近業績下滑"}],
+      build:function(v){return "激勵 "+v.n+(v.s?" "+v.s:"");}}},
+    {label:"里程碑記錄",tag:"表單",form:{title:"里程碑記錄",
+      fields:[{id:"n",lbl:"夥伴名稱",type:"text",req:1,ph:"例：建德"},
+              {id:"a",lbl:"成就描述",type:"textarea",ph:"例：首次達成業績目標"}],
+      build:function(v){return "里程碑 "+v.n+(v.a?" "+v.a:"");}}},
+    {label:"查詢所有夥伴",tag:"執行",cmd:"查詢夥伴"},
+    {label:"查詢待跟進夥伴",tag:"執行",cmd:"查詢待跟進夥伴"},
+    {label:"新增夥伴",tag:"表單",form:{title:"新增夥伴",
+      fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"姓名"},
+              {id:"g",lbl:"目標",type:"text",ph:"例：月入三萬"},
+              {id:"d",lbl:"下次跟進日期",type:"date"},
+              {id:"r",lbl:"備註",type:"textarea",ph:"補充資訊"}],
+      build:function(v){return "新增夥伴 "+v.n+" | "+v.g+" | "+v.d+" | "+v.r;}}},
+    {label:"跟進夥伴",tag:"表單",form:{title:"跟進夥伴",
+      fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"姓名"},
+              {id:"s",lbl:"狀態",type:"text",ph:"例：持續跟進"},
+              {id:"d",lbl:"下次跟進日期",type:"date"},
+              {id:"r",lbl:"備註",type:"textarea",ph:"補充資訊"}],
+      build:function(v){return "跟進夥伴 "+v.n+" | "+v.s+" | "+v.d+" | "+v.r;}}},
+  ]},
+  {label:"🗓️ 行事曆",items:[
+    {label:"查詢今日行事曆",tag:"執行",cmd:"查詢行事曆"},
+    {label:"查詢過往行事曆",tag:"執行",cmd:"查詢過往行事曆"},
+    {label:"查詢全部行事曆",tag:"執行",cmd:"查詢全部行事曆"},
+    {label:"新增行事曆事件",tag:"表單",form:{title:"新增行事曆事件",
+      fields:[{id:"d",lbl:"日期",type:"date",req:1},
+              {id:"t",lbl:"時間（選填）",type:"time"},
+              {id:"ti",lbl:"標題",type:"text",req:1,ph:"活動名稱"},
+              {id:"r",lbl:"備註（選填）",type:"textarea",ph:"補充說明"}],
+      build:function(v){return "新增行事曆 "+v.d+(v.t?" "+v.t:"")+" "+v.ti+(v.r?" | "+v.r:"");}}},
+  ]},
+  {label:"📂 歸類模式",items:[
+    {label:"查詢目前歸類模式",tag:"執行",cmd:"歸類模式"},
+    {label:"設定歸類模式",tag:"表單",form:{title:"設定歸類模式",
+      fields:[{id:"m",lbl:"歸類模式",type:"select",req:1,opts:AMODES},
+              {id:"p",lbl:"人員名稱（選填）",type:"text",ph:"例：建德"},
+              {id:"d",lbl:"日期（選填）",type:"date"}],
+      build:function(v){var c="歸類模式";if(v.p)c+=" "+v.p;c+=" "+v.m;if(v.d)c+=" "+v.d;return c;}}},
+    {label:"關閉歸類模式",tag:"執行",cmd:"關閉歸類模式"},
+    {label:"查詢所有歸檔",tag:"執行",cmd:"查詢歸檔"},
+    {label:"查詢指定人員歸檔",tag:"表單",form:{title:"查詢指定人員歸檔",
+      fields:[{id:"n",lbl:"人員名稱",type:"text",req:1,ph:"例：建德"}],
+      build:function(v){return "查詢歸檔 "+v.n;}}},
+  ]},
+  {label:"📖 培訓記錄",items:[
+    {label:"整理今日培訓記錄",tag:"執行",cmd:"整理"},
+    {label:"整理指定日期記錄",tag:"表單",form:{title:"整理指定日期記錄",
+      fields:[{id:"d",lbl:"日期",type:"date",req:1}],
+      build:function(v){return "整理 "+v.d.replace(/-/g,"");}}},
+    {label:"再次整理（強制覆蓋）",tag:"執行",cmd:"再次整理"},
+    {label:"查詢培訓記錄",tag:"表單",form:{title:"查詢指定日期培訓記錄",
+      fields:[{id:"d",lbl:"日期",type:"date",req:1}],
+      build:function(v){return "MTG-"+v.d.replace(/-/g,"");}}},
+  ]},
+  {label:"🛍️ 安麗產品歸檔",items:[
+    {label:"💊 營養保健 (Nutrilite)",tag:"執行",cmd:"營養保健歸檔"},
+    {label:"💄 美容保養 (Artistry)",tag:"執行",cmd:"美容保養歸檔"},
+    {label:"🧹 居家清潔 (Amway Home)",tag:"執行",cmd:"居家清潔歸檔"},
+    {label:"🪥 個人護理 (Glister)",tag:"執行",cmd:"個人護理歸檔"},
+    {label:"🍳 廚具與生活用品",tag:"執行",cmd:"廚具生活歸檔"},
+    {label:"💧 空氣與水處理設備",tag:"執行",cmd:"空水設備歸檔"},
+    {label:"⚖️ 體重管理與運動營養",tag:"執行",cmd:"體重管理歸檔"},
+    {label:"🌸 香氛與個人風格",tag:"執行",cmd:"香氛風格歸檔"},
+    {label:"🛠️ 事業工具與教育系統",tag:"執行",cmd:"事業工具歸檔"},
+  ]},
+  {label:"📝 故事分類",items:[
+    {label:"👤 人物故事歸檔",tag:"表單",form:{title:"人物故事歸檔",
+      fields:[{id:"n",lbl:"人物名稱",type:"text",req:1,ph:"例：建德"}],
+      build:function(v){return "潛在家人資料 "+v.n;}}},
+    {label:"📖 產品故事歸檔",tag:"執行",cmd:"產品故事歸檔"},
+  ]},
+  {label:"❓ 說明",items:[
+    {label:"顯示所有指令",tag:"執行",cmd:"指令集"},
+  ]},
+];
+// Build sidebar
+function buildSB(){
+  var sb=document.getElementById("sidebar");sb.innerHTML="";
+  GROUPS.forEach(function(g){
+    var sec=document.createElement("div");sec.className="sg";
+    var hdr=document.createElement("div");hdr.className="sghdr";
+    hdr.innerHTML=g.label+' <span class="arr">▶</span>';
+    var items=document.createElement("div");items.className="sgitems";
+    hdr.onclick=function(){hdr.classList.toggle("open");items.classList.toggle("open");};
+    g.items.forEach(function(item){
+      var b=document.createElement("button");
+      b.className="sbtn"+(item.cmd&&!item.form?" direct":"")+(item.form?" form-btn":"");
+      b.innerHTML='<span class="lbl">'+item.label+'</span><span class="tag">'+item.tag+'</span>';
+      b.onclick=function(){clickItem(item);};
+      items.appendChild(b);
+    });
+    sec.appendChild(hdr);sec.appendChild(items);sb.appendChild(sec);
+  });
+}
+buildSB();
+// Build mobile menu
+function buildMob(){
+  var c=document.getElementById("mobcont");c.innerHTML="";
+  GROUPS.forEach(function(g){
+    var gh=document.createElement("div");gh.className="mgg";
+    var ghl=document.createElement("div");ghl.className="mgghdr";ghl.textContent=g.label;
+    gh.appendChild(ghl);
+    g.items.forEach(function(item){
+      var b=document.createElement("button");
+      b.className="mgbtn"+(item.cmd&&!item.form?" direct":"");
+      b.innerHTML='<span class="lbl">'+item.label+'</span><span class="mtag">'+item.tag+'</span>';
+      b.onclick=function(){closeMob();clickItem(item);};
+      gh.appendChild(b);
+    });
+    c.appendChild(gh);
+  });
+}
+buildMob();
+function openMob(){document.getElementById("mobmenu").classList.add("on");}
+function closeMob(){document.getElementById("mobmenu").classList.remove("on");}
+// Modal
+var _build=null;
+function clickItem(item){
+  if(item.cmd&&!item.form){doSend(item.cmd);}
+  else if(item.form){openModal(item.form);}
+}
+function openModal(f){
+  _build=f.build;
+  document.getElementById("mtitletext").textContent=f.title||"";
+  var mf=document.getElementById("mfields");mf.innerHTML="";
+  f.fields.forEach(function(fd){
+    var w=document.createElement("div");w.className="mf";
+    var l=document.createElement("label");
+    l.textContent=fd.lbl+(fd.req?" *":"");l.setAttribute("for","mf_"+fd.id);
+    w.appendChild(l);
+    var el;
+    if(fd.type==="select"){
+      el=document.createElement("select");el.id="mf_"+fd.id;
+      if(!fd.req){var o=document.createElement("option");o.value="";o.textContent="（選填）";el.appendChild(o);}
+      (fd.opts||[]).forEach(function(o){var oe=document.createElement("option");oe.value=o;oe.textContent=o;el.appendChild(oe);});
+    } else if(fd.type==="textarea"){
+      el=document.createElement("textarea");el.id="mf_"+fd.id;
+      el.placeholder=fd.ph||"";el.rows=3;
+    } else {
+      el=document.createElement("input");el.id="mf_"+fd.id;
+      el.type=fd.type||"text";el.placeholder=fd.ph||"";
+      if(fd.req)el.required=true;
+      if(fd.type==="date")el.value=new Date().toISOString().split("T")[0];
+    }
+    w.appendChild(el);mf.appendChild(w);
+  });
+  document.getElementById("overlay").classList.add("on");
+  var first=mf.querySelector("input,select,textarea");
+  if(first)setTimeout(function(){first.focus();},120);
+}
+function closeModal(){
+  document.getElementById("overlay").classList.remove("on");_build=null;
+}
+function submitModal(){
+  var mf=document.getElementById("mfields");
+  var vals={};var ok=true;
+  mf.querySelectorAll("input,select,textarea").forEach(function(el){
+    var id=el.id.replace("mf_","");
+    el.classList.remove("err");
+    if(el.required&&!el.value.trim()){el.classList.add("err");ok=false;}
+    else{vals[id]=el.value.trim();}
+  });
+  if(!ok){mf.querySelector(".err").focus();return;}
+  var cmd=_build(vals);
+  closeModal();doSend(cmd);
+}
+// Chat
+function nt(){return new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});}
+function addMsg(text,role){
+  var chat=document.getElementById("chat");
+  var w=document.createElement("div");w.className="msg "+role;
+  var b=document.createElement("div");b.className="bbl";b.textContent=text;
+  var t=document.createElement("div");t.className="mt";t.textContent=nt();
+  w.appendChild(b);w.appendChild(t);chat.appendChild(w);
+  chat.scrollTop=chat.scrollHeight;return w;
+}
+function addSpin(){
+  var chat=document.getElementById("chat");
+  var w=document.createElement("div");w.className="msg b smsg";
+  w.innerHTML='<div class="bbl"><div class="spin"></div><span>處理中…</span></div>';
+  chat.appendChild(w);chat.scrollTop=chat.scrollHeight;return w;
+}
+function setBusy(on){
+  document.getElementById("dot").className=on?"busy":"";
+  document.getElementById("sendbtn").disabled=on;
+  document.getElementById("inp").disabled=on;
+}
+async function doSend(forced){
+  var inp=document.getElementById("inp");
+  var cmd=(forced!==undefined?forced:inp.value).trim();
+  if(!cmd)return;
+  if(forced===undefined)inp.value="";
+  addMsg(cmd,"u");setBusy(true);var sp=addSpin();
+  try{
+    var r=await fetch("/api/command",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({command:cmd})});
+    var d=await r.json();sp.remove();
+    var txt=d.result||"（無回應）";
+    addMsg(txt,"b");
+    if(txt.startsWith("📋 潛在家人名單")){addListButtons(txt,"潛在家人詳情");}
+    else if(txt.startsWith("👤 ")){var nm=txt.split("\\n")[0].replace("👤 ","").split(/[\s　]/)[0];if(nm)addDetailButtons(nm);}
+  }catch(e){sp.remove();addMsg("⚠️ 連線失敗："+e.message,"b");}
+  finally{setBusy(false);}
+}
+function addDetailButtons(name){
+  var chat=document.getElementById("chat");
+  var w=document.createElement("div");w.className="msg b";
+  var wrap=document.createElement("div");wrap.style.cssText="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0";
+  var eb=document.createElement("button");
+  eb.style.cssText="background:#34C759;color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer";
+  eb.textContent="✏️ 編輯基本資料";eb.onclick=function(){openEditProspect(name);};
+  var xb=document.createElement("button");
+  xb.style.cssText="background:#FF9500;color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer";
+  xb.textContent="📝 新增體驗記錄";xb.onclick=function(){openAddExperience(name);};
+  wrap.appendChild(eb);wrap.appendChild(xb);w.appendChild(wrap);
+  chat.appendChild(w);chat.scrollTop=chat.scrollHeight;
+}
+async function openEditProspect(name){
+  setBusy(true);
+  try{
+    var r=await fetch("/api/prospect/"+encodeURIComponent(name));
+    var d=await r.json();var row=d.result||{};
+    document.getElementById("mtitletext").textContent="✏️ 維護 "+name+" 的資料";
+    var mf=document.getElementById("mfields");mf.innerHTML="";
+    [{id:"電話",lbl:"電話",type:"text",ph:"手機號碼"},
+     {id:"地區",lbl:"地區",type:"text",ph:"例：台中市西屯區"},
+     {id:"地址",lbl:"地址",type:"text",ph:"完整地址"},
+     {id:"接觸狀態",lbl:"接觸狀態",type:"text",ph:"例：持續跟進"},
+     {id:"下次跟進日",lbl:"下次跟進日期",type:"date"},
+     {id:"使用產品",lbl:"使用產品（逗號或頓號分隔）",type:"text",ph:"例：益生菌、魚油"},
+     {id:"淨水器型號",lbl:"淨水器型號",type:"text",ph:"例：eSpring E-9255"},
+     {id:"濾心上次換",lbl:"濾心上次更換日期",type:"date"},
+     {id:"濾心下次換",lbl:"濾心下次更換日期",type:"date"},
+     {id:"備註",lbl:"備註",type:"textarea"}
+    ].forEach(function(fd){
+      var ww=document.createElement("div");ww.className="mf";
+      var l=document.createElement("label");l.textContent=fd.lbl;ww.appendChild(l);
+      var el;
+      if(fd.type==="textarea"){el=document.createElement("textarea");el.rows=3;}
+      else{el=document.createElement("input");el.type=fd.type;}
+      el.id="mf_"+fd.id;el.placeholder=fd.ph||"";
+      el.value=row[fd.id]||"";
+      ww.appendChild(el);mf.appendChild(ww);
+    });
+    document.getElementById("overlay").classList.add("on");
+    document.getElementById("mok").onclick=async function(){
+      var updates={name:name};
+      mf.querySelectorAll("input,textarea").forEach(function(el){updates[el.id.replace("mf_","")]=el.value.trim();});
+      document.getElementById("overlay").classList.remove("on");
+      document.getElementById("mok").onclick=submitModal;
+      setBusy(true);var sp=addSpin();
+      try{var r2=await fetch("/api/prospect/update",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(updates)});
+        var d2=await r2.json();sp.remove();addMsg(d2.result||"（已更新）","b");
+      }catch(e){sp.remove();addMsg("⚠️ "+e.message,"b");}finally{setBusy(false);}
+    };
+  }catch(e){addMsg("⚠️ 載入失敗："+e.message,"b");}
+  finally{setBusy(false);}
+}
+function openAddExperience(name){
+  document.getElementById("mtitletext").textContent="📝 新增體驗記錄 — "+name;
+  var mf=document.getElementById("mfields");mf.innerHTML="";
+  [{id:"product",lbl:"產品/食品名稱",type:"text",req:1,ph:"例：益生菌、魚油、eSpring"},
+   {id:"note",lbl:"備註",type:"textarea",ph:"例：每天早上服用 2 顆，效果明顯"},
+   {id:"filter_last",lbl:"濾心上次更換（若適用）",type:"date"},
+   {id:"filter_next",lbl:"濾心下次更換（若適用）",type:"date"}
+  ].forEach(function(fd){
+    var ww=document.createElement("div");ww.className="mf";
+    var l=document.createElement("label");l.textContent=fd.lbl+(fd.req?" *":"");ww.appendChild(l);
+    var el;
+    if(fd.type==="textarea"){el=document.createElement("textarea");el.rows=3;}
+    else{el=document.createElement("input");el.type=fd.type;}
+    el.id="mfe_"+fd.id;el.placeholder=fd.ph||"";if(fd.req)el.required=true;
+    ww.appendChild(el);mf.appendChild(ww);
+  });
+  document.getElementById("overlay").classList.add("on");
+  var first=mf.querySelector("input");if(first)setTimeout(function(){first.focus();},120);
+  document.getElementById("mok").onclick=async function(){
+    var prod=document.getElementById("mfe_product");
+    if(!prod.value.trim()){prod.classList.add("err");prod.focus();return;}
+    var body={name:name,product:prod.value.trim(),
+      note:(document.getElementById("mfe_note")||{}).value||"",
+      filter_last:(document.getElementById("mfe_filter_last")||{}).value||"",
+      filter_next:(document.getElementById("mfe_filter_next")||{}).value||""};
+    document.getElementById("overlay").classList.remove("on");
+    document.getElementById("mok").onclick=submitModal;
+    setBusy(true);var sp=addSpin();
+    try{var r=await fetch("/api/prospect/experience",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      var d=await r.json();sp.remove();addMsg(d.result||"（已記錄）","b");
+    }catch(e){sp.remove();addMsg("⚠️ "+e.message,"b");}finally{setBusy(false);}
+  };
+}
+function addListButtons(txt,prefix){
+  var chat=document.getElementById("chat");
+  var w=document.createElement("div");w.className="msg b";
+  var wrap=document.createElement("div");
+  wrap.style.cssText="display:flex;flex-direction:column;gap:6px;padding:4px 0";
+  txt.split("\\n").forEach(function(line){
+    var m=line.match(/^(\d+)\./);
+    if(!m)return;
+    var n=parseInt(m[1]);
+    var btn=document.createElement("button");
+    btn.style.cssText="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer;text-align:left;width:100%";
+    btn.textContent=line.trim()+" 👉 查看詳情";
+    btn.onclick=function(){doSend(prefix+" "+n);};
+    wrap.appendChild(btn);
+  });
+  if(wrap.children.length>0){w.appendChild(wrap);chat.appendChild(w);chat.scrollTop=chat.scrollHeight;}
+}
+// Upload
+document.getElementById("finput").addEventListener("change",async function(){
+  var f=this.files[0];if(!f)return;this.value="";
+  addMsg("📎 "+f.name,"u");setBusy(true);var sp=addSpin();
+  var fd=new FormData();fd.append("file",f,f.name);
+  try{
+    var r=await fetch("/api/upload",{method:"POST",body:fd});
+    var d=await r.json();sp.remove();
+    if(d.result){addMsg(d.result,"b");await refreshPend();}
+    else{addMsg("✅ 上傳完成","b");}
+  }catch(e){sp.remove();addMsg("⚠️ 上傳失敗："+e.message,"b");}
+  finally{setBusy(false);}
+});
+// Pending
+async function refreshPend(){
+  try{var r=await fetch("/api/pending");var d=await r.json();
+    if(d.result){showPend(d.result);}else{hidePend();}}catch(e){}
+}
+function showPend(txt){
+  var btns=document.getElementById("pendbtns");btns.innerHTML="";
+  txt.split("\\n").forEach(function(line){
+    var m=line.match(/^(\\d+)[.)、:：]/);
+    if(m){var n=parseInt(m[1]);
+      var b=document.createElement("button");b.className="pbtn";
+      b.textContent=line.trim();b.onclick=function(){execPend(n);};btns.appendChild(b);}
+  });
+  var cb=document.createElement("button");cb.className="pbtn cancel";
+  cb.textContent="✕ 取消";cb.onclick=function(){execPend(0);hidePend();};btns.appendChild(cb);
+  document.getElementById("pend").classList.add("on");
+}
+function hidePend(){
+  document.getElementById("pend").classList.remove("on");
+  document.getElementById("pendbtns").innerHTML="";
+}
+async function execPend(n){
+  setBusy(true);var sp=addSpin();
+  try{var r=await fetch("/api/pending/execute",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify({choice:n})});
+    var d=await r.json();sp.remove();addMsg(d.result||"（已執行）","b");hidePend();
+  }catch(e){sp.remove();addMsg("⚠️ 執行失敗："+e.message,"b");}
+  finally{setBusy(false);}
+}
+// Init
+addMsg("你好！我是 Yisheng 助理 🤖\\n手機：點右下角 ☰ 開啟選單\\n電腦：點左側選單按鈕\\n上傳檔案：點 📎 按鈕","b");
+refreshPend();
+</script>
+</body>
+</html>"""
+
+
+@app.route("/web")
+def web_dashboard():
+    return _render_dashboard_html_v2(), 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/api/command", methods=["POST"])
+def api_command():
+    try:
+        data = request.get_json(force=True) or {}
+        cmd = data.get("command", "").strip()
+        if not cmd:
+            return {"result": "⚠️ 請提供指令"}, 400
+        result = process_web_command(cmd)
+        return {"result": result}
+    except Exception as e:
+        return {"result": f"⚠️ 伺服器錯誤：{e}"}, 500
+
+
+@app.route("/api/upload", methods=["POST"])
+def api_upload():
+    try:
+        if "file" not in request.files:
+            return {"result": "⚠️ 未找到上傳的檔案"}, 400
+        f = request.files["file"]
+        filename = f.filename or "upload"
+        data = f.read()
+        content_type = f.content_type or "application/octet-stream"
+
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        if ext in ("jpg", "jpeg", "png", "gif", "webp"):
+            file_type = "image"
+        elif ext in ("m4a", "mp3", "wav", "ogg", "aac"):
+            file_type = "audio"
+        elif ext in ("mp4", "mov", "avi", "mkv"):
+            file_type = "video"
+        else:
+            file_type = "file"
+
+        clf_mod = _load_classifier()
+        clf = clf_mod.ClassifierAgent()
+        clf.stage_file(data, filename, file_type, "web_user",
+                       content_type=content_type, source_name=filename)
+        menu = clf.format_pending_menu("web_user")
+        return {"result": menu}
+    except Exception as e:
+        return {"result": f"⚠️ 上傳失敗：{e}"}, 500
+
+
+@app.route("/api/pending", methods=["GET"])
+def api_pending():
+    try:
+        clf_mod = _load_classifier()
+        clf = clf_mod.ClassifierAgent()
+        menu = clf.format_pending_menu("web_user")
+        return {"result": menu if menu else None}
+    except Exception as e:
+        return {"result": None}
+
+
+@app.route("/api/pending/execute", methods=["POST"])
+def api_pending_execute():
+    try:
+        data = request.get_json(force=True) or {}
+        choice = int(data.get("choice", 0))
+        clf_mod = _load_classifier()
+        clf = clf_mod.ClassifierAgent()
+        result = clf.execute_pending_option("web_user", choice)
+        return {"result": result}
+    except Exception as e:
+        return {"result": f"⚠️ 執行失敗：{e}"}, 500
+
+
+@app.route("/api/prospect/<name>", methods=["GET"])
+def api_prospect_get(name):
+    try:
+        market = _load_market_dev()
+        row = market.MarketDevAgent().get_prospect_by_name(name)
+        if row:
+            return {"result": row}
+        return {"result": None}, 404
+    except Exception as e:
+        return {"result": None, "error": str(e)}, 500
+
+
+@app.route("/api/prospect/update", methods=["POST"])
+def api_prospect_update():
+    try:
+        data = request.get_json(force=True) or {}
+        name = data.pop("name", "").strip()
+        if not name:
+            return {"result": "⚠️ 請提供姓名"}, 400
+        market = _load_market_dev()
+        result = market.MarketDevAgent().update_prospect_fields(name, data)
+        return {"result": result}
+    except Exception as e:
+        return {"result": f"⚠️ 更新失敗：{e}"}, 500
+
+
+@app.route("/api/prospect/experience", methods=["POST"])
+def api_prospect_experience():
+    try:
+        data = request.get_json(force=True) or {}
+        name    = data.get("name", "").strip()
+        product = data.get("product", "").strip()
+        if not name or not product:
+            return {"result": "⚠️ 姓名和產品為必填"}, 400
+        market = _load_market_dev()
+        result = market.MarketDevAgent().add_experience(
+            name, product,
+            note=data.get("note", ""),
+            filter_last=data.get("filter_last", ""),
+            filter_next=data.get("filter_next", ""),
+        )
+        return {"result": result}
+    except Exception as e:
+        return {"result": f"⚠️ 新增失敗：{e}"}, 500
 
 
 # ============================================================
