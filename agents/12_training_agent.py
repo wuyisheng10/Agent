@@ -13,12 +13,16 @@ CSV 欄位:
 import csv
 import json
 import os
-import subprocess
-import tempfile
 from datetime import datetime, date
 from pathlib import Path
+import sys
 
 from dotenv import load_dotenv
+
+AGENTS_DIR = Path(__file__).resolve().parent
+if str(AGENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(AGENTS_DIR))
+from common_runtime import load_json_config, push_line_message, run_codex_cli
 
 BASE_DIR     = Path(r"C:\Users\user\claude AI_Agent")
 CSV_DIR      = BASE_DIR / "output" / "csv_data"
@@ -133,62 +137,20 @@ def log(msg: str):
 
 
 def load_config() -> dict:
-    try:
-        with open(CONFIG, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    return load_json_config(CONFIG)
 
 
 def run_claude(prompt: str, timeout: int = 90) -> str:
-    # 優先：Codex CLI
-    response_path = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", suffix=".txt",
-            delete=False, dir=str(BASE_DIR / "logs")
-        ) as f:
-            response_path = f.name
-        result = subprocess.run(
-            ["cmd", "/c", "codex", "exec",
-             "--skip-git-repo-check", "--sandbox", "read-only",
-             "--color", "never", "-C", str(BASE_DIR),
-             "-o", response_path, "-"],
-            input=prompt, capture_output=True, text=True,
-            encoding="utf-8", timeout=timeout,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "codex CLI 回傳非零")
-        out = ""
-        if response_path and os.path.exists(response_path):
-            with open(response_path, "r", encoding="utf-8") as f:
-                out = f.read().strip()
-        if not out:
-            out = result.stdout.strip()
-        if out:
-            return out
-        raise RuntimeError("codex CLI 未回傳內容")
-    except Exception:
-        raise
-    finally:
-        if response_path and os.path.exists(response_path):
-            try:
-                os.unlink(response_path)
-            except Exception:
-                pass
+    return run_codex_cli(prompt, timeout=timeout)
 
 
 def push_line(user_id: str, message: str):
-    if not LINE_TOKEN or not user_id:
+    status = push_line_message(LINE_TOKEN, user_id, LINE_PUSH, message)
+    if status is None:
         log("  ⚠️ LINE 未設定或無 UID，跳過推播")
         return
-    import requests
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {LINE_TOKEN}"}
-    chunks = [message[i:i+4900] for i in range(0, len(message), 4900)]
-    payload = {"to": user_id, "messages": [{"type": "text", "text": c} for c in chunks[:5]]}
-    r = requests.post(LINE_PUSH, headers=headers, json=payload, timeout=10)
-    if r.status_code != 200:
-        log(f"  ⚠️ LINE 推播失敗：{r.status_code}")
+    if status != 200:
+        log(f"  ⚠️ LINE 推播失敗：{status}")
 
 
 def days_since(date_str: str) -> int:
