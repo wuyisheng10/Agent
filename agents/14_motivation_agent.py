@@ -14,18 +14,64 @@ Trigger:
 import argparse
 import csv
 import os
+import shutil
+import subprocess
+import tempfile
 from datetime import datetime, date
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 try:
-    from common_runtime import BASE_DIR, load_json_config, push_line_message, run_codex_cli
+    from common_runtime import BASE_DIR, load_json_config, push_line_message
 except ModuleNotFoundError:
-    from agents.common_runtime import BASE_DIR, load_json_config, push_line_message, run_codex_cli
+    from agents.common_runtime import BASE_DIR, load_json_config, push_line_message
+
+
+def _resolve_codex_cli() -> list[str]:
+    appdata = Path(os.getenv("APPDATA", r"C:\Users\user\AppData\Roaming"))
+    node_exe = shutil.which("node") or r"C:\Program Files\nodejs\node.exe"
+    script = appdata / "npm" / "node_modules" / "@openai" / "codex" / "bin" / "codex.js"
+    return [node_exe, str(script)]
+
+
+def _run_codex_local(prompt: str, timeout: int = 90) -> str:
+    logs_dir = BASE_DIR / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    response_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".txt", delete=False, dir=str(logs_dir)
+        ) as f:
+            response_path = f.name
+        cmd = _resolve_codex_cli() + [
+            "exec", "--skip-git-repo-check", "--sandbox", "read-only",
+            "--color", "never", "-C", str(BASE_DIR),
+            "-o", response_path, "-",
+        ]
+        result = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
+                                encoding="utf-8", timeout=timeout)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "codex CLI 回傳非零")
+        out = ""
+        if response_path and os.path.exists(response_path):
+            with open(response_path, encoding="utf-8") as f:
+                out = f.read().strip()
+        if not out:
+            out = result.stdout.strip()
+        if out:
+            return out
+        raise RuntimeError("codex CLI 未回傳內容")
+    finally:
+        if response_path and os.path.exists(response_path):
+            try:
+                os.unlink(response_path)
+            except Exception:
+                pass
 
 CSV_DIR          = BASE_DIR / "output" / "csv_data"
 PARTNERS_CSV     = CSV_DIR / "partners.csv"
+PARTNERS_JSON    = BASE_DIR / "output" / "partners" / "partners.json"
 MOTIVATION_LOG   = CSV_DIR / "motivation_log.csv"
 LOG_FILE         = BASE_DIR / "logs" / "motivation_agent_log.txt"
 CONFIG           = BASE_DIR / "config" / "settings.json"
@@ -59,18 +105,53 @@ MILESTONE_KEYWORDS = [
 # ============================================================
 
 def read_partners() -> list[dict]:
-    if not PARTNERS_CSV.exists():
+    import json as _json
+    if PARTNERS_CSV.exists():
+        with open(PARTNERS_CSV, encoding="utf-8-sig", newline="") as f:
+            return list(csv.DictReader(f))
+    if not PARTNERS_JSON.exists():
         return []
-    with open(PARTNERS_CSV, encoding="utf-8-sig", newline="") as f:
-        return list(csv.DictReader(f))
+    with open(PARTNERS_JSON, encoding="utf-8") as f:
+        raw = _json.load(f)
+    result = []
+    for p in raw:
+        joined = (p.get("created_at") or "")[:10]
+        result.append({
+            "姓名": p.get("name", ""),
+            "LINE_UID": "",
+            "電話": "",
+            "加入日期": joined,
+            "風險等級": p.get("stage", ""),
+            "里程碑": p.get("recent_title", "") or p.get("goal", ""),
+            "備註": p.get("note", ""),
+            "最後互動": p.get("updated_at", "")[:10] if p.get("updated_at") else "",
+            "層級": str(p.get("level", "")),
+        })
+    return result
 
 
 def write_partners(rows: list[dict]):
-    CSV_DIR.mkdir(parents=True, exist_ok=True)
-    with open(PARTNERS_CSV, "w", encoding="utf-8-sig", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=PARTNER_FIELDNAMES, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
+    """優先更新 partners.csv，若不存在則更新 partners.json。"""
+    import json as _json
+    if PARTNERS_CSV.exists():
+        CSV_DIR.mkdir(parents=True, exist_ok=True)
+        with open(PARTNERS_CSV, "w", encoding="utf-8-sig", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=PARTNER_FIELDNAMES, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(rows)
+        return
+    if not PARTNERS_JSON.exists():
+        return
+    with open(PARTNERS_JSON, encoding="utf-8") as f:
+        raw = _json.load(f)
+    name_to_milestone = {r["姓名"]: r.get("里程碑", "") for r in rows}
+    for p in raw:
+        name = p.get("name", "")
+        if name in name_to_milestone:
+            p["recent_title"] = name_to_milestone[name]
+            p["updated_at"] = datetime.now().isoformat()
+    with open(PARTNERS_JSON, "w", encoding="utf-8") as f:
+        _json.dump(raw, f, ensure_ascii=False, indent=2)
 
 
 def append_motivation_log(name: str, trigger_type: str, context: str, summary: str):
@@ -110,7 +191,7 @@ def load_config() -> dict:
 
 
 def run_claude(prompt: str, timeout: int = 90) -> str:
-    return run_codex_cli(prompt, timeout=timeout)
+    return _run_codex_local(prompt, timeout=timeout)
 
 
 def push_line_to_owner(message: str):
