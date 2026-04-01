@@ -239,6 +239,8 @@ class _FakeMotivationModule:
 
 
 class _FakeTrainingLogModule:
+    _root = None
+
     @staticmethod
     def get_summary_by_key(key):
         return f"SUMMARY:{key}"
@@ -246,6 +248,19 @@ class _FakeTrainingLogModule:
     @staticmethod
     def process_transcript(transcript, date_str, force=False):
         return "20260401", f"TRAINING_LOG:{date_str}:{'FORCE' if force else 'NORMAL'}"
+
+    @classmethod
+    def get_date_dir(cls, date_str):
+        path = cls._root / date_str
+        path.mkdir(parents=True, exist_ok=True)
+        transcript = path / "transcript.txt"
+        if not transcript.exists():
+            transcript.write_text("測試逐字稿", encoding="utf-8")
+        return path
+
+    @staticmethod
+    def archive_transcript(transcript, date_str):
+        return None
 
 
 class _FakeRequest:
@@ -312,6 +327,7 @@ class FullLineWebValidationTest(unittest.TestCase):
     def setUp(self):
         self.tmp = TemporaryDirectory()
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        _FakeTrainingLogModule._root = Path(self.tmp.name) / "training"
         self.stack = ExitStack()
         self.stack.enter_context(patch.object(webhook, "_load_calendar", return_value=_FakeCalendarModule()))
         self.stack.enter_context(patch.object(webhook, "_load_partner", return_value=_FakePartnerModule()))
@@ -354,7 +370,19 @@ class FullLineWebValidationTest(unittest.TestCase):
         def _push(target, text):
             pushes.append(text)
 
-        with patch.object(webhook, "reply_message", _reply), patch.object(webhook, "push_message", _push):
+        class _ImmediateThread:
+            def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+                self.target = target
+                self.args = args
+                self.kwargs = kwargs or {}
+
+            def start(self):
+                if self.target:
+                    self.target(*self.args, **self.kwargs)
+
+        with patch.object(webhook, "reply_message", _reply), \
+             patch.object(webhook, "push_message", _push), \
+             patch.object(webhook.threading, "Thread", _ImmediateThread):
             for message in messages:
                 webhook._webhook_line_events.process_line_events(
                     request=_FakeRequest(message),
