@@ -1,12 +1,12 @@
 """
 Orchestrator Agent
 File: C:/Users/user/claude AI_Agent/agents/10_orchestrator.py
-Function: 總調度 — 協調市場開發、培訓、夥伴跟進、夥伴激勵四大 Agent
+Function: 總調度 — 協調市場開發、培訓、夥伴跟進、夥伴激勵、課程邀約五大 Agent
 Schedule:
-  - 09:00 每日 (morning): 市場開發 + 培訓推播 + 激勵排程
+  - 09:00 每日 (morning): 市場開發 + 培訓推播 + 激勵排程 + 課程邀約推播
   - 17:00 每日 (evening): 夥伴跟進報告
 Usage:
-  python 10_orchestrator.py --mode morning|evening|market|training|followup|motivation
+  python 10_orchestrator.py --mode morning|evening|market|training|followup|motivation|course
 """
 
 import argparse
@@ -56,9 +56,10 @@ def run_morning():
     log("早班任務開始 (morning mode)")
 
     for label, filename, method in [
-        ("市場開發", "11_market_dev_agent.py", "MarketDevAgent"),
-        ("培訓推播", "12_training_agent.py",   "TrainingAgent"),
-        ("激勵排程", "14_motivation_agent.py",  "MotivationAgent"),
+        ("市場開發", "11_market_dev_agent.py",    "MarketDevAgent"),
+        ("培訓推播", "12_training_agent.py",      "TrainingAgent"),
+        ("激勵排程", "14_motivation_agent.py",    "MotivationAgent"),
+        ("課程邀約", "16_course_invite_agent.py", "CourseInviteAgent"),
     ]:
         try:
             log(f"▶ 啟動 {label}...")
@@ -93,12 +94,27 @@ def run_evening():
     log("=" * 50)
 
 
+def run_daily_report():
+    """08:00 每日報告：寄送業務摘要至指定信箱"""
+    log("=" * 50)
+    log("每日報告開始 (daily_report mode)")
+    try:
+        mod = _load("每日報告", "17_daily_report_agent.py")
+        result = mod.DailyReportAgent().run()
+        log(f"✓ 每日報告：{result}")
+    except Exception as e:
+        log(f"✗ 每日報告失敗：{e}")
+    log("=" * 50)
+
+
 def run_single(mode: str):
     mapping = {
-        "market":     ("市場開發", "11_market_dev_agent.py", "MarketDevAgent",  "run"),
-        "training":   ("培訓推播", "12_training_agent.py",   "TrainingAgent",   "run"),
-        "followup":   ("夥伴跟進", "13_followup_agent.py",   "FollowupAgent",   "run"),
-        "motivation": ("激勵排程", "14_motivation_agent.py",  "MotivationAgent", "run_scheduled"),
+        "market":     ("市場開發", "11_market_dev_agent.py",    "MarketDevAgent",     "run"),
+        "training":   ("培訓推播", "12_training_agent.py",      "TrainingAgent",      "run"),
+        "followup":   ("夥伴跟進", "13_followup_agent.py",      "FollowupAgent",      "run"),
+        "motivation": ("激勵排程", "14_motivation_agent.py",    "MotivationAgent",    "run_scheduled"),
+        "course":     ("課程邀約", "16_course_invite_agent.py", "CourseInviteAgent",  "run"),
+        "daily_report": ("每日報告", "17_daily_report_agent.py", "DailyReportAgent",  "run"),
     }
     label, filename, cls, method = mapping[mode]
     log(f"▶ 單獨執行 {label}...")
@@ -115,7 +131,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Orchestrator Agent")
     parser.add_argument(
         "--mode",
-        choices=["morning", "evening", "market", "training", "followup", "motivation"],
+        choices=["morning", "evening", "market", "training", "followup", "motivation", "course", "daily_report"],
         default="morning",
         help="執行模式"
     )
@@ -127,5 +143,7 @@ if __name__ == "__main__":
         run_morning()
     elif args.mode == "evening":
         run_evening()
+    elif args.mode == "daily_report":
+        run_daily_report()
     else:
         run_single(args.mode)

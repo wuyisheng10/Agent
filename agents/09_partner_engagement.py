@@ -105,6 +105,8 @@ def _format_partner(item: dict) -> str:
     parts = [f"- {item['name']}"]
     if item.get("level"):
         parts.append(f"層級{item['level']}")
+    if item.get("category"):
+        parts.append(f"分類：{item['category']}")
     if item.get("stage"):
         parts.append(f"狀態：{item['stage']}")
     if item.get("next_followup"):
@@ -151,6 +153,8 @@ def _infer_stage(item: dict) -> str:
 
 def _partner_note(item: dict) -> str:
     parts = []
+    if item.get("category"):
+        parts.append(f"分類:{item['category']}")
     if item.get("type"):
         parts.append(f"類型:{item['type']}")
     if item.get("authorized"):
@@ -195,6 +199,7 @@ def _build_partner_item(item: dict) -> dict:
         "created_at": item.get("created_at", now),
         "updated_at": now,
         "level": item.get("level", ""),
+        "category": item.get("category", ""),
         "authorized": item.get("authorized", ""),
         "type": item.get("type", ""),
         "amway_no": item.get("amway_no", ""),
@@ -332,6 +337,7 @@ def import_partner_roster(raw_text: str) -> dict:
             item["records"] = existing.get("records", [])
             item["goal"] = existing.get("goal", "")
             item["next_followup"] = existing.get("next_followup", "")
+            item["category"] = existing.get("category", "")
             item["created_at"] = existing.get("created_at", item["created_at"])
             if existing.get("stage") and existing.get("stage") not in {"待跟進", "會員觀察中", "有組織活躍", "穩定購貨"}:
                 item["stage"] = existing["stage"]
@@ -347,32 +353,51 @@ def import_partner_roster(raw_text: str) -> dict:
 
 
 def add_partner(command: str) -> str:
-    m = re.fullmatch(r"新增夥伴\s+(.+?)(?:\s*\|\s*(.+?))?(?:\s*\|\s*(\d{4}-\d{2}-\d{2}))?(?:\s*\|\s*(.+))?", command.strip())
-    if not m:
-        return "格式：新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註"
-    name = m.group(1).strip()
-    goal = (m.group(2) or "").strip()
-    next_followup = _normalize_date(m.group(3)) if m.group(3) else ""
-    note = (m.group(4) or "").strip()
+    prefix = "新增夥伴"
+    if not command.strip().startswith(prefix):
+        return "格式：新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註 | 分類"
+    raw = command.strip()[len(prefix):].strip()
+    if not raw:
+        return "格式：新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註 | 分類"
+    parts = [part.strip() for part in raw.split("|")]
+    if len(parts) < 5:
+        parts.extend([""] * (5 - len(parts)))
+    name, goal, next_followup, note, category = parts[:5]
+    if not name:
+        return "格式：新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註 | 分類"
+    next_followup = _normalize_date(next_followup) if next_followup else ""
+    category = category.upper()
     partners = load_partners()
     if _find_partner(name, partners):
         return f"夥伴已存在：{name}"
-    item = _build_partner_item({"name": name, "goal": goal, "note": note, "next_followup": next_followup, "stage": "待跟進"})
+    item = _build_partner_item({
+        "name": name,
+        "goal": goal,
+        "note": note,
+        "next_followup": next_followup,
+        "stage": "待跟進",
+        "category": category,
+    })
     partners.append(item)
     save_partners(sorted(partners, key=_sort_key))
-    return f"已新增夥伴：{name}" + (f"\n下次跟進：{next_followup}" if next_followup else "")
+    lines = [f"已新增夥伴：{name}"]
+    if category:
+        lines.append(f"分類：{category}")
+    if next_followup:
+        lines.append(f"下次跟進：{next_followup}")
+    return "\n".join(lines)
 
 
 def update_partner(command: str) -> str:
     prefix = "更新夥伴"
     if not command.strip().startswith(prefix):
-        return "格式：更新夥伴 姓名 | 層級 | 近況 | 下次跟進日期 | 聯絡資訊 | 備註 | 類型 | 編號 | 合夥人 | 推薦人 | 到期日 | 年月 | 一年內新上獎銜 | 首次獎金% | 現金抵用券 | 購物積點 | 優惠券 | 本月購貨 | 上月購貨 | 前2月購貨 | 前3月購貨"
+        return "格式：更新夥伴 姓名 | 層級 | 近況 | 下次跟進日期 | 聯絡資訊 | 備註 | 類型 | 編號 | 合夥人 | 推薦人 | 到期日 | 年月 | 一年內新上獎銜 | 首次獎金% | 現金抵用券 | 購物積點 | 優惠券 | 本月購貨 | 上月購貨 | 前2月購貨 | 前3月購貨 | 分類"
     raw = command.strip()[len(prefix):].strip()
     if not raw:
-        return "格式：更新夥伴 姓名 | 層級 | 近況 | 下次跟進日期 | 聯絡資訊 | 備註 | 類型 | 編號 | 合夥人 | 推薦人 | 到期日 | 年月 | 一年內新上獎銜 | 首次獎金% | 現金抵用券 | 購物積點 | 優惠券 | 本月購貨 | 上月購貨 | 前2月購貨 | 前3月購貨"
+        return "格式：更新夥伴 姓名 | 層級 | 近況 | 下次跟進日期 | 聯絡資訊 | 備註 | 類型 | 編號 | 合夥人 | 推薦人 | 到期日 | 年月 | 一年內新上獎銜 | 首次獎金% | 現金抵用券 | 購物積點 | 優惠券 | 本月購貨 | 上月購貨 | 前2月購貨 | 前3月購貨 | 分類"
     parts = [part.strip() for part in raw.split("|")]
-    if len(parts) < 21:
-        parts.extend([""] * (21 - len(parts)))
+    if len(parts) < 22:
+        parts.extend([""] * (22 - len(parts)))
     (
         target,
         level,
@@ -395,6 +420,7 @@ def update_partner(command: str) -> str:
         last_month_purchase,
         prev2_month_purchase,
         prev3_month_purchase,
+        category,
     ) = parts
     partners = load_partners()
     item = _find_partner(target, partners)
@@ -412,6 +438,8 @@ def update_partner(command: str) -> str:
         item["note"] = note
     if partner_type and partner_type != "-":
         item["type"] = partner_type
+    if category and category != "-":
+        item["category"] = category.upper()
     if amway_no and amway_no != "-":
         item["amway_no"] = amway_no
         item["id"] = _partner_id(item["name"], amway_no)
@@ -448,7 +476,7 @@ def update_partner(command: str) -> str:
     _append_record(
         item,
         "update",
-        f"更新資料：層級={item.get('level','')}，狀態={item.get('stage','')}，類型={item.get('type','')}，編號={item.get('amway_no','')}，年月={item.get('year_month','')}，獎銜={item.get('recent_title','')}，現金抵用券={item.get('cash_voucher','')}",
+        f"更新資料：層級={item.get('level','')}，狀態={item.get('stage','')}，類型={item.get('type','')}，分類={item.get('category','')}，編號={item.get('amway_no','')}，年月={item.get('year_month','')}，獎銜={item.get('recent_title','')}，現金抵用券={item.get('cash_voucher','')}",
         item.get("next_followup", ""),
     )
     save_partners(sorted(partners, key=_sort_key))
@@ -538,6 +566,7 @@ def query_partner(command: str) -> str:
             f"{item['name']}｜層級{item.get('level', '') or '-'}｜狀態：{item.get('stage', '待跟進')}",
             f"編號：{item.get('amway_no', '-') or '-'}",
             f"類型：{item.get('type', '-') or '-'}",
+            f"分類：{item.get('category', '-') or '-'}",
             f"推薦人：{item.get('sponsor', '-') or '-'}",
             f"合夥人：{item.get('partner', '-') or '-'}",
             f"到期日：{item.get('expire_date', '-') or '-'}",

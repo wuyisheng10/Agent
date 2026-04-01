@@ -19,6 +19,12 @@ $trigger1 = New-ScheduledTaskTrigger -Daily -At "08:00"
 Register-ScheduledTask -TaskName "Amway_AI_DailyPipeline" -Description "Daily: scraper + scoring + message" -Action $action1 -Trigger $trigger1 -RunLevel Highest -Force
 Write-Host "OK Task1: Daily Pipeline 08:00" -ForegroundColor Green
 
+# Task 1B: Daily Report Email (08:00)
+$action1b  = New-ScheduledTaskAction -Execute $Python -Argument "`"$AgentsDir\10_orchestrator.py`" --mode daily_report" -WorkingDirectory $AgentsDir
+$trigger1b = New-ScheduledTaskTrigger -Daily -At "08:00"
+Register-ScheduledTask -TaskName "Amway_AI_DailyReport" -Description "Daily 08:00: send business summary email report" -Action $action1b -Trigger $trigger1b -RunLevel Highest -Force
+Write-Host "OK Task1B: Daily Report 08:00" -ForegroundColor Green
+
 # Task 2: LINE Bot Send (09:00)
 $action2  = New-ScheduledTaskAction -Execute $Python -Argument "`"$AgentsDir\05_line_bot.py`"" -WorkingDirectory $AgentsDir
 $trigger2 = New-ScheduledTaskTrigger -Daily -At "09:00"

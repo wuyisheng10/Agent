@@ -110,6 +110,36 @@ def _load_course_invite():
     spec.loader.exec_module(m)
     return m
 
+
+def _load_daily_report():
+    spec = _ilu.spec_from_file_location(
+        "daily_report_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "17_daily_report_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _load_nutrition_dri():
+    spec = _ilu.spec_from_file_location(
+        "nutrition_dri_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "18_nutrition_dri_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _load_nutrition_assessment():
+    spec = _ilu.spec_from_file_location(
+        "nutrition_assessment_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "19_nutrition_assessment_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
 load_dotenv(dotenv_path=r"C:\Users\user\claude AI_Agent\.env")
 
 BASE_DIR        = Path(r"C:\Users\user\claude AI_Agent")
@@ -233,6 +263,35 @@ HELP_TEXT += """
 
 HELP_TEXT += """
 
+🥗 營養評估系統（衛福部第八版 DRI）
+  查詢營養素標準 性別 年齡 [餐別]
+    → 查詢指定性別年齡的每日/每餐攝取參考量
+    範例：查詢營養素標準 女 30 午餐
+  營養素運作原理 營養素名稱
+    → 查看該營養素的功能機制與長期缺乏警訊
+    範例：營養素運作原理 維生素D
+  列出營養素
+    → 列出所有可查詢的營養素
+  下載營養素標準
+    → 從衛福部網站下載最新 PDF 資料
+  開始飲食評估 性別 年齡
+    → 開始今日飲食評估，進入接收照片模式
+    範例：開始飲食評估 男 35
+  設定餐別 早餐/午餐/晚餐
+    → 指定下一張上傳照片的餐別
+  （上傳餐點照片 1-3 張）
+    → 在評估模式下上傳，系統自動收集
+  評估飲食 喝水量XXXml
+    → 觸發 AI 分析所有餐點照片，生成報告並寄至 Email
+    範例：評估飲食 喝水量1500ml
+  飲食評估狀態
+    → 查看目前評估進度
+  清除飲食評估
+    → 取消並清除本次評估記錄
+"""
+
+HELP_TEXT += """
+
 🎓 課程會議邀約
   新增課程會議 YYYY-MM-DD [HH:MM] 標題|地點|說明
     → 手動新增課程會議
@@ -318,7 +377,7 @@ EXEC_MENU_ITEMS = {
     # 安麗產品歸檔（不綁定人員）
     21: {"label": "💊 營養保健歸檔 (Nutrilite)", "cmd": "營養保健歸檔", "prompt": None, "reset_person": True},
     22: {"label": "💄 美容保養歸檔 (Artistry)",  "cmd": "美容保養歸檔", "prompt": None, "reset_person": True},
-    23: {"label": "🧹 居家清潔歸檔 (Amway Home)","cmd": "居家清潔歸檔", "prompt": None, "reset_person": True},
+    23: {"label": "🧹 居家清潔歸檔 (Home)","cmd": "居家清潔歸檔", "prompt": None, "reset_person": True},
     24: {"label": "🪥 個人護理歸檔 (Glister)",   "cmd": "個人護理歸檔", "prompt": None, "reset_person": True},
     25: {"label": "🍳 廚具與生活用品歸檔",        "cmd": "廚具生活歸檔", "prompt": None, "reset_person": True},
     26: {"label": "💧 空氣與水處理設備歸檔",      "cmd": "空水設備歸檔", "prompt": None, "reset_person": True},
@@ -348,6 +407,24 @@ EXEC_MENU_ITEMS = {
     43: {"label": "查詢已產生的邀約文宣", "cmd": "查詢已產生的今日之後會議邀約文宣", "prompt": None},
     44: {"label": "修改已產生的邀約文宣", "cmd": None,
          "prompt": "請複製後修改再送出：\n小幫手 修改已產生的今日之後會議邀約文宣 COURSE-XXXX | 姓名 | 新內容"},
+    45: {"label": "📧 寄送每日報告",    "cmd": "寄送每日報告",  "prompt": None},
+    # 營養評估
+    46: {"label": "📊 查詢營養素標準",  "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 查詢營養素標準 男 30\n（可加餐別：早餐/午餐/晚餐）"},
+    47: {"label": "🔬 營養素運作原理",  "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 營養素運作原理 鈣\n可查：鈣/鐵/維生素D/維生素C/蛋白質 等"},
+    48: {"label": "📋 列出所有營養素",  "cmd": "列出營養素",   "prompt": None},
+    49: {"label": "📥 更新官方營養素標準", "cmd": "下載營養素標準", "prompt": None},
+    50: {"label": "🍽️ 開始飲食評估",   "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 開始飲食評估 男 30\n（填寫性別：男/女，年齡）\n然後上傳餐點照片"},
+    51: {"label": "🥗 執行飲食評估",    "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 評估飲食 喝水量1500ml\n（先上傳餐點照片後再執行）"},
+    52: {"label": "📷 設定下一張餐別",  "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 設定餐別 早餐\n（可選：早餐/午餐/晚餐/宵夜）"},
+    53: {"label": "📈 飲食評估狀態",    "cmd": "飲食評估狀態", "prompt": None},
+    54: {"label": "🗑️ 清除飲食評估",   "cmd": "清除飲食評估", "prompt": None},
+    55: {"label": "🏷️ 設定歸檔對象",   "cmd": None,
+         "prompt": "請複製後修改再送出：\n小幫手 設定評估對象 王小明\n（照片與報告將歸入 classified/王小明/飲食評估/）"},
 }
 
 EXEC_MENU_TEXT = """\
@@ -392,7 +469,7 @@ EXEC_MENU_TEXT = """\
 🛍️ 安麗產品歸檔（設定模式）
  21. 💊 營養保健 (Nutrilite) ▶
  22. 💄 美容保養 (Artistry) ▶
- 23. 🧹 居家清潔 (Amway Home) ▶
+ 23. 🧹 居家清潔 (Home) ▶
  24. 🪥 個人護理 (Glister) ▶
  25. 🍳 廚具與生活用品 ▶
  26. 💧 空氣與水處理設備 ▶
@@ -417,12 +494,29 @@ EXEC_MENU_TEXT = """\
  43. 查詢已產生的邀約文宣 ▶
  44. 修改已產生的邀約文宣
 
+📧 每日報告
+ 45. 寄送每日報告 ▶
+
+🥗 營養評估（衛福部第八版 DRI）
+ 46. 查詢營養素標準
+ 47. 營養素運作原理
+ 48. 列出所有營養素 ▶
+ 49. 更新官方營養素標準 ▶
+ 50. 開始飲食評估
+ 51. 執行飲食評估（AI分析＋寄報告）
+ 52. 設定下一張餐別
+ 53. 飲食評估狀態 ▶
+ 54. 清除飲食評估 ▶
+ 55. 設定歸檔對象
+
 ══════════════════
 ▶ 直接執行　其餘顯示輸入範本
 回覆數字即可　NA = 取消返回"""
 
 # 追蹤哪些 scope 正在等待執行選單輸入（in-memory，重啟後清除）
 _exec_menu_active: dict = {}
+# 追蹤飲食評估 Session（scope_id → {gender, age, photos, water_ml, awaiting_photo}）
+_nutrition_sessions: dict = {}
 # 追蹤哪些 scope 正在等待輸入人物名稱以設定模式（scope_id → mode_name）
 _awaiting_person_for_mode: dict = {}
 # 追蹤哪些 scope 已送出 prompt 等待使用者填入後回傳（scope_id → True）
@@ -753,6 +847,18 @@ def handle_image_message(event: dict, mode_info: dict = None, clf=None):
     img_bytes = _download_line_content(msg_id)
     if img_bytes is None:
         reply_message(reply_token, "⚠️ 圖片下載失敗，請重試")
+        return
+
+    # 飲食評估 Session：收集照片
+    if scope_id in _nutrition_sessions and _nutrition_sessions[scope_id].get("awaiting_photo"):
+        try:
+            na_mod = _load_nutrition_assessment()
+            session = _nutrition_sessions[scope_id]
+            meal_label = session.pop("next_meal_label", None)
+            result = na_mod.NutritionAssessmentAgent().add_photo(session, img_bytes, meal_label)
+            reply_message(reply_token, result)
+        except Exception as e:
+            reply_message(reply_token, f"✗ 加入照片失敗：{e}")
         return
 
     mode   = (mode_info or {}).get("mode", "auto")
@@ -1161,6 +1267,18 @@ def handle_training_command(user_msg: str, reply_token: str,
         threading.Thread(target=_run_followup, daemon=True).start()
         return True
 
+    if msg.strip() == "寄送每日報告":
+        def _run_daily_report():
+            try:
+                dr = _load_daily_report()
+                result = dr.DailyReportAgent().run()
+                push_message(push_target, result)
+            except Exception as e:
+                push_message(push_target, f"✗ 每日報告失敗：{e}")
+        reply_message(reply_token, "⏳ 正在產生每日報告並寄送，請稍候...")
+        threading.Thread(target=_run_daily_report, daemon=True).start()
+        return True
+
     if msg.startswith("激勵") or msg.startswith("里程碑"):
         def _run_motivation():
             try:
@@ -1238,6 +1356,45 @@ def handle_training_command(user_msg: str, reply_token: str,
         date_str = datetime.now().strftime("%Y%m%d")
         tl.archive_transcript(msg, date_str)
         threading.Thread(target=_bg_process, args=(msg, date_str, False), daemon=True).start()
+        return True
+
+    # ── 5. 營養評估系統 ──────────────────────────────────────────────────
+    _nutrition_dri_prefixes = ("查詢營養素標準", "營養素運作原理", "列出營養素",
+                               "所有營養素", "下載營養素標準", "更新營養素標準")
+    if any(msg.startswith(p) for p in _nutrition_dri_prefixes) or msg in _nutrition_dri_prefixes:
+        try:
+            dri_mod = _load_nutrition_dri()
+            result = dri_mod.NutritionDRIAgent().handle_command(msg)
+            if result:
+                reply_message(reply_token, result)
+                return True
+        except Exception as e:
+            reply_message(reply_token, f"✗ 營養素查詢失敗：{e}")
+            return True
+
+    _nutrition_assess_prefixes = ("開始飲食評估", "設定餐別", "設定評估對象", "評估飲食",
+                                  "清除飲食評估", "取消飲食評估", "飲食評估狀態")
+    if any(msg.startswith(p) for p in _nutrition_assess_prefixes):
+        try:
+            na_mod = _load_nutrition_assessment()
+
+            def _run_assessment():
+                try:
+                    result = na_mod.handle_command(msg, _nutrition_sessions, push_target)
+                    if result:
+                        push_message(push_target, result)
+                except Exception as e:
+                    push_message(push_target, f"✗ 飲食評估失敗：{e}")
+
+            if msg.startswith("評估飲食"):
+                reply_message(reply_token, "⏳ 正在分析餐點照片並生成報告，請稍候（約30-60秒）...")
+                threading.Thread(target=_run_assessment, daemon=True).start()
+            else:
+                result = na_mod.handle_command(msg, _nutrition_sessions, push_target)
+                if result:
+                    reply_message(reply_token, result)
+        except Exception as e:
+            reply_message(reply_token, f"✗ 飲食評估指令失敗：{e}")
         return True
 
     return False
@@ -2171,6 +2328,13 @@ def process_web_command(cmd: str) -> str:
     except Exception as e:
         return f"⚠️ 課程邀約指令錯誤：{e}"
 
+    if cmd.strip() == "寄送每日報告":
+        try:
+            dr = _load_daily_report()
+            return dr.DailyReportAgent().run()
+        except Exception as e:
+            return f"⚠️ 每日報告錯誤：{e}"
+
     try:
         # Followup
         followup = _load_followup()
@@ -2217,6 +2381,28 @@ def process_web_command(cmd: str) -> str:
             return msg
     except Exception as e:
         return f"⚠️ 培訓記錄指令錯誤：{e}"
+
+    try:
+        # Nutrition DRI queries
+        _dri_prefixes = ("查詢營養素標準", "營養素運作原理", "列出營養素",
+                         "所有營養素", "下載營養素標準", "更新營養素標準")
+        if any(cmd.startswith(p) for p in _dri_prefixes) or cmd in _dri_prefixes:
+            dri_mod = _load_nutrition_dri()
+            result = dri_mod.NutritionDRIAgent().handle_command(cmd)
+            return result if result else "⚠️ 無結果"
+    except Exception as e:
+        return f"⚠️ 營養素查詢錯誤：{e}"
+
+    try:
+        # Nutrition assessment (web version — synchronous)
+        _assess_prefixes = ("開始飲食評估", "設定餐別", "設定評估對象", "評估飲食",
+                            "清除飲食評估", "取消飲食評估", "飲食評估狀態")
+        if any(cmd.startswith(p) for p in _assess_prefixes):
+            na_mod = _load_nutrition_assessment()
+            result = na_mod.handle_command(cmd, _nutrition_sessions, "web")
+            return result if result else "⚠️ 無結果"
+    except Exception as e:
+        return f"⚠️ 飲食評估指令錯誤：{e}"
 
     # Exec menu
     if cmd in ("執行選單", "選單"):
@@ -2548,7 +2734,7 @@ const MENU_GROUPS = [
     items: [
       { label: "💊 營養保健 (Nutrilite)", cmd: "營養保健歸檔" },
       { label: "💄 美容保養 (Artistry)", cmd: "美容保養歸檔" },
-      { label: "🧹 居家清潔 (Amway Home)", cmd: "居家清潔歸檔" },
+      { label: "🧹 居家清潔 (Home)", cmd: "居家清潔歸檔" },
       { label: "🪥 個人護理 (Glister)", cmd: "個人護理歸檔" },
       { label: "🍳 廚具與生活用品", cmd: "廚具生活歸檔" },
       { label: "💧 空氣與水處理設備", cmd: "空水設備歸檔" },
@@ -2580,6 +2766,30 @@ const MENU_GROUPS = [
       { label: "邀約文宣－跟進夥伴", prompt: "邀約文宣 跟進夥伴 " },
       { label: "查詢已產生的邀約文宣", cmd: "查詢已產生的今日之後會議邀約文宣" },
       { label: "修改已產生的邀約文宣", prompt: "修改已產生的今日之後會議邀約文宣 COURSE-XXXX | 姓名 | 新內容" },
+    ]
+  },
+  {
+    label: "📧 每日報告",
+    key: "每日報告",
+    items: [
+      { label: "寄送每日報告", cmd: "寄送每日報告" },
+    ]
+  },
+  {
+    label: "🥗 營養評估",
+    key: "營養評估",
+    items: [
+      { label: "查詢營養素標準", prompt: "查詢營養素標準 男 30" },
+      { label: "查詢每餐攝取量", prompt: "查詢營養素標準 女 30 午餐" },
+      { label: "營養素運作原理", prompt: "營養素運作原理 " },
+      { label: "列出所有營養素", cmd: "列出營養素" },
+      { label: "更新官方標準", cmd: "下載營養素標準" },
+      { label: "開始飲食評估", prompt: "開始飲食評估 男 30" },
+      { label: "設定下一張餐別", prompt: "設定餐別 早餐" },
+      { label: "設定歸檔對象", prompt: "設定評估對象 " },
+      { label: "執行飲食評估", prompt: "評估飲食 喝水量1500ml" },
+      { label: "飲食評估狀態", cmd: "飲食評估狀態" },
+      { label: "清除飲食評估", cmd: "清除飲食評估" },
     ]
   },
   {
@@ -3147,7 +3357,7 @@ const GROUPS=[
   {label:"🛍️ 安麗產品歸檔",items:[
     {label:"💊 營養保健 (Nutrilite)",tag:"執行",cmd:"營養保健歸檔"},
     {label:"💄 美容保養 (Artistry)",tag:"執行",cmd:"美容保養歸檔"},
-    {label:"🧹 居家清潔 (Amway Home)",tag:"執行",cmd:"居家清潔歸檔"},
+    {label:"🧹 居家清潔 (Home)",tag:"執行",cmd:"居家清潔歸檔"},
     {label:"🪥 個人護理 (Glister)",tag:"執行",cmd:"個人護理歸檔"},
     {label:"🍳 廚具與生活用品",tag:"執行",cmd:"廚具生活歸檔"},
     {label:"💧 空氣與水處理設備",tag:"執行",cmd:"空水設備歸檔"},
@@ -3171,7 +3381,7 @@ const GROUPS=[
               {id:"r",lbl:"說明（選填）",type:"textarea",ph:"例：歡迎帶朋友"},
               {id:"sp",lbl:"演講貴賓（選填）",type:"text",ph:"例：鑽石李大明"},
               {id:"spb",lbl:"貴賓介紹（選填）",type:"textarea",ph:"例：20年資深鑽石，擅長事業說明與激勵"},
-              {id:"tp",lbl:"課程主題（選填）",type:"text",ph:"例：Amway事業機會介紹"},
+              {id:"tp",lbl:"課程主題（選填）",type:"text",ph:"例：事業機會介紹"},
               {id:"tpd",lbl:"主題介紹（選填）",type:"textarea",ph:"例：從零到鑽石的實戰分享，含產品體驗與收入模型"}],
       build:function(v){
         var s="新增課程會議 "+v.d+(v.t?" "+v.t:"")+" "+v.ti;
@@ -3223,6 +3433,37 @@ const GROUPS=[
               {id:"n",lbl:"姓名",type:"text",req:1,ph:"例：吳建德"},
               {id:"c",lbl:"新內容",type:"textarea",req:1,ph:"輸入修改後的邀約文宣"}],
       build:function(v){return "修改已產生的今日之後會議邀約文宣 "+v.id+" | "+v.n+" | "+v.c;}}},
+  ]},
+  {label:"📧 每日報告",items:[
+    {label:"寄送每日報告",tag:"執行",cmd:"寄送每日報告"},
+  ]},
+  {label:"🥗 營養評估",items:[
+    {label:"查詢營養素標準",tag:"表單",form:{title:"查詢營養素標準",
+      fields:[{id:"g",lbl:"性別",type:"select",req:1,options:[{v:"男",l:"男"},{v:"女",l:"女"}]},
+              {id:"a",lbl:"年齡",type:"text",req:1,ph:"例：30"},
+              {id:"m",lbl:"餐別（可不填）",type:"select",req:0,options:[{v:"",l:"全日"},{v:"早餐",l:"早餐"},{v:"午餐",l:"午餐"},{v:"晚餐",l:"晚餐"}]}],
+      build:function(v){var s="查詢營養素標準 "+v.g+" "+v.a;if(v.m)s+=" "+v.m;return s;}}},
+    {label:"營養素運作原理",tag:"表單",form:{title:"查詢營養素運作原理",
+      fields:[{id:"n",lbl:"營養素名稱",type:"text",req:1,ph:"例：鈣、維生素D、鐵"}],
+      build:function(v){return "營養素運作原理 "+v.n;}}},
+    {label:"列出所有營養素",tag:"執行",cmd:"列出營養素"},
+    {label:"更新官方標準",tag:"執行",cmd:"下載營養素標準"},
+    {label:"開始飲食評估",tag:"表單",form:{title:"開始飲食評估",
+      fields:[{id:"g",lbl:"性別",type:"select",req:1,options:[{v:"男",l:"男"},{v:"女",l:"女"}]},
+              {id:"a",lbl:"年齡",type:"text",req:1,ph:"例：30"},
+              {id:"p",lbl:"歸檔對象姓名（可不填）",type:"text",req:0,ph:"例：王小明"}],
+      build:function(v){var s="開始飲食評估 "+v.g+" "+v.a;if(v.p)s+=" 對象:"+v.p;return s;}}},
+    {label:"設定歸檔對象",tag:"表單",form:{title:"設定歸檔對象",
+      fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"例：王小明"}],
+      build:function(v){return "設定評估對象 "+v.n;}}},
+    {label:"設定下一張餐別",tag:"表單",form:{title:"設定餐別",
+      fields:[{id:"m",lbl:"餐別",type:"select",req:1,options:[{v:"早餐",l:"早餐"},{v:"午餐",l:"午餐"},{v:"晚餐",l:"晚餐"},{v:"宵夜",l:"宵夜"}]}],
+      build:function(v){return "設定餐別 "+v.m;}}},
+    {label:"執行飲食評估",tag:"表單",form:{title:"執行飲食評估（AI分析）",
+      fields:[{id:"w",lbl:"今日飲水量 (ml)",type:"text",req:1,ph:"例：1500"}],
+      build:function(v){return "評估飲食 喝水量"+v.w+"ml";}}},
+    {label:"飲食評估狀態",tag:"執行",cmd:"飲食評估狀態"},
+    {label:"清除飲食評估",tag:"執行",cmd:"清除飲食評估"},
   ]},
   {label:"❓ 說明",items:[
     {label:"顯示所有指令",tag:"執行",cmd:"指令集"},
@@ -3287,7 +3528,7 @@ function openModal(f){
     if(fd.type==="select"){
       el=document.createElement("select");el.id="mf_"+fd.id;
       if(!fd.req){var o=document.createElement("option");o.value="";o.textContent="（選填）";el.appendChild(o);}
-      (fd.opts||[]).forEach(function(o){var oe=document.createElement("option");oe.value=o;oe.textContent=o;el.appendChild(oe);});
+      (fd.opts||fd.options||[]).forEach(function(o){var oe=document.createElement("option");if(typeof o==="object"&&o!==null){oe.value=(o.v!==undefined?o.v:(o.value!==undefined?o.value:""));oe.textContent=(o.l!==undefined?o.l:(o.label!==undefined?o.label:oe.value));}else{oe.value=o;oe.textContent=o;}el.appendChild(oe);});
     } else if(fd.type==="textarea"){
       el=document.createElement("textarea");el.id="mf_"+fd.id;
       el.placeholder=fd.ph||"";el.rows=3;
@@ -3680,6 +3921,13 @@ def api_upload():
         else:
             file_type = "file"
 
+        if file_type == "image" and "web" in _nutrition_sessions and _nutrition_sessions["web"].get("awaiting_photo"):
+            na_mod = _load_nutrition_assessment()
+            session = _nutrition_sessions["web"]
+            meal_label = session.pop("next_meal_label", None)
+            result = na_mod.NutritionAssessmentAgent().add_photo(session, data, meal_label)
+            return {"result": result}
+
         clf_mod = _load_classifier()
         clf = clf_mod.ClassifierAgent()
         clf.stage_file(data, filename, file_type, "web_user",
@@ -3708,6 +3956,13 @@ def api_pending_execute():
         choice = int(data.get("choice", 0))
         clf_mod = _load_classifier()
         clf = clf_mod.ClassifierAgent()
+        if choice == 0:
+            pending = clf.get_pending("web_user")
+            if not pending:
+                return {"result": "目前沒有待歸檔項目"}
+            count = len(pending.get("items", []))
+            clf.clear_pending("web_user", remove_file=True)
+            return {"result": f"已清除待歸檔 {count} 項"}
         result = clf.execute_pending_option("web_user", choice)
         return {"result": result}
     except Exception as e:
@@ -3818,6 +4073,17 @@ def update_status(user_id: str, intent: dict):
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         log(f"  ⚠️ 狀態更新失敗：{e}")
+
+
+@app.route("/api/send-daily-report", methods=["POST"])
+def api_send_daily_report():
+    """觸發每日報告寄送（供網頁／外部系統呼叫）"""
+    try:
+        dr = _load_daily_report()
+        result = dr.DailyReportAgent().run()
+        return {"result": result}
+    except Exception as e:
+        return {"result": f"⚠️ 每日報告失敗：{e}"}, 500
 
 
 # ============================================================
