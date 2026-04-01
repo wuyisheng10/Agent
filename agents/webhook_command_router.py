@@ -198,6 +198,18 @@ def handle_web_command(
 ):
     cmd = (cmd or "").strip()
 
+    clf_mod = None
+
+    def _get_classifier():
+        nonlocal clf_mod
+        if clf_mod is None:
+            clf_mod = load_classifier()
+        return clf_mod
+
+    available_modes = set(getattr(_get_classifier(), "AVAILABLE_MODES", []))
+    if cmd in available_modes:
+        return _get_classifier().ClassifierAgent().set_mode(cmd, "")
+
     if cmd == "寄送每日報告":
         dr = load_daily_report()
         return dr.DailyReportAgent().run()

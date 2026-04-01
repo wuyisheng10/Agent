@@ -201,6 +201,25 @@ class NutritionAgentsTest(unittest.TestCase):
         self.assertEqual(dri_result, "DRI_OK:查詢營養素標準 男 30")
         self.assertEqual(assess_result, "ASSESS_OK:開始飲食評估 男 30:web")
 
+    def test_web_archive_mode_command_uses_classifier_mode(self):
+        class _FakeClassifierAgent:
+            def handle_command(self, cmd):
+                return f"CLASSIFY_HANDLE:{cmd}"
+
+            def set_mode(self, mode, person=""):
+                return f"CLASSIFY_MODE:{mode}:{person}"
+
+        class _FakeClassifierModule:
+            AVAILABLE_MODES = ["營養保健歸檔", "市場開發"]
+
+            def ClassifierAgent(self):
+                return _FakeClassifierAgent()
+
+        with patch.object(webhook, "_load_classifier", return_value=_FakeClassifierModule()):
+            result = webhook.process_web_command("營養保健歸檔")
+
+        self.assertEqual(result, "CLASSIFY_MODE:營養保健歸檔:")
+
     def test_web_upload_prefers_nutrition_session_over_archive(self):
         class _FakeNutritionAgent:
             def add_photo(self, session, data, meal_label=None):
