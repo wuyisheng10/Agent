@@ -25,12 +25,15 @@ def process_line_events(
     awaiting_invite_manage_select,
     awaiting_invite_manage_action,
     awaiting_invite_manage_edit,
+    awaiting_promo_optimize_apply,
     looks_like_explicit_command,
     normalize_partner_category_choice,
     partners_by_category,
     format_partner_choice_menu,
     format_meeting_choice_menu,
+    format_invite_manage_list,
     format_invite_manage_actions,
+    format_invite_view,
     format_invite_edit_confirm,
     load_course_invite,
     load_classifier_module,
@@ -137,6 +140,7 @@ def process_line_events(
             awaiting_invite_manage_select.pop(scope, None)
             awaiting_invite_manage_action.pop(scope, None)
             awaiting_invite_manage_edit.pop(scope, None)
+            awaiting_promo_optimize_apply.pop(scope, None)
             reply_message(reply_token, execute_menu_text)
             continue
 
@@ -166,7 +170,7 @@ def process_line_events(
             or awaiting_invite_selection.get(scope) or awaiting_partner_invite_category.get(scope)
             or awaiting_partner_invite_person.get(scope) or awaiting_partner_invite_meeting.get(scope)
             or awaiting_invite_manage_select.get(scope) or awaiting_invite_manage_action.get(scope)
-            or awaiting_invite_manage_edit.get(scope)
+            or awaiting_invite_manage_edit.get(scope) or awaiting_promo_optimize_apply.get(scope)
         ):
             awaiting_person_for_mode.pop(scope, None)
             awaiting_exec_input.pop(scope, None)
@@ -179,6 +183,7 @@ def process_line_events(
             awaiting_invite_manage_select.pop(scope, None)
             awaiting_invite_manage_action.pop(scope, None)
             awaiting_invite_manage_edit.pop(scope, None)
+            awaiting_promo_optimize_apply.pop(scope, None)
             reply_message(reply_token, "↩️ 已取消，返回待機。")
             continue
 
@@ -193,6 +198,31 @@ def process_line_events(
             awaiting_invite_manage_select.pop(scope, None)
             awaiting_invite_manage_action.pop(scope, None)
             awaiting_invite_manage_edit.pop(scope, None)
+            awaiting_promo_optimize_apply.pop(scope, None)
+
+        if user_msg.strip().startswith("邀約文宣 跟進夥伴"):
+            awaiting_partner_invite_category[scope] = True
+            awaiting_partner_invite_person.pop(scope, None)
+            awaiting_partner_invite_meeting.pop(scope, None)
+            reply_message(reply_token, "📋 請先選擇夥伴分類屬性\n1. A 類：持續有使用產品、有積分額、且有聽過鐘老師演講\n2. B 類：偶爾使用產品，或有聽過鐘老師演講\n3. C 類：即將開始了解，或即將聽鐘老師演講\n\n請輸入 1、2、3 或 A、B、C，NA 取消")
+            continue
+
+        if awaiting_promo_optimize_apply.get(scope) and user_msg.strip().isdigit():
+            state = awaiting_promo_optimize_apply.pop(scope)
+            choice = int(user_msg.strip())
+            if choice == 1:
+                try:
+                    course = load_course_invite()
+                    reply_message(reply_token, course.apply_optimized_promo(state["promo_id"]))
+                except Exception as e:
+                    reply_message(reply_token, f"✗ 套用優化文宣失敗：{e}")
+                continue
+            if choice == 2:
+                reply_message(reply_token, "已保留優化結果，不覆蓋原課程文宣")
+                continue
+            awaiting_promo_optimize_apply[scope] = state
+            reply_message(reply_token, "⚠️ 請輸入 1 或 2，NA 取消")
+            continue
 
         if awaiting_invite_manage_edit.get(scope):
             state = awaiting_invite_manage_edit[scope]
@@ -219,12 +249,26 @@ def process_line_events(
             reply_message(reply_token, "✅ 已更新邀約文宣" if ok else "⚠️ 找不到該筆邀約文宣")
             continue
 
-        if awaiting_invite_manage_action.get(scope) and user_msg.strip().isdigit():
-            rec = awaiting_invite_manage_action.pop(scope)
+        if awaiting_invite_manage_action.get(scope) and awaiting_invite_manage_action[scope].get("step") == "view" and user_msg.strip().isdigit():
+            state = awaiting_invite_manage_action.pop(scope)
+            rec = state["record"]
             choice = int(user_msg.strip())
             if choice == 1:
                 awaiting_invite_manage_edit[scope] = {"step": "confirm", "record": rec}
                 reply_message(reply_token, format_invite_edit_confirm(rec))
+                continue
+            if choice == 2:
+                reply_message(reply_token, "已返回邀約文宣管理")
+                continue
+            reply_message(reply_token, "⚠️ 請輸入 1 或 2，NA 取消")
+            continue
+
+        if awaiting_invite_manage_action.get(scope) and user_msg.strip().isdigit():
+            rec = awaiting_invite_manage_action.pop(scope)
+            choice = int(user_msg.strip())
+            if choice == 1:
+                awaiting_invite_manage_action[scope] = {"step": "view", "record": rec}
+                reply_message(reply_token, format_invite_view(rec))
                 continue
             if choice == 2:
                 try:
@@ -327,7 +371,37 @@ def process_line_events(
                 reply_message(reply_token, f"⚠️ 請輸入 1～{len(rows)} 的編號，NA 取消")
             continue
 
+        if user_msg.strip() == "查詢已產生的今日之後會議邀約文宣":
+            try:
+                course = load_course_invite()
+                rows = course.list_upcoming_invites(today_only_after=True)
+            except Exception as e:
+                reply_message(reply_token, f"⚠️ 查詢已產生邀約文宣失敗：{e}")
+                continue
+            if rows:
+                awaiting_invite_manage_select[scope] = rows
+            else:
+                awaiting_invite_manage_select.pop(scope, None)
+            reply_message(reply_token, format_invite_manage_list(rows))
+            continue
+
         handled = handle_training_command(user_msg, reply_token, user_id, group_id)
+        if (not handled) and user_msg.strip().startswith("優化課程文宣"):
+            try:
+                course = load_course_invite()
+                result = course.CourseInviteAgent().handle_command(user_msg.strip())
+                if result and result.startswith("✅ 文宣已優化（"):
+                    promo_id = user_msg.strip().replace("優化課程文宣", "", 1).strip()
+                    awaiting_promo_optimize_apply[scope] = {"promo_id": promo_id}
+                    reply_message(
+                        reply_token,
+                        result + "\n\n1. 套用到該課程文宣\n2. 保留優化結果，不覆蓋\n\n請輸入 1 或 2，NA 取消",
+                    )
+                else:
+                    reply_message(reply_token, result or "⚠️ AI 無回應，請稍後再試")
+            except Exception as e:
+                reply_message(reply_token, f"✗ 優化課程文宣失敗：{e}")
+            continue
         if not handled:
             reply_message(reply_token, "⚠️ 無法辨識指令，請輸入「說明」查看可用功能。")
 

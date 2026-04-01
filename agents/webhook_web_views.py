@@ -194,6 +194,27 @@ const GROUPS=[
     {label:"加入潛在家人資訊",tag:"表單",form:{title:"加入潛在家人資訊",
       fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"請輸入潛在家人姓名"}],
       build:function(v){return "潛在家人資料 "+v.n;}}},
+    {label:"修改潛在家人資訊",tag:"表單",form:{title:"修改潛在家人資訊",
+      fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"請輸入潛在家人姓名"},
+              {id:"phone",lbl:"電話（選填）",type:"text",ph:"例：0912345678"},
+              {id:"area",lbl:"地區（選填）",type:"text",ph:"例：台中西屯"},
+              {id:"addr",lbl:"地址（選填）",type:"text",ph:"例：民生路123號"},
+              {id:"status",lbl:"接觸狀態（選填）",type:"text",ph:"例：已聯繫"},
+              {id:"next",lbl:"下次跟進日（選填）",type:"date"},
+              {id:"product",lbl:"使用產品（選填）",type:"text",ph:"例：益生菌"},
+              {id:"filter",lbl:"淨水器型號（選填）",type:"text",ph:"例：eSpring"},
+              {id:"r",lbl:"備註（選填）",type:"textarea",ph:"補充資訊"}],
+      build:function(v){
+        var parts=["更新潛在家人 "+v.n];
+        if(v.phone)parts.push("電話:"+v.phone);
+        if(v.area)parts.push("地區:"+v.area);
+        if(v.addr)parts.push("地址:"+v.addr);
+        if(v.status)parts.push("接觸狀態:"+v.status);
+        if(v.next)parts.push("下次跟進日:"+v.next);
+        if(v.product)parts.push("使用產品:"+v.product);
+        if(v.filter)parts.push("淨水器型號:"+v.filter);
+        if(v.r)parts.push("備註:"+v.r);
+        return parts.join("|");}}},
   ]},
   {label:"📚 培訓系統",items:[
     {label:"查詢培訓進度",tag:"表單",form:{title:"查詢培訓進度",

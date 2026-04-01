@@ -504,6 +504,20 @@ def optimize_promo(promo_id: str) -> str:
     return f"✅ 文宣已優化（{promo_id}）：\n\n{optimized}"
 
 
+def apply_optimized_promo(promo_id: str) -> str:
+    promos = _load_promos()
+    for p in promos:
+        if p["id"] == promo_id:
+            optimized = (p.get("optimized") or "").strip()
+            if not optimized:
+                return f"⚠️ 文宣 {promo_id} 尚未有優化內容，請先執行：優化課程文宣 {promo_id}"
+            p["content"] = optimized
+            p["updated_at"] = datetime.now().isoformat()
+            _save_promos(promos)
+            return f"✅ 已將優化內容套用到課程文宣：{promo_id}"
+    return f"⚠️ 找不到文宣：{promo_id}"
+
+
 # ============================================================
 # Codex CLI: Generate Invite — Prospect
 # ============================================================
@@ -825,6 +839,12 @@ class CourseInviteAgent:
             if not pid:
                 return "⚠️ 格式：優化課程文宣 PROMO-XXXX\n查詢現有文宣：查詢課程文宣"
             return optimize_promo(pid)
+
+        if msg.startswith("套用優化課程文宣"):
+            pid = msg.replace("套用優化課程文宣", "").strip()
+            if not pid:
+                return "⚠️ 格式：套用優化課程文宣 PROMO-XXXX"
+            return apply_optimized_promo(pid)
 
         # 邀約文宣 潛在家人 [姓名]
         if msg.startswith("邀約文宣 潛在家人"):

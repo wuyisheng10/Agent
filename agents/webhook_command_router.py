@@ -94,6 +94,9 @@ def handle_line_command(
             reply_message(reply_token, f"✗ 新增潛在家人失敗：{exc}")
             return True
 
+    if msg.startswith("更新潛在家人"):
+        return False
+
     if msg == "潛在家人總表" or msg.startswith("查詢潛在家人"):
         try:
             keyword = None if msg == "潛在家人總表" else (msg.replace("查詢潛在家人", "", 1).strip() or None)
@@ -115,13 +118,13 @@ def handle_line_command(
         "新增課程會議", "查詢課程會議", "刪除課程會議", "修改課程會議", "從行事曆加入課程",
         "新增課程文宣", "查詢課程文宣", "優化課程文宣",
         "查詢已產生的今日之後會議邀約文宣", "修改已產生的今日之後會議邀約文宣",
-        "邀約文宣 潛在家人", "邀約文宣 跟進夥伴",
+        "邀約文宣 潛在家人",
         "課程會議", "課程文宣", "課程",
     )
     if any(msg.startswith(prefix) for prefix in course_prefixes):
         try:
             course = load_course_invite()
-            if msg.startswith("優化課程文宣") or msg.startswith("邀約文宣"):
+            if msg.startswith("優化課程文宣") or msg.startswith("邀約文宣 潛在家人"):
                 reply_message(reply_token, "⏳ 正在透過 AI 產生課程文宣，請稍候...")
                 result = course.CourseInviteAgent().handle_command(msg)
                 push_message(push_target, result if result else "⚠️ 課程指令無結果")
@@ -252,6 +255,25 @@ def handle_web_command(
         person = cmd.replace("查詢歸檔", "", 1).strip() or None
         return clf_mod.ClassifierAgent().query_archive(person)
 
+    if cmd.startswith("更新潛在家人"):
+        market = load_market_dev()
+        content = cmd.replace("更新潛在家人", "", 1).strip()
+        parts = [p.strip() for p in content.split("|")]
+        name = parts[0] if parts else ""
+        if not name:
+            return (
+                "⚠️ 格式：\n更新潛在家人 姓名|欄位:值|欄位:值\n\n"
+                "可用欄位：電話、地區、地址、接觸狀態、下次跟進日、使用產品、淨水器型號、備註"
+            )
+        fields = {}
+        for part in parts[1:]:
+            if ":" in part:
+                k, v = part.split(":", 1)
+                fields[k.strip()] = v.strip()
+        if not fields:
+            return "⚠️ 請提供要更新的欄位，格式：欄位:值"
+        return market.MarketDevAgent().update_prospect_fields(name, fields)
+
     if cmd.startswith("新增潛在家人") or cmd.startswith("查詢潛在家人") or cmd == "潛在家人總表":
         market = load_market_dev()
         if cmd.startswith("新增潛在家人"):
@@ -269,7 +291,7 @@ def handle_web_command(
         "新增課程會議", "查詢課程會議", "刪除課程會議", "修改課程會議", "從行事曆加入課程",
         "新增課程文宣", "查詢課程文宣", "優化課程文宣",
         "查詢已產生的今日之後會議邀約文宣", "修改已產生的今日之後會議邀約文宣",
-        "邀約文宣 潛在家人", "邀約文宣 跟進夥伴",
+        "邀約文宣 潛在家人",
         "課程會議", "課程文宣", "課程",
     )
     if any(cmd.startswith(prefix) for prefix in course_prefixes):

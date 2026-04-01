@@ -75,8 +75,22 @@ def format_invite_manage_actions(rec: dict) -> str:
     return (
         "🛠️ 邀約文宣管理\n"
         f"{meeting['id']}｜{rec.get('name', '')}｜{meeting['title']}｜{when}\n\n"
-        "1. 修改已產生文宣\n"
+        "1. 查看文宣\n"
         "2. 強制重新產生\n\n"
+        "請輸入 1 或 2，NA 取消"
+    )
+
+
+def format_invite_view(rec: dict) -> str:
+    meeting = rec["meeting"]
+    when = meeting["date"] + (f" {meeting['time']}" if meeting.get("time") else "")
+    content = (rec.get("content", "") or "").strip() or "（目前沒有已產生內容）"
+    return (
+        "📄 邀約文宣內容\n"
+        f"{meeting['id']}｜{rec.get('name', '')}｜{meeting['title']}｜{when}\n\n"
+        f"{content}\n\n"
+        "1. 修改這份文宣\n"
+        "2. 返回\n\n"
         "請輸入 1 或 2，NA 取消"
     )
 

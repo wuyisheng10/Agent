@@ -153,11 +153,14 @@ class _FakeMarketDevModule:
 class _FakeCourseInviteAgent:
     @staticmethod
     def handle_command(cmd):
+        if cmd.startswith("優化課程文宣"):
+            promo_id = cmd.replace("優化課程文宣", "", 1).strip()
+            return f"✅ 文宣已優化（{promo_id}）：\n\n優化後內容"
         return f"COURSE:{cmd}"
 
     @staticmethod
     def list_meetings():
-        return [{"id": "COURSE-1", "title": "台南OPP", "datetime": "2026-04-18 13:30"}]
+        return [{"id": "COURSE-1", "title": "台南OPP", "date": "2026-04-18", "time": "13:30"}]
 
     @staticmethod
     def generate_partner_invite_for_meeting(name, meeting):
@@ -171,10 +174,40 @@ class _FakeCourseInviteAgent:
     def update_invite(meeting_id, name, content):
         return True
 
+    @staticmethod
+    def apply_optimized_promo(promo_id):
+        return f"PROMO_APPLIED:{promo_id}"
+
 
 class _FakeCourseInviteModule:
     def CourseInviteAgent(self):
         return _FakeCourseInviteAgent()
+
+    @staticmethod
+    def apply_optimized_promo(promo_id):
+        return _FakeCourseInviteAgent.apply_optimized_promo(promo_id)
+
+    @staticmethod
+    def list_meetings():
+        return _FakeCourseInviteAgent.list_meetings()
+
+    @staticmethod
+    def generate_partner_invite_for_meeting(name, meeting):
+        return _FakeCourseInviteAgent.generate_partner_invite_for_meeting(name, meeting)
+
+    @staticmethod
+    def generate_prospect_invite_for_meeting(name, meeting):
+        return _FakeCourseInviteAgent.generate_prospect_invite_for_meeting(name, meeting)
+
+    @staticmethod
+    def list_upcoming_invites(today_only_after=True):
+        return [{
+            "meeting_id": "COURSE-1",
+            "name": "建德",
+            "role": "partner",
+            "content": "原始邀約內容",
+            "meeting": {"id": "COURSE-1", "title": "台南OPP", "date": "2026-04-18", "time": "13:30"},
+        }]
 
 
 class _FakeDailyReportAgent:
@@ -284,6 +317,7 @@ class _FakeRequest:
 FORM_SAMPLES = {
     "新增潛在家人": "新增潛在家人 王小美|老師|朋友介紹|備註",
     "加入潛在家人資訊": "潛在家人資料 王小美",
+    "修改潛在家人資訊": "更新潛在家人 王小美|地區:台中西屯|地址:民生路123號|電話:0912345678",
     "查詢培訓進度": "培訓 建德",
     "激勵夥伴": "激勵 建德 最近需要鼓勵",
     "里程碑記錄": "里程碑 建德 首次達成目標",
@@ -328,6 +362,10 @@ class FullLineWebValidationTest(unittest.TestCase):
         self.tmp = TemporaryDirectory()
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         _FakeTrainingLogModule._root = Path(self.tmp.name) / "training"
+        webhook._web_invite_combos.clear()
+        webhook._web_partner_invite_state.clear()
+        webhook._web_invite_manage_state.clear()
+        webhook._web_promo_optimize_state.clear()
         self.stack = ExitStack()
         self.stack.enter_context(patch.object(webhook, "_load_calendar", return_value=_FakeCalendarModule()))
         self.stack.enter_context(patch.object(webhook, "_load_partner", return_value=_FakePartnerModule()))
@@ -362,6 +400,7 @@ class FullLineWebValidationTest(unittest.TestCase):
             "awaiting_invite_manage_select": {},
             "awaiting_invite_manage_action": {},
             "awaiting_invite_manage_edit": {},
+            "awaiting_promo_optimize_apply": {},
         }
 
         def _reply(token, text):
@@ -410,12 +449,15 @@ class FullLineWebValidationTest(unittest.TestCase):
                     awaiting_invite_manage_select=state["awaiting_invite_manage_select"],
                     awaiting_invite_manage_action=state["awaiting_invite_manage_action"],
                     awaiting_invite_manage_edit=state["awaiting_invite_manage_edit"],
+                    awaiting_promo_optimize_apply=state["awaiting_promo_optimize_apply"],
                     looks_like_explicit_command=webhook._looks_like_explicit_command,
                     normalize_partner_category_choice=webhook._normalize_partner_category_choice,
                     partners_by_category=webhook._partners_by_category,
                     format_partner_choice_menu=webhook._format_partner_choice_menu,
                     format_meeting_choice_menu=webhook._format_meeting_choice_menu,
+                    format_invite_manage_list=webhook._format_invite_manage_list,
                     format_invite_manage_actions=webhook._format_invite_manage_actions,
+                    format_invite_view=webhook._format_invite_view,
                     format_invite_edit_confirm=webhook._format_invite_edit_confirm,
                     load_course_invite=webhook._load_course_invite,
                     load_classifier_module=webhook._load_classifier,
@@ -486,6 +528,49 @@ class FullLineWebValidationTest(unittest.TestCase):
             json.dumps(form_results, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+
+    def test_web_optimize_promo_can_apply(self):
+        result = webhook.process_web_command("優化課程文宣 PROMO-1234")
+        self.assertIn("1. 套用到該課程文宣", result)
+        applied = webhook.process_web_command("1")
+        self.assertEqual(applied, "PROMO_APPLIED:PROMO-1234")
+
+    def test_web_invite_query_can_view_then_modify(self):
+        result = webhook.process_web_command("查詢已產生的今日之後會議邀約文宣")
+        self.assertIn("輸入編號管理該筆文宣", result)
+        result = webhook.process_web_command("1")
+        self.assertIn("1. 查看文宣", result)
+        result = webhook.process_web_command("1")
+        self.assertIn("邀約文宣內容", result)
+        result = webhook.process_web_command("1")
+        self.assertIn("是否修改這份邀約文宣", result)
+
+    def test_web_partner_invite_uses_category_then_person_then_meeting(self):
+        with patch.object(webhook, "_partners_by_category", return_value=[{"name": "建德", "level": "1", "stage": "積極跟進"}]):
+            result = webhook.process_web_command("邀約文宣 跟進夥伴")
+            self.assertIn("請先選擇夥伴分類屬性", result)
+            result = webhook.process_web_command("1")
+            self.assertIn("A 類夥伴清單", result)
+            result = webhook.process_web_command("1")
+            self.assertIn("建德 的可邀約會議", result)
+            result = webhook.process_web_command("1")
+            self.assertEqual(result, "PARTNER_INVITE:建德:COURSE-1")
+
+    def test_line_partner_invite_uses_category_then_person_then_meeting(self):
+        with patch.object(webhook, "_partners_by_category", return_value=[{"name": "建德", "level": "1", "stage": "積極跟進"}]):
+            replies, pushes = self._run_line_sequence(["邀約文宣 跟進夥伴", "1", "1", "1"])
+        self.assertIn("請先選擇夥伴分類屬性", replies[0])
+        self.assertTrue(any("A 類夥伴清單" in x for x in replies))
+        self.assertTrue(any("建德 的可邀約會議" in x for x in replies))
+        self.assertTrue(any("PARTNER_INVITE:建德:COURSE-1" in x for x in replies + pushes))
+
+    def test_line_invite_query_can_view_then_modify(self):
+        replies, pushes = self._run_line_sequence(["查詢已產生的今日之後會議邀約文宣", "1", "1", "1"])
+        all_msgs = replies + pushes
+        self.assertTrue(any("輸入編號管理該筆文宣" in x for x in all_msgs))
+        self.assertTrue(any("1. 查看文宣" in x for x in all_msgs))
+        self.assertTrue(any("邀約文宣內容" in x for x in all_msgs))
+        self.assertTrue(any("是否修改這份邀約文宣" in x for x in all_msgs))
 
 
 if __name__ == "__main__":

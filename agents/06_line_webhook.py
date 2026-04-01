@@ -663,9 +663,11 @@ _awaiting_partner_invite_meeting = _webhook_state._awaiting_partner_invite_meeti
 _awaiting_invite_manage_select = _webhook_state._awaiting_invite_manage_select
 _awaiting_invite_manage_action = _webhook_state._awaiting_invite_manage_action
 _awaiting_invite_manage_edit = _webhook_state._awaiting_invite_manage_edit
+_awaiting_promo_optimize_apply = _webhook_state._awaiting_promo_optimize_apply
 _web_invite_combos = _webhook_state._web_invite_combos
 _web_partner_invite_state = _webhook_state._web_partner_invite_state
 _web_invite_manage_state = _webhook_state._web_invite_manage_state
+_web_promo_optimize_state = _webhook_state._web_promo_optimize_state
 
 
 def _format_prospect_detail(r: dict) -> str:
@@ -825,6 +827,7 @@ _format_partner_choice_menu = _webhook_router_helpers.format_partner_choice_menu
 _format_meeting_choice_menu = _webhook_router_helpers.format_meeting_choice_menu
 _format_invite_manage_list = _webhook_router_helpers.format_invite_manage_list
 _format_invite_manage_actions = _webhook_router_helpers.format_invite_manage_actions
+_format_invite_view = _webhook_router_helpers.format_invite_view
 _format_invite_edit_confirm = _webhook_router_helpers.format_invite_edit_confirm
 _looks_like_explicit_command = _webhook_router_helpers.looks_like_explicit_command
 
@@ -944,6 +947,18 @@ def handle_training_command(user_msg: str, reply_token: str,
     partner = _load_partner()
     msg = user_msg.strip()
     push_target = group_id or user_id   # 優先推送回群組
+    if msg == "查詢已產生的今日之後會議邀約文宣":
+        try:
+            course = _load_course_invite()
+            rows = course.list_upcoming_invites(today_only_after=True)
+            if rows:
+                _awaiting_invite_manage_select[group_id or user_id] = rows
+            reply_message(reply_token, _format_invite_manage_list(rows))
+        except Exception as e:
+            reply_message(reply_token, f"✗ 查詢邀約文宣失敗：{e}")
+        return True
+    if msg.startswith("優化課程文宣"):
+        return False
     routed = _webhook_command_router.handle_line_command(
         msg=msg,
         reply_token=reply_token,
@@ -1164,12 +1179,15 @@ def webhook():
         awaiting_invite_manage_select=_awaiting_invite_manage_select,
         awaiting_invite_manage_action=_awaiting_invite_manage_action,
         awaiting_invite_manage_edit=_awaiting_invite_manage_edit,
+        awaiting_promo_optimize_apply=_awaiting_promo_optimize_apply,
         looks_like_explicit_command=_looks_like_explicit_command,
         normalize_partner_category_choice=_normalize_partner_category_choice,
         partners_by_category=_partners_by_category,
         format_partner_choice_menu=_format_partner_choice_menu,
         format_meeting_choice_menu=_format_meeting_choice_menu,
+        format_invite_manage_list=_format_invite_manage_list,
         format_invite_manage_actions=_format_invite_manage_actions,
+        format_invite_view=_format_invite_view,
         format_invite_edit_confirm=_format_invite_edit_confirm,
         load_course_invite=_load_course_invite,
         load_classifier_module=_load_classifier,
@@ -1403,6 +1421,48 @@ def archive_browse(subpath):
 
 def process_web_command(cmd: str) -> str:
     """Handle all bot commands and return a string result (no LINE reply)."""
+    if cmd.strip() == "查詢已產生的今日之後會議邀約文宣":
+        try:
+            course = _load_course_invite()
+            rows = course.list_upcoming_invites(today_only_after=True)
+            if rows:
+                _web_invite_manage_state["web"] = {"step": "select", "rows": rows}
+            else:
+                _web_invite_manage_state.pop("web", None)
+            return _format_invite_manage_list(rows)
+        except Exception as e:
+            return f"✗ 查詢邀約文宣失敗：{e}"
+
+    if cmd.strip().startswith("邀約文宣 跟進夥伴"):
+        _web_partner_invite_state["web"] = {"step": "category"}
+        return _partner_category_menu()
+
+    if _web_promo_optimize_state.get("web") and cmd.strip().isdigit():
+        state = _web_promo_optimize_state.pop("web")
+        choice = int(cmd.strip())
+        if choice == 1:
+            try:
+                course = _load_course_invite()
+                return course.apply_optimized_promo(state["promo_id"])
+            except Exception as e:
+                return f"✗ 套用優化文宣失敗：{e}"
+        if choice == 2:
+            return "已保留優化結果，不覆蓋原課程文宣"
+        _web_promo_optimize_state["web"] = state
+        return "⚠️ 請輸入 1 或 2，NA 取消"
+
+    if cmd.startswith("優化課程文宣"):
+        try:
+            course = _load_course_invite()
+            result = course.CourseInviteAgent().handle_command(cmd)
+            if result and result.startswith("✅ 文宣已優化（"):
+                promo_id = cmd.replace("優化課程文宣", "", 1).strip()
+                _web_promo_optimize_state["web"] = {"promo_id": promo_id}
+                return result + "\n\n1. 套用到該課程文宣\n2. 保留優化結果，不覆蓋\n\n請輸入 1 或 2，NA 取消"
+            return result or "⚠️ AI 無回應，請稍後再試"
+        except Exception as e:
+            return f"✗ 優化課程文宣失敗：{e}"
+
     routed = _webhook_command_router.handle_web_command(
         cmd=cmd,
         sessions=_nutrition_sessions,
@@ -1502,12 +1562,22 @@ def process_web_command(cmd: str) -> str:
             rec = rows[idx - 1]
             _web_invite_manage_state["web"] = {"step": "action", "record": rec}
             return _format_invite_manage_actions(rec)
-        if state.get("step") == "action" and cmd.strip().isdigit():
+        if state.get("step") == "view" and cmd.strip().isdigit():
             rec = state["record"]
             choice = int(cmd.strip())
             if choice == 1:
                 _web_invite_manage_state["web"] = {"step": "confirm_edit", "record": rec}
                 return _format_invite_edit_confirm(rec)
+            if choice == 2:
+                _web_invite_manage_state.pop("web", None)
+                return "已返回邀約文宣管理"
+            return "⚠️ 請輸入 1 或 2"
+        if state.get("step") == "action" and cmd.strip().isdigit():
+            rec = state["record"]
+            choice = int(cmd.strip())
+            if choice == 1:
+                _web_invite_manage_state["web"] = {"step": "view", "record": rec}
+                return _format_invite_view(rec)
             if choice == 2:
                 _web_invite_manage_state.pop("web", None)
                 try:
