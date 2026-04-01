@@ -1151,6 +1151,7 @@ def webhook():
         handle_training_command=handle_training_command,
         reply_message=reply_message,
         execute_menu_text=EXEC_MENU_TEXT,
+        execute_menu_items=EXEC_MENU_ITEMS,
         exec_menu_active=_exec_menu_active,
         awaiting_person_for_mode=_awaiting_person_for_mode,
         awaiting_exec_input=_awaiting_exec_input,
@@ -1171,6 +1172,7 @@ def webhook():
         format_invite_manage_actions=_format_invite_manage_actions,
         format_invite_edit_confirm=_format_invite_edit_confirm,
         load_course_invite=_load_course_invite,
+        load_classifier_module=_load_classifier,
         load_market_dev=_load_market_dev,
         format_prospect_detail=_format_prospect_detail,
     )

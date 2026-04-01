@@ -12,6 +12,7 @@ def process_line_events(
     handle_training_command,
     reply_message,
     execute_menu_text,
+    execute_menu_items,
     exec_menu_active,
     awaiting_person_for_mode,
     awaiting_exec_input,
@@ -137,6 +138,26 @@ def process_line_events(
             awaiting_invite_manage_action.pop(scope, None)
             awaiting_invite_manage_edit.pop(scope, None)
             reply_message(reply_token, execute_menu_text)
+            continue
+
+        if exec_menu_active.get(scope) and user_msg.strip().isdigit():
+            choice = int(user_msg.strip())
+            item = execute_menu_items.get(choice)
+            if not item:
+                reply_message(reply_token, "⚠️ 無效編號，請重新輸入 5168 查看選單。")
+                continue
+            exec_menu_active.pop(scope, None)
+            prompt = item.get("prompt")
+            cmd = item.get("cmd")
+            if prompt:
+                reply_message(reply_token, prompt)
+                continue
+            if cmd:
+                handled = handle_training_command(cmd, reply_token, user_id, group_id)
+                if not handled:
+                    reply_message(reply_token, "⚠️ 無法辨識指令，請輸入「說明」查看可用功能。")
+                continue
+            reply_message(reply_token, "⚠️ 此功能尚未設定。")
             continue
 
         if user_msg.strip().upper() == "NA" and (

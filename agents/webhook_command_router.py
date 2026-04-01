@@ -21,6 +21,26 @@ def handle_line_command(
     load_motivation,
 ):
     msg = (msg or "").strip()
+    if msg in ("行事曆圖檔整理", "上傳行事曆圖片"):
+        try:
+            clf_mod = load_classifier()
+            result = clf_mod.ClassifierAgent().set_mode("行事曆", "")
+            reply_message(reply_token, result + "\n\n請直接上傳行事曆圖片，系統會整理今天之後的活動。")
+            return True
+        except Exception as exc:
+            reply_message(reply_token, f"✗ 行事曆圖檔模式設定失敗：{exc}")
+            return True
+
+    try:
+        clf_mod = load_classifier()
+        available_modes = set(getattr(clf_mod, "AVAILABLE_MODES", []))
+        if msg in available_modes:
+            result = clf_mod.ClassifierAgent().set_mode(msg, "")
+            reply_message(reply_token, result)
+            return True
+    except Exception as exc:
+        reply_message(reply_token, f"✗ 歸檔模式設定失敗：{exc}")
+        return True
 
     if msg == "寄送每日報告":
         try:
@@ -74,9 +94,9 @@ def handle_line_command(
             reply_message(reply_token, f"✗ 新增潛在家人失敗：{exc}")
             return True
 
-    if msg.startswith("查詢潛在家人"):
+    if msg == "潛在家人總表" or msg.startswith("查詢潛在家人"):
         try:
-            keyword = msg.replace("查詢潛在家人", "", 1).strip() or None
+            keyword = None if msg == "潛在家人總表" else (msg.replace("查詢潛在家人", "", 1).strip() or None)
             market = load_market_dev()
             rows = market.MarketDevAgent().list_prospects(keyword)
             if not rows:
@@ -206,6 +226,9 @@ def handle_web_command(
             clf_mod = load_classifier()
         return clf_mod
 
+    if cmd in ("行事曆圖檔整理", "上傳行事曆圖片"):
+        return _get_classifier().ClassifierAgent().set_mode("行事曆", "") + "\n\n請直接上傳行事曆圖片，系統會整理今天之後的活動。"
+
     available_modes = set(getattr(_get_classifier(), "AVAILABLE_MODES", []))
     if cmd in available_modes:
         return _get_classifier().ClassifierAgent().set_mode(cmd, "")
@@ -229,11 +252,11 @@ def handle_web_command(
         person = cmd.replace("查詢歸檔", "", 1).strip() or None
         return clf_mod.ClassifierAgent().query_archive(person)
 
-    if cmd.startswith("新增潛在家人") or cmd.startswith("查詢潛在家人"):
+    if cmd.startswith("新增潛在家人") or cmd.startswith("查詢潛在家人") or cmd == "潛在家人總表":
         market = load_market_dev()
         if cmd.startswith("新增潛在家人"):
             return market.MarketDevAgent().handle_add_prospect(cmd)
-        keyword = cmd.replace("查詢潛在家人", "", 1).strip() or None
+        keyword = None if cmd == "潛在家人總表" else (cmd.replace("查詢潛在家人", "", 1).strip() or None)
         rows = market.MarketDevAgent().list_prospects(keyword)
         if not rows:
             return "⚠️ 目前沒有潛在家人資料。"

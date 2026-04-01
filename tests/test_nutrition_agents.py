@@ -174,11 +174,13 @@ class NutritionAgentsTest(unittest.TestCase):
     def test_line_and_web_menu_wiring(self):
         self.assertIn("查詢營養素標準", webhook.HELP_TEXT)
         self.assertIn("開始飲食評估", webhook.HELP_TEXT)
+        self.assertIn("上傳行事曆圖片", webhook.HELP_TEXT)
 
         html = webhook._render_dashboard_html_v2()
         self.assertIn("營養評估", html)
         self.assertIn("查詢營養素標準", html)
         self.assertIn("開始飲食評估", html)
+        self.assertIn("上傳行事曆圖片", html)
 
         class _FakeDRIAgent:
             def handle_command(self, cmd):
@@ -219,6 +221,23 @@ class NutritionAgentsTest(unittest.TestCase):
             result = webhook.process_web_command("營養保健歸檔")
 
         self.assertEqual(result, "CLASSIFY_MODE:營養保健歸檔:")
+
+    def test_calendar_image_shortcuts_use_calendar_archive_mode(self):
+        class _FakeClassifierAgent:
+            def set_mode(self, mode, person=""):
+                return f"CLASSIFY_MODE:{mode}:{person}"
+
+        class _FakeClassifierModule:
+            AVAILABLE_MODES = ["營養保健歸檔", "市場開發", "行事曆"]
+
+            def ClassifierAgent(self):
+                return _FakeClassifierAgent()
+
+        with patch.object(webhook, "_load_classifier", return_value=_FakeClassifierModule()):
+            web_result = webhook.process_web_command("上傳行事曆圖片")
+
+        self.assertIn("CLASSIFY_MODE:行事曆:", web_result)
+        self.assertIn("請直接上傳行事曆圖片", web_result)
 
     def test_web_upload_prefers_nutrition_session_over_archive(self):
         class _FakeNutritionAgent:
