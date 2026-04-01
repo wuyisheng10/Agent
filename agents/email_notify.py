@@ -24,30 +24,48 @@ def send_email(subject: str, body: str) -> bool:
     Send an email notification via Gmail SMTP.
     Returns True on success, False on failure.
     """
+    return send_email_to(subject, body, [RECEIVER])
+
+
+def send_email_to(subject: str, body: str, receivers: list) -> bool:
+    """
+    Send an email to one or more recipients.
+    body may be plain text or a full HTML string.
+    Returns True on success, False on failure.
+    """
     if not ENABLED:
         print("[EMAIL] Email notifications are disabled.")
         return False
 
-    if not all([SENDER, PASSWORD, RECEIVER]):
+    if not all([SENDER, PASSWORD]):
         print("[EMAIL] Missing email credentials in .env")
+        return False
+
+    targets = [r for r in receivers if r]
+    if not targets:
+        print("[EMAIL] No recipients specified.")
         return False
 
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"]    = SENDER
-        msg["To"]      = RECEIVER
+        msg["To"]      = ", ".join(targets)
 
-        # Plain text version
-        text_part = MIMEText(body, "plain", "utf-8")
+        # Plain text version (strip tags for fallback)
+        import re as _re
+        plain = _re.sub(r"<[^>]+>", "", body)
+        text_part = MIMEText(plain, "plain", "utf-8")
 
-        # HTML version
-        html_body = body.replace("\n", "<br>")
-        html_part = MIMEText(
-            f"""
+        # HTML version — if body already contains <html>, use as-is; else wrap
+        if body.lstrip().lower().startswith("<html"):
+            html_content = body
+        else:
+            html_body = body.replace("\n", "<br>")
+            html_content = f"""
             <html><body>
             <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #ddd;border-radius:8px;">
-              <h2 style="color:#2c3e50;">Amway AI Agent Notification</h2>
+              <h2 style="color:#2c3e50;">Yisheng AI Notification</h2>
               <div style="background:#f9f9f9;padding:15px;border-radius:5px;line-height:1.8;">
                 {html_body}
               </div>
@@ -56,19 +74,17 @@ def send_email(subject: str, body: str) -> bool:
               </p>
             </div>
             </body></html>
-            """,
-            "html",
-            "utf-8"
-        )
+            """
+        html_part = MIMEText(html_content, "html", "utf-8")
 
         msg.attach(text_part)
         msg.attach(html_part)
 
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(SENDER, PASSWORD)
-            server.sendmail(SENDER, RECEIVER, msg.as_string())
+            server.sendmail(SENDER, targets, msg.as_string())
 
-        print(f"[EMAIL] Sent successfully to {RECEIVER}")
+        print(f"[EMAIL] Sent successfully to {', '.join(targets)}")
         return True
 
     except Exception as e:
@@ -93,7 +109,7 @@ def notify_pipeline_done(results: list, summary_path: str = "") -> bool:
         lines.append("")
         lines.append(f"Summary saved to: {summary_path}")
 
-    subject = f"[Amway AI] Daily Pipeline - {status_icon} - {datetime.now().strftime('%Y/%m/%d')}"
+    subject = f"[Yisheng AI] Daily Pipeline - {status_icon} - {datetime.now().strftime('%Y/%m/%d')}"
     return send_email(subject, "\n".join(lines))
 
 
@@ -108,7 +124,7 @@ def notify_crew_done(result_path: str = "") -> bool:
     if result_path:
         lines.append(f"Report saved to: {result_path}")
 
-    subject = f"[Amway AI] Weekly Report Done - {datetime.now().strftime('%Y/%m/%d')}"
+    subject = f"[Yisheng AI] Weekly Report Done - {datetime.now().strftime('%Y/%m/%d')}"
     return send_email(subject, "\n".join(lines))
 
 
@@ -121,7 +137,7 @@ def notify_error(agent_name: str, error_msg: str) -> bool:
         "Error Details:",
         error_msg[:500],
     ]
-    subject = f"[Amway AI] ERROR in {agent_name} - {datetime.now().strftime('%Y/%m/%d %H:%M')}"
+    subject = f"[Yisheng AI] ERROR in {agent_name} - {datetime.now().strftime('%Y/%m/%d %H:%M')}"
     return send_email(subject, "\n".join(lines))
 
 
@@ -129,7 +145,7 @@ def notify_error(agent_name: str, error_msg: str) -> bool:
 if __name__ == "__main__":
     print("Testing email notification...")
     ok = send_email(
-        subject="[Amway AI] Test Email",
+        subject="[Yisheng AI] Test Email",
         body=f"This is a test notification.\nSent at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     )
     print("Test result:", "SUCCESS" if ok else "FAILED")

@@ -255,7 +255,7 @@ def build_report() -> tuple[str, str]:
   <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
   {divider.join(sections)}
   <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
-  <p style="color:#aaa;font-size:11px;text-align:center;">由 Amway AI Agent 自動產生</p>
+  <p style="color:#aaa;font-size:11px;text-align:center;">由 Yisheng AI Agent 自動產生</p>
 </div>
 </body></html>"""
 

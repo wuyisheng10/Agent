@@ -51,6 +51,40 @@ npm install -g @google/generative-ai-cli
 
 ---
 
+## 🚀 系統重啟步驟（每次開機後執行）
+
+開兩個獨立的 **命令提示字元（cmd）** 視窗：
+
+### 視窗 1 — 啟動 Flask Server
+```bat
+cd "C:\Users\user\claude AI_Agent"
+python agents\06_line_webhook.py
+```
+確認看到以下訊息即代表成功：
+```
+* Running on http://127.0.0.1:5000
+* Running on http://192.168.x.x:5000
+```
+
+### 視窗 2 — 啟動 ngrok（對外開放手機存取）
+```bat
+cd "C:\Users\user\claude AI_Agent"
+ngrok.exe http 5000
+```
+確認看到 `Forwarding https://xxxx.ngrok-free.app -> http://localhost:5000`
+
+### 確認方式
+| 位置 | 網址 |
+|------|------|
+| 本機健康檢查 | http://localhost:5000/health |
+| 本機網頁介面 | http://localhost:5000/web |
+| 手機（外部）| https://xxxx.ngrok-free.app/web |
+| LINE Webhook | https://xxxx.ngrok-free.app/webhook |
+
+> 注意：ngrok 免費版每次重啟 URL 會改變，需至 LINE Developer Console 更新 Webhook URL。
+
+---
+
 ## 🔄 每日執行流程
 
 ```
