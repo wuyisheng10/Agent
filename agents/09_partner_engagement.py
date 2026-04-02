@@ -12,6 +12,54 @@ LOG_FILE = BASE_DIR / "logs" / "partner_log.txt"
 
 PURCHASE_KEYS = ["this_month", "last_month", "prev2_month", "prev3_month"]
 EMPTY_MARKERS = {"", "-", "無", "查詢", "null", "None"}
+PARTNER_STAGE_DEFINITIONS = [
+    {
+        "value": "待跟進",
+        "label": "待跟進",
+        "description": "已列入跟進名單，接下來需要安排關心、邀約或確認近況。",
+    },
+    {
+        "value": "跟進中",
+        "label": "跟進中",
+        "description": "已開始互動跟進，正在持續聯繫與建立關係。",
+    },
+    {
+        "value": "已邀約活動",
+        "label": "已邀約活動",
+        "description": "已邀請參加會議、課程或活動，等待對方回覆或出席。",
+    },
+    {
+        "value": "已體驗產品",
+        "label": "已體驗產品",
+        "description": "已開始接觸或體驗產品，適合追蹤使用感受與回饋。",
+    },
+    {
+        "value": "觀望中",
+        "label": "觀望中",
+        "description": "對方仍在觀察評估，適合低壓陪伴與持續提供價值。",
+    },
+    {
+        "value": "激勵中",
+        "label": "激勵中",
+        "description": "目前重點是鼓勵、提振狀態與恢復節奏。",
+    },
+    {
+        "value": "已成交/已加入",
+        "label": "已成交/已加入",
+        "description": "已完成加入、成交或正式進入合作階段。",
+    },
+    {
+        "value": "暫停跟進",
+        "label": "暫停跟進",
+        "description": "現階段先暫停主動推進，保留後續再啟動空間。",
+    },
+    {
+        "value": "待重新啟動",
+        "label": "待重新啟動",
+        "description": "曾中斷跟進，後續可視時機重新接觸與暖身。",
+    },
+]
+PARTNER_STAGE_VALUES = {item["value"] for item in PARTNER_STAGE_DEFINITIONS}
 
 
 def log(msg: str):
@@ -44,6 +92,39 @@ def save_partners(items: list[dict]):
 def _clean(value: str) -> str:
     value = (value or "").replace("\ufeff", "").strip()
     return "" if value in EMPTY_MARKERS else value
+
+
+def list_partner_status_definitions() -> str:
+    lines = ["夥伴狀態定義："]
+    for item in PARTNER_STAGE_DEFINITIONS:
+        lines.append(f"- {item['label']}：{item['description']}")
+    return "\n".join(lines)
+
+
+def normalize_partner_stage(stage: str) -> str:
+    stage = (stage or "").strip()
+    if not stage or stage == "-":
+        return ""
+    aliases = {
+        "待跟進中": "待跟進",
+        "持續跟進": "跟進中",
+        "跟進當中": "跟進中",
+        "積極跟進": "跟進中",
+        "已邀約": "已邀約活動",
+        "已邀約課程": "已邀約活動",
+        "已邀約體驗": "已體驗產品",
+        "產品體驗中": "已體驗產品",
+        "激勵": "激勵中",
+        "已加入": "已成交/已加入",
+        "已成交": "已成交/已加入",
+        "暫停": "暫停跟進",
+        "重新啟動": "待重新啟動",
+    }
+    stage = aliases.get(stage, stage)
+    if stage not in PARTNER_STAGE_VALUES:
+        allowed = "、".join(item["value"] for item in PARTNER_STAGE_DEFINITIONS)
+        raise ValueError(f"狀態不在定義清單內：{stage}\n可用狀態：{allowed}")
+    return stage
 
 
 def _partner_id(name: str, amway_no: str = "") -> str:
@@ -129,7 +210,11 @@ def list_partners(title: str, items: list[dict]) -> str:
 
 def due_partners() -> list[dict]:
     today = date.today().isoformat()
-    items = [p for p in load_partners() if p.get("next_followup") and p["next_followup"] <= today]
+    items = [
+        p
+        for p in load_partners()
+        if p.get("stage") == "待跟進" or (p.get("next_followup") and p["next_followup"] <= today)
+    ]
     return sorted(items, key=_sort_key)
 
 
@@ -353,10 +438,11 @@ def import_partner_roster(raw_text: str) -> dict:
 
 
 def add_partner(command: str) -> str:
+    stripped = command.strip()
     prefix = "新增夥伴"
-    if not command.strip().startswith(prefix):
+    if not stripped.startswith(prefix):
         return "格式：新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註 | 分類"
-    raw = command.strip()[len(prefix):].strip()
+    raw = stripped[len(prefix):].strip()
     if not raw:
         return "格式：新增夥伴 姓名 | 目標 | 下次跟進日期 | 備註 | 分類"
     parts = [part.strip() for part in raw.split("|")]
@@ -386,6 +472,30 @@ def add_partner(command: str) -> str:
     if next_followup:
         lines.append(f"下次跟進：{next_followup}")
     return "\n".join(lines)
+
+
+def add_followup_partner(command: str) -> str:
+    prefix = "新增跟進夥伴"
+    if not command.strip().startswith(prefix):
+        return "格式：新增跟進夥伴 姓名 | 下次跟進日期 | 備註"
+    raw = command.strip()[len(prefix):].strip()
+    if not raw:
+        return "格式：新增跟進夥伴 姓名 | 下次跟進日期 | 備註"
+    parts = [part.strip() for part in raw.split("|")]
+    if len(parts) < 3:
+        parts.extend([""] * (3 - len(parts)))
+    target, next_followup, note = parts[:3]
+    if not target or not next_followup:
+        return "格式：新增跟進夥伴 姓名 | 下次跟進日期 | 備註"
+    partners = load_partners()
+    item = _find_partner(target, partners)
+    if not item:
+        return f"找不到夥伴：{target}\n請先從既有夥伴名單中選擇。"
+    next_followup = _normalize_date(next_followup)
+    item["stage"] = "待跟進"
+    _append_record(item, "followup_add", note or "加入待跟進清單", next_followup=next_followup)
+    save_partners(sorted(partners, key=_sort_key))
+    return f"已加入待跟進：{item['name']}\n狀態：待跟進\n下次跟進：{next_followup}"
 
 
 def update_partner(command: str) -> str:
@@ -429,7 +539,10 @@ def update_partner(command: str) -> str:
     if level and level != "-":
         item["level"] = level
     if stage and stage != "-":
-        item["stage"] = stage
+        try:
+            item["stage"] = normalize_partner_stage(stage)
+        except ValueError as e:
+            return str(e)
     if next_followup and next_followup != "-":
         item["next_followup"] = _normalize_date(next_followup)
     if contact_info and contact_info != "-":
@@ -503,7 +616,11 @@ def follow_partner(command: str) -> str:
     m = re.fullmatch(r"跟進夥伴\s+(.+?)\s*\|\s*(.+?)\s*\|\s*(\d{4}-\d{2}-\d{2})(?:\s*\|\s*(.+))?", command.strip())
     if not m:
         return "格式：跟進夥伴 姓名 | 狀態 | 下次跟進日期 | 備註"
-    target, stage, next_followup, note = m.group(1).strip(), m.group(2).strip(), _normalize_date(m.group(3)), (m.group(4) or "").strip()
+    try:
+        stage = normalize_partner_stage(m.group(2).strip())
+    except ValueError as e:
+        return str(e)
+    target, next_followup, note = m.group(1).strip(), _normalize_date(m.group(3)), (m.group(4) or "").strip()
     partners = load_partners()
     item = _find_partner(target, partners)
     if not item:
@@ -531,9 +648,15 @@ def motivate_partner(command: str) -> str:
         f"目前聚焦：{goal}\n"
         f"下一步：{next_followup}"
     )
+    _set_stage_if_motivated(item)
     _append_record(item, "motivate", msg)
     save_partners(sorted(partners, key=_sort_key))
     return msg
+
+
+def _set_stage_if_motivated(item: dict):
+    if item.get("stage") != "激勵中":
+        item["stage"] = "激勵中"
 
 
 def delete_partner(command: str) -> str:
@@ -602,8 +725,12 @@ def query_partner(command: str) -> str:
 
 def handle_partner_command(command: str) -> str:
     msg = command.strip()
+    if msg in {"查詢夥伴狀態定義", "夥伴狀態定義", "夥伴狀態說明"}:
+        return list_partner_status_definitions()
     if msg.startswith("新增夥伴"):
         return add_partner(msg)
+    if msg.startswith("新增跟進夥伴"):
+        return add_followup_partner(msg)
     if msg.startswith("更新夥伴"):
         return update_partner(msg)
     if msg.startswith("邀約夥伴"):

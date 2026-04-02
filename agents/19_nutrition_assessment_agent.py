@@ -511,6 +511,97 @@ def handle_command(cmd: str, sessions: dict, scope_id: str, push_fn=None, reply_
     return ""
 
 
+def _load_prompt_manager():
+    spec = _ilu.spec_from_file_location(
+        "ai_prompt_manager",
+        str(BASE_DIR / "agents" / "20_ai_prompt_manager.py"),
+    )
+    module = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_skill_manager():
+    spec = _ilu.spec_from_file_location(
+        "ai_skill_manager",
+        str(BASE_DIR / "agents" / "22_ai_skill_manager.py"),
+    )
+    module = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _with_nutrition_skill(prompt: str) -> str:
+    try:
+        skill_text = _load_skill_manager().render_skill("nutrition_assessment_strategy").strip()
+    except Exception:
+        skill_text = ""
+    return f"{skill_text}\n\n{prompt}".strip() if skill_text else prompt
+
+
+def _analyze_image_with_codex(img_bytes: bytes, meal_label: str, timeout: int = 120) -> str:
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    img_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".jpg", delete=False, dir=str(LOGS_DIR)) as fh:
+            fh.write(img_bytes)
+            img_path = fh.name
+
+        pm = _load_prompt_manager()
+        prompt = _with_nutrition_skill(pm.render_prompt("nutrition_meal_image_analysis", meal_label=meal_label))
+        return _run_codex_cli(prompt, timeout=timeout, image_path=img_path)
+    finally:
+        if img_path and os.path.exists(img_path):
+            try:
+                os.unlink(img_path)
+            except OSError:
+                pass
+
+
+def _assess_deficiencies(analyses: list[dict], water_ml: int, gender: str, age: int) -> dict:
+    gender_key = "M" if str(gender).upper() in ("M", "男", "男性") else "F"
+    gender_label = "男性" if gender_key == "M" else "女性"
+
+    dri_mod = _load_dri_agent()
+    dri_agent = dri_mod.NutritionDRIAgent()
+    dri_group, dri_values = dri_agent._match_age_group(age, gender_key)
+    dri_summary = json.dumps(dri_values, ensure_ascii=False)
+
+    meals_text = ""
+    for item in analyses:
+        meals_text += f"\n【{item['label']}】\n{item['analysis']}\n"
+
+    pm = _load_prompt_manager()
+    prompt = _with_nutrition_skill(pm.render_prompt(
+        "nutrition_daily_assessment",
+        gender_label=gender_label,
+        age=age,
+        dri_group=dri_group,
+        meals_text=meals_text,
+        water_ml=water_ml,
+        water_target=dri_values.get("水", 2000),
+        dri_summary=dri_summary,
+    ))
+
+    try:
+        assessment_text = _run_codex_cli(prompt, timeout=180)
+        if not assessment_text:
+            raise RuntimeError("Codex CLI 沒有回傳內容")
+    except Exception as exc:
+        assessment_text = _basic_assessment_text(analyses, water_ml, gender_label, age, str(exc))
+
+    return {
+        "gender": gender_label,
+        "age": age,
+        "dri_group": dri_group,
+        "water_ml": water_ml,
+        "water_target": dri_values.get("水", 2000),
+        "meals": analyses,
+        "assessment_md": assessment_text,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+
+
 if __name__ == "__main__":
     _sessions = {}
     print(handle_command("開始飲食評估 女 30 王小美", _sessions, "test"))

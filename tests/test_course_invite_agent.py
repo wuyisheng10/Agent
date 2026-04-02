@@ -100,6 +100,18 @@ class CourseInviteAgentTest(unittest.TestCase):
             result = course.generate_prospect_invite("Amy")
         self.assertIn("目前沒有排定的課程會議", result)
 
+    def test_optimize_and_apply_promo(self):
+        item = course.add_promo("四月文宣", "原始內容")
+        with patch.object(course, "_run_codex", return_value="優化後內容"):
+            result = course.optimize_promo(item["id"])
+        self.assertIn("已優化", result)
+
+        applied = course.apply_optimized_promo(item["id"])
+        self.assertIn("已將優化內容套用", applied)
+
+        updated = course.get_promo_detail(item["id"])
+        self.assertEqual(updated["content"], "優化後內容")
+
 
 if __name__ == "__main__":
     unittest.main()
