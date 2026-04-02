@@ -695,6 +695,9 @@ _awaiting_invite_selection = _webhook_state._awaiting_invite_selection
 _awaiting_partner_invite_category = _webhook_state._awaiting_partner_invite_category
 _awaiting_partner_invite_person = _webhook_state._awaiting_partner_invite_person
 _awaiting_partner_invite_meeting = _webhook_state._awaiting_partner_invite_meeting
+_awaiting_prospect_invite_category = _webhook_state._awaiting_prospect_invite_category
+_awaiting_prospect_invite_person = _webhook_state._awaiting_prospect_invite_person
+_awaiting_prospect_invite_meeting = _webhook_state._awaiting_prospect_invite_meeting
 _awaiting_invite_manage_select = _webhook_state._awaiting_invite_manage_select
 _awaiting_invite_manage_action = _webhook_state._awaiting_invite_manage_action
 _awaiting_invite_manage_edit = _webhook_state._awaiting_invite_manage_edit
@@ -702,6 +705,7 @@ _awaiting_promo_optimize_apply = _webhook_state._awaiting_promo_optimize_apply
 _awaiting_partner_voice_add = _webhook_state._awaiting_partner_voice_add
 _web_invite_combos = _webhook_state._web_invite_combos
 _web_partner_invite_state = _webhook_state._web_partner_invite_state
+_web_prospect_invite_state = _webhook_state._web_prospect_invite_state
 _web_invite_manage_state = _webhook_state._web_invite_manage_state
 _web_promo_optimize_state = _webhook_state._web_promo_optimize_state
 
@@ -858,8 +862,11 @@ def _looks_like_explicit_command(msg: str) -> bool:
 _load_partner_rows = lambda: _webhook_router_helpers.load_partner_rows(BASE_DIR)
 _partners_by_category = lambda category: _webhook_router_helpers.partners_by_category(BASE_DIR, category)
 _partner_category_menu = _webhook_router_helpers.partner_category_menu
+_prospects_by_category = lambda category: _webhook_router_helpers.prospects_by_category(BASE_DIR, category)
+_prospect_category_menu = _webhook_router_helpers.prospect_category_menu
 _normalize_partner_category_choice = _webhook_router_helpers.normalize_partner_category_choice
 _format_partner_choice_menu = _webhook_router_helpers.format_partner_choice_menu
+_format_prospect_choice_menu = _webhook_router_helpers.format_prospect_choice_menu
 _format_meeting_choice_menu = _webhook_router_helpers.format_meeting_choice_menu
 _format_invite_manage_list = _webhook_router_helpers.format_invite_manage_list
 _format_invite_manage_actions = _webhook_router_helpers.format_invite_manage_actions
@@ -1217,6 +1224,9 @@ def webhook():
         awaiting_partner_invite_category=_awaiting_partner_invite_category,
         awaiting_partner_invite_person=_awaiting_partner_invite_person,
         awaiting_partner_invite_meeting=_awaiting_partner_invite_meeting,
+        awaiting_prospect_invite_category=_awaiting_prospect_invite_category,
+        awaiting_prospect_invite_person=_awaiting_prospect_invite_person,
+        awaiting_prospect_invite_meeting=_awaiting_prospect_invite_meeting,
         awaiting_invite_manage_select=_awaiting_invite_manage_select,
         awaiting_invite_manage_action=_awaiting_invite_manage_action,
         awaiting_invite_manage_edit=_awaiting_invite_manage_edit,
@@ -1226,6 +1236,9 @@ def webhook():
         normalize_partner_category_choice=_normalize_partner_category_choice,
         partners_by_category=_partners_by_category,
         format_partner_choice_menu=_format_partner_choice_menu,
+        prospect_category_menu=_prospect_category_menu,
+        prospects_by_category=_prospects_by_category,
+        format_prospect_choice_menu=_format_prospect_choice_menu,
         format_meeting_choice_menu=_format_meeting_choice_menu,
         format_invite_manage_list=_format_invite_manage_list,
         format_invite_manage_actions=_format_invite_manage_actions,
@@ -1499,6 +1512,10 @@ def process_web_command(cmd: str) -> str:
         _web_partner_invite_state["web"] = {"step": "category"}
         return _partner_category_menu()
 
+    if cmd.strip() == "邀約文宣 潛在家人":
+        _web_prospect_invite_state["web"] = {"step": "category"}
+        return _prospect_category_menu()
+
     if _web_promo_optimize_state.get("web") and cmd.strip().isdigit():
         state = _web_promo_optimize_state.pop("web")
         choice = int(cmd.strip())
@@ -1548,11 +1565,14 @@ def process_web_command(cmd: str) -> str:
     if cmd.strip().upper() == "NA":
         _web_invite_combos.pop("web", None)
         _web_partner_invite_state.pop("web", None)
+        _web_prospect_invite_state.pop("web", None)
         _web_invite_manage_state.pop("web", None)
         return "↩️ 已取消，返回待機。"
 
     if _looks_like_explicit_command(cmd) and _web_partner_invite_state.get("web"):
         _web_partner_invite_state.pop("web", None)
+    if _looks_like_explicit_command(cmd) and _web_prospect_invite_state.get("web"):
+        _web_prospect_invite_state.pop("web", None)
     if _looks_like_explicit_command(cmd) and _web_invite_manage_state.get("web"):
         _web_invite_manage_state.pop("web", None)
 
@@ -1597,6 +1617,50 @@ def process_web_command(cmd: str) -> str:
             try:
                 course = _load_course_invite()
                 return course.generate_partner_invite_for_meeting(name, meeting)
+            except Exception as e:
+                return f"✗ 邀約文宣產生失敗：{e}"
+
+    if _web_prospect_invite_state.get("web"):
+        state = _web_prospect_invite_state["web"]
+        if _looks_like_explicit_command(cmd):
+            _web_prospect_invite_state.pop("web", None)
+            state = None
+        if not state:
+            pass
+        elif state.get("step") == "category":
+            category = _normalize_partner_category_choice(cmd)
+            if not category:
+                return "⚠️ 請輸入 1、2、3 或 A、B、C"
+            people = _prospects_by_category(category)
+            if not people:
+                _web_prospect_invite_state.pop("web", None)
+                return f"⚠️ 目前沒有分類 {category} 的潛在家人。"
+            _web_prospect_invite_state["web"] = {"step": "person", "category": category, "people": people}
+            return _format_prospect_choice_menu(category, people)
+        elif state.get("step") == "person" and cmd.strip().isdigit():
+            people = state["people"]
+            idx = int(cmd.strip())
+            if not (1 <= idx <= len(people)):
+                return f"⚠️ 請輸入 1～{len(people)} 的編號"
+            course = _load_course_invite()
+            meetings = course.list_meetings()
+            if not meetings:
+                _web_prospect_invite_state.pop("web", None)
+                return "⚠️ 目前沒有排定的課程會議，請先新增課程會議。"
+            person = people[idx - 1]
+            _web_prospect_invite_state["web"] = {"step": "meeting", "name": person.get("name", ""), "meetings": meetings}
+            return _format_meeting_choice_menu(person.get("name", ""), meetings)
+        elif state.get("step") == "meeting" and cmd.strip().isdigit():
+            meetings = state["meetings"]
+            idx = int(cmd.strip())
+            if not (1 <= idx <= len(meetings)):
+                return f"⚠️ 請輸入 1～{len(meetings)} 的編號"
+            meeting = meetings[idx - 1]
+            name = state["name"]
+            _web_prospect_invite_state.pop("web", None)
+            try:
+                course = _load_course_invite()
+                return course.generate_prospect_invite_for_meeting(name, meeting)
             except Exception as e:
                 return f"✗ 邀約文宣產生失敗：{e}"
 

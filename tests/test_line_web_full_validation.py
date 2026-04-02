@@ -24,6 +24,22 @@ webhook = load_module("line_webhook_full_validation", "agents/06_line_webhook.py
 
 class _FakeCalendarModule:
     @staticmethod
+    def upcoming_events():
+        return [{"id": "EVT-1", "date": "2026-04-02", "time": "19:30", "title": "今天會議"}]
+
+    @staticmethod
+    def past_events():
+        return [{"id": "EVT-0", "date": "2026-03-20", "time": "19:30", "title": "過往會議"}]
+
+    @staticmethod
+    def events_between():
+        return _FakeCalendarModule.upcoming_events() + _FakeCalendarModule.past_events()
+
+    @staticmethod
+    def format_events(events, limit=12, title="行事曆："):
+        return title + "\\n" + "\\n".join(f"- {e['date']} {e['title']}" for e in events[:limit])
+
+    @staticmethod
     def handle_calendar_command(cmd):
         prefixes = (
             "查詢行事曆",
@@ -216,6 +232,13 @@ class _FakeCourseInviteModule:
             "meeting": {"id": "COURSE-1", "title": "台南OPP", "date": "2026-04-18", "time": "13:30"},
         }]
 
+    @staticmethod
+    def list_promos():
+        return [
+            {"id": "PROMO-1234", "title": "四月 OPP 邀約", "content": "歡迎參加", "optimized": ""},
+            {"id": "PROMO-5678", "title": "五月 OPP 邀約", "content": "歡迎再來", "optimized": ""},
+        ]
+
 
 class _FakeDailyReportAgent:
     @staticmethod
@@ -359,7 +382,6 @@ FORM_SAMPLES = {
     "刪除課程會議": "刪除課程會議 COURSE-1234",
     "新增課程文宣": "新增課程文宣 四月OPP邀約|歡迎參加",
     "優化課程文宣（AI）": "優化課程文宣 PROMO-1234",
-    "邀約文宣－潛在家人（AI）": "邀約文宣 潛在家人 Amy",
     "邀約文宣－跟進夥伴（AI）": "邀約文宣 跟進夥伴",
     "修改已產生的邀約文宣": "修改已產生的今日之後會議邀約文宣 COURSE-1234 | 建德 | 新內容",
     "查詢營養素標準": "查詢營養素標準 男 30 午餐",
@@ -419,6 +441,9 @@ class FullLineWebValidationTest(unittest.TestCase):
             "awaiting_partner_invite_category": {},
             "awaiting_partner_invite_person": {},
             "awaiting_partner_invite_meeting": {},
+            "awaiting_prospect_invite_category": {},
+            "awaiting_prospect_invite_person": {},
+            "awaiting_prospect_invite_meeting": {},
             "awaiting_invite_manage_select": {},
             "awaiting_invite_manage_action": {},
             "awaiting_invite_manage_edit": {},
@@ -469,6 +494,9 @@ class FullLineWebValidationTest(unittest.TestCase):
                     awaiting_partner_invite_category=state["awaiting_partner_invite_category"],
                     awaiting_partner_invite_person=state["awaiting_partner_invite_person"],
                     awaiting_partner_invite_meeting=state["awaiting_partner_invite_meeting"],
+                    awaiting_prospect_invite_category=state["awaiting_prospect_invite_category"],
+                    awaiting_prospect_invite_person=state["awaiting_prospect_invite_person"],
+                    awaiting_prospect_invite_meeting=state["awaiting_prospect_invite_meeting"],
                     awaiting_invite_manage_select=state["awaiting_invite_manage_select"],
                     awaiting_invite_manage_action=state["awaiting_invite_manage_action"],
                     awaiting_invite_manage_edit=state["awaiting_invite_manage_edit"],
@@ -477,7 +505,10 @@ class FullLineWebValidationTest(unittest.TestCase):
                     looks_like_explicit_command=webhook._looks_like_explicit_command,
                     normalize_partner_category_choice=webhook._normalize_partner_category_choice,
                     partners_by_category=webhook._partners_by_category,
+                    prospect_category_menu=webhook._prospect_category_menu,
+                    prospects_by_category=webhook._prospects_by_category,
                     format_partner_choice_menu=webhook._format_partner_choice_menu,
+                    format_prospect_choice_menu=webhook._format_prospect_choice_menu,
                     format_meeting_choice_menu=webhook._format_meeting_choice_menu,
                     format_invite_manage_list=webhook._format_invite_manage_list,
                     format_invite_manage_actions=webhook._format_invite_manage_actions,
@@ -580,6 +611,17 @@ class FullLineWebValidationTest(unittest.TestCase):
             result = webhook.process_web_command("1")
             self.assertEqual(result, "PARTNER_INVITE:建德:COURSE-1")
 
+    def test_web_prospect_invite_uses_category_then_person_then_meeting(self):
+        with patch.object(webhook, "_prospects_by_category", return_value=[{"name": "Amy", "job": "護理師", "status": "新接觸", "tag": "健康", "category": "A"}]):
+            result = webhook.process_web_command("邀約文宣 潛在家人")
+            self.assertIn("請先選擇潛在家人分類屬性", result)
+            result = webhook.process_web_command("1")
+            self.assertIn("A 類潛在家人清單", result)
+            result = webhook.process_web_command("1")
+            self.assertIn("Amy 的可邀約會議", result)
+            result = webhook.process_web_command("1")
+            self.assertEqual(result, "PROSPECT_INVITE:Amy:COURSE-1")
+
     def test_line_partner_invite_uses_category_then_person_then_meeting(self):
         with patch.object(webhook, "_partners_by_category", return_value=[{"name": "建德", "level": "1", "stage": "積極跟進"}]):
             replies, pushes = self._run_line_sequence(["邀約文宣 跟進夥伴", "1", "1", "1"])
@@ -587,6 +629,14 @@ class FullLineWebValidationTest(unittest.TestCase):
         self.assertTrue(any("A 類夥伴清單" in x for x in replies))
         self.assertTrue(any("建德 的可邀約會議" in x for x in replies))
         self.assertTrue(any("PARTNER_INVITE:建德:COURSE-1" in x for x in replies + pushes))
+
+    def test_line_prospect_invite_uses_category_then_person_then_meeting(self):
+        with patch.object(webhook, "_prospects_by_category", return_value=[{"name": "Amy", "job": "護理師", "status": "新接觸", "tag": "健康", "category": "A"}]):
+            replies, pushes = self._run_line_sequence(["邀約文宣 潛在家人", "1", "1", "1"])
+        self.assertIn("請先選擇潛在家人分類屬性", replies[0])
+        self.assertTrue(any("A 類潛在家人清單" in x for x in replies))
+        self.assertTrue(any("Amy 的可邀約會議" in x for x in replies))
+        self.assertTrue(any("PROSPECT_INVITE:Amy:COURSE-1" in x for x in replies + pushes))
 
     def test_line_invite_query_can_view_then_modify(self):
         replies, pushes = self._run_line_sequence(["查詢已產生的今日之後會議邀約文宣", "1", "1", "1"])
@@ -623,6 +673,25 @@ class FullLineWebValidationTest(unittest.TestCase):
         self.assertIn("/api/partner-statuses", html)
         self.assertIn("查詢夥伴狀態定義", html)
 
+    def test_web_html_contains_story_people_and_promo_select_sources(self):
+        html = webhook._render_dashboard_html_v2()
+        self.assertIn('pick:"people"', html)
+        self.assertIn('pick:"promo"', html)
+        self.assertIn("/api/course-promos", html)
+
+
+    def test_training_progress_form_uses_partner_select(self):
+        html = webhook._render_dashboard_html_v2()
+        self.assertIn("查詢培訓進度", html)
+        self.assertIn("_isTrainingProgressForm", html)
+        self.assertIn("_isMilestoneForm", html)
+        self.assertIn("_isPartnerLookupForm", html)
+
+    def test_web_calendar_alias_commands_use_router(self):
+        result = webhook.process_web_command("查詢過往行事曆")
+        self.assertNotIn("意圖：其他", result)
+        result = webhook.process_web_command("查詢全部行事曆")
+        self.assertNotIn("意圖：其他", result)
 
     def test_line_pending_folder_name_is_consumed_before_intent(self):
         self.fake_classifier_agent.pending["U-test"] = {

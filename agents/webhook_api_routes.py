@@ -19,17 +19,17 @@ def register_api_routes(
             data = request.get_json(force=True) or {}
             cmd = data.get("command", "").strip()
             if not cmd:
-                return {"result": "⚠️ 請提供指令"}, 400
-            result = process_web_command(cmd)
-            return {"result": result}
+                return {"result": "缺少指令"}, 400
+            return {"result": process_web_command(cmd)}
         except Exception as e:
-            return {"result": f"⚠️ 伺服器錯誤：{e}"}, 500
+            return {"result": f"指令執行失敗：{e}"}, 500
 
     @app.route("/api/upload", methods=["POST"])
     def api_upload():
         try:
             if "file" not in request.files:
-                return {"result": "⚠️ 未找到上傳的檔案"}, 400
+                return {"result": "沒有收到檔案"}, 400
+
             f = request.files["file"]
             filename = f.filename or "upload"
             data = f.read()
@@ -55,16 +55,14 @@ def register_api_routes(
             clf_mod = load_classifier()
             clf = clf_mod.ClassifierAgent()
             clf.stage_file(data, filename, file_type, "web_user", content_type=content_type, source_name=filename)
-            menu = clf.format_pending_menu("web_user")
-            return {"result": menu}
+            return {"result": clf.format_pending_menu("web_user")}
         except Exception as e:
-            return {"result": f"⚠️ 上傳失敗：{e}"}, 500
+            return {"result": f"上傳失敗：{e}"}, 500
 
     @app.route("/api/pending", methods=["GET"])
     def api_pending():
         try:
-            clf_mod = load_classifier()
-            clf = clf_mod.ClassifierAgent()
+            clf = load_classifier().ClassifierAgent()
             menu = clf.format_pending_menu("web_user")
             return {"result": menu if menu else None}
         except Exception:
@@ -75,25 +73,22 @@ def register_api_routes(
         try:
             data = request.get_json(force=True) or {}
             choice = int(data.get("choice", 0))
-            clf_mod = load_classifier()
-            clf = clf_mod.ClassifierAgent()
+            clf = load_classifier().ClassifierAgent()
             if choice == 0:
                 pending = clf.get_pending("web_user")
                 if not pending:
                     return {"result": "目前沒有待歸檔項目"}
                 count = len(pending.get("items", []))
                 clf.clear_pending("web_user", remove_file=True)
-                return {"result": f"已清除待歸檔 {count} 項"}
-            result = clf.execute_pending_option("web_user", choice)
-            return {"result": result}
+                return {"result": f"已清除待歸檔，共 {count} 項"}
+            return {"result": clf.execute_pending_option("web_user", choice)}
         except Exception as e:
-            return {"result": f"⚠️ 執行失敗：{e}"}, 500
+            return {"result": f"待歸檔執行失敗：{e}"}, 500
 
     @app.route("/api/prospect/<name>", methods=["GET"])
     def api_prospect_get(name):
         try:
-            market = load_market_dev()
-            row = market.MarketDevAgent().get_prospect_by_name(name)
+            row = load_market_dev().MarketDevAgent().get_prospect_by_name(name)
             if row:
                 return {"result": row}
             return {"result": None}, 404
@@ -105,18 +100,24 @@ def register_api_routes(
         try:
             market = load_market_dev()
             rows = market.MarketDevAgent().list_prospects()
+            try:
+                from webhook_router_helpers import prospect_category_from_row
+            except ModuleNotFoundError:
+                from agents.webhook_router_helpers import prospect_category_from_row
+
             items = []
             for row in rows:
-                name = str(row.get("姓名", "")).strip()
+                name = str(row.get("姓名", "") or row.get("憪?", "")).strip()
                 if not name:
                     continue
                 items.append(
                     {
                         "name": name,
-                        "job": str(row.get("職業", "")).strip(),
-                        "area": str(row.get("地區", "")).strip(),
+                        "job": str(row.get("職業", "") or row.get("?瑟平", "")).strip(),
+                        "area": str(row.get("地區", "") or row.get("?啣?", "")).strip(),
                         "status": str(row.get("接觸狀態", "")).strip(),
                         "tag": str(row.get("需求標籤", "")).strip(),
+                        "category": prospect_category_from_row(row),
                     }
                 )
             items.sort(key=lambda x: x.get("name", ""))
@@ -127,8 +128,7 @@ def register_api_routes(
     @app.route("/api/partners", methods=["GET"])
     def api_partners():
         try:
-            partner = load_partner()
-            items = partner.load_partners()
+            items = load_partner().load_partners()
             rows = [
                 {
                     "name": item.get("name", ""),
@@ -148,8 +148,7 @@ def register_api_routes(
     @app.route("/api/partner-statuses", methods=["GET"])
     def api_partner_statuses():
         try:
-            partner = load_partner()
-            return {"result": partner.PARTNER_STAGE_DEFINITIONS}
+            return {"result": load_partner().PARTNER_STAGE_DEFINITIONS}
         except Exception as e:
             return {"result": [], "error": str(e)}, 500
 
@@ -165,6 +164,28 @@ def register_api_routes(
         except Exception as e:
             return {"result": None, "error": str(e)}, 500
 
+    @app.route("/api/course-promos", methods=["GET"])
+    def api_course_promos():
+        try:
+            rows = load_course_invite().list_promos()
+            items = []
+            for row in rows:
+                promo_id = str(row.get("id", "")).strip()
+                if not promo_id:
+                    continue
+                items.append(
+                    {
+                        "id": promo_id,
+                        "title": str(row.get("title", "")).strip(),
+                        "content": str(row.get("content", "")).strip(),
+                        "optimized": str(row.get("optimized", "")).strip(),
+                    }
+                )
+            items.sort(key=lambda x: x.get("id", ""))
+            return {"result": items}
+        except Exception as e:
+            return {"result": [], "error": str(e)}, 500
+
     @app.route("/api/course-invite", methods=["GET"])
     def api_course_invite_get():
         try:
@@ -172,8 +193,7 @@ def register_api_routes(
             name = request.args.get("name", "").strip()
             if not meeting_id or not name:
                 return {"result": None, "error": "缺少 id 或 name"}, 400
-            course = load_course_invite()
-            rec = course.get_invite(meeting_id, name)
+            rec = load_course_invite().get_invite(meeting_id, name)
             if rec:
                 return {"result": rec}
             return {"result": None}, 404
@@ -188,14 +208,13 @@ def register_api_routes(
             name = data.get("name", "").strip()
             content = data.get("content", "").strip()
             if not meeting_id or not name or not content:
-                return {"result": "⚠️ 缺少必要欄位"}, 400
-            course = load_course_invite()
-            ok = course.update_invite(meeting_id, name, content)
+                return {"result": "缺少必要欄位"}, 400
+            ok = load_course_invite().update_invite(meeting_id, name, content)
             if ok:
-                return {"result": "✅ 邀約文宣已更新"}
-            return {"result": "⚠️ 找不到該筆邀約，請先產生"}, 404
+                return {"result": "已更新邀約文宣"}
+            return {"result": "找不到要更新的邀約文宣"}, 404
         except Exception as e:
-            return {"result": f"⚠️ 更新失敗：{e}"}, 500
+            return {"result": f"更新邀約文宣失敗：{e}"}, 500
 
     @app.route("/api/prospect/update", methods=["POST"])
     def api_prospect_update():
@@ -203,12 +222,11 @@ def register_api_routes(
             data = request.get_json(force=True) or {}
             name = data.pop("name", "").strip()
             if not name:
-                return {"result": "⚠️ 請提供姓名"}, 400
-            market = load_market_dev()
-            result = market.MarketDevAgent().update_prospect_fields(name, data)
+                return {"result": "缺少姓名"}, 400
+            result = load_market_dev().MarketDevAgent().update_prospect_fields(name, data)
             return {"result": result}
         except Exception as e:
-            return {"result": f"⚠️ 更新失敗：{e}"}, 500
+            return {"result": f"更新潛在家人失敗：{e}"}, 500
 
     @app.route("/api/prospect/experience", methods=["POST"])
     def api_prospect_experience():
@@ -217,9 +235,8 @@ def register_api_routes(
             name = data.get("name", "").strip()
             product = data.get("product", "").strip()
             if not name or not product:
-                return {"result": "⚠️ 姓名和產品為必填"}, 400
-            market = load_market_dev()
-            result = market.MarketDevAgent().add_experience(
+                return {"result": "缺少姓名或產品"}, 400
+            result = load_market_dev().MarketDevAgent().add_experience(
                 name,
                 product,
                 note=data.get("note", ""),
@@ -228,30 +245,26 @@ def register_api_routes(
             )
             return {"result": result}
         except Exception as e:
-            return {"result": f"⚠️ 新增失敗：{e}"}, 500
+            return {"result": f"新增體驗失敗：{e}"}, 500
 
     @app.route("/api/send-daily-report", methods=["POST"])
     def api_send_daily_report():
         try:
-            dr = load_daily_report()
-            result = dr.DailyReportAgent().run()
-            return {"result": result}
+            return {"result": load_daily_report().DailyReportAgent().run()}
         except Exception as e:
-            return {"result": f"⚠️ 每日報告失敗：{e}"}, 500
+            return {"result": f"寄送每日報告失敗：{e}"}, 500
 
     @app.route("/api/ai-prompts", methods=["GET"])
     def api_ai_prompts():
         try:
-            pm = load_ai_prompt_manager()
-            return {"result": pm.list_prompt_labels()}
+            return {"result": load_ai_prompt_manager().list_prompt_labels()}
         except Exception as e:
             return {"result": [], "error": str(e)}, 500
 
     @app.route("/api/ai-prompt/<key>", methods=["GET"])
     def api_ai_prompt_detail(key):
         try:
-            pm = load_ai_prompt_manager()
-            item = pm.get_prompt(key)
+            item = load_ai_prompt_manager().get_prompt(key)
             if not item:
                 return {"result": None}, 404
             return {"result": {"key": key, **item}}
@@ -261,16 +274,14 @@ def register_api_routes(
     @app.route("/api/ai-skills", methods=["GET"])
     def api_ai_skills():
         try:
-            sm = load_ai_skill_manager()
-            return {"result": sm.list_skill_labels()}
+            return {"result": load_ai_skill_manager().list_skill_labels()}
         except Exception as e:
             return {"result": [], "error": str(e)}, 500
 
     @app.route("/api/ai-skill/<key>", methods=["GET"])
     def api_ai_skill_detail(key):
         try:
-            sm = load_ai_skill_manager()
-            item = sm.get_skill(key)
+            item = load_ai_skill_manager().get_skill(key)
             if not item:
                 return {"result": None}, 404
             return {"result": {"key": key, **item}}

@@ -340,7 +340,7 @@ const GROUPS=[
   ]},
   {label:"📝 故事分類",items:[
     {label:"👤 人物故事歸檔",tag:"表單",form:{title:"人物故事歸檔",
-      fields:[{id:"n",lbl:"人物名稱",type:"text",req:1,ph:"例：建德"}],
+      fields:[{id:"n",lbl:"人物名稱",type:"text",req:1,ph:"例：建德",pick:"people"}],
       build:function(v){return "潛在家人資料 "+v.n;}}},
     {label:"📖 產品故事歸檔",tag:"執行",cmd:"產品故事歸檔"},
   ]},
@@ -392,11 +392,9 @@ const GROUPS=[
               {id:"c",lbl:"內文",type:"textarea",req:1,ph:"輸入文宣內容"}],
       build:function(v){return "新增課程文宣 "+v.ti+"|"+v.c;}}},
     {label:"優化課程文宣（AI）",tag:"表單",form:{title:"優化課程文宣",
-      fields:[{id:"id",lbl:"文宣 ID（PROMO-XXXX）",type:"text",req:1,ph:"先查詢課程文宣取得 ID"}],
+      fields:[{id:"id",lbl:"文宣 ID（PROMO-XXXX）",type:"text",req:1,ph:"先查詢課程文宣取得 ID",pick:"promo"}],
       build:function(v){return "優化課程文宣 "+v.id;}}},
-    {label:"邀約文宣－潛在家人（AI）",tag:"表單",form:{title:"潛在家人邀約文宣",
-      fields:[{id:"n",lbl:"姓名（選填，空白＝通用）",type:"text",ph:"例：Amy"}],
-      build:function(v){return "邀約文宣 潛在家人"+(v.n?" "+v.n:"");}}},
+    {label:"邀約文宣－潛在家人（AI）",tag:"執行",cmd:"邀約文宣 潛在家人"},
     {label:"邀約文宣－跟進夥伴（AI）",tag:"表單",form:{title:"跟進夥伴邀約文宣",
       fields:[{id:"n",lbl:"姓名（選填，空白＝通用）",type:"text",ph:"例：建德"}],
       build:function(v){return "邀約文宣 跟進夥伴"+(v.n?" "+v.n:"");}}},
@@ -485,6 +483,8 @@ function closeMob(){document.getElementById("mobmenu").classList.remove("on");}
 // Modal
 var _build=null;
 var _partnerCache=null;
+var _prospectCache=null;
+var _promoCache=null;
 function _fieldIds(f){return (f.fields||[]).map(function(x){return x.id;});}
 function _isUpdatePartnerForm(f){
   var ids=_fieldIds(f);
@@ -502,6 +502,21 @@ function _isMotivateForm(f){
   var ids=_fieldIds(f);
   return ids.length===2&&ids.includes("n")&&ids.includes("s");
 }
+function _isTrainingProgressForm(f){
+  return !!f && (f.title||"")==="查詢培訓進度";
+}
+function _isMilestoneForm(f){
+  return !!f && (f.title||"")==="里程碑記錄";
+}
+function _isPartnerLookupForm(f){
+  return !!f && (f.title||"")==="查詢指定夥伴";
+}
+function _isStoryPersonForm(f){
+  return !!f && (f.title||"")==="人物故事歸檔";
+}
+function _isPromoSelectForm(f){
+  return !!f && (f.title||"")==="優化課程文宣";
+}
 async function _getPartners(){
   if(_partnerCache)return _partnerCache;
   var r=await fetch("/api/partners");
@@ -509,8 +524,41 @@ async function _getPartners(){
   _partnerCache=(d&&d.result)||[];
   return _partnerCache;
 }
+async function _getProspects(){
+  if(_prospectCache)return _prospectCache;
+  var r=await fetch("/api/prospects");
+  var d=await r.json();
+  _prospectCache=(d&&d.result)||[];
+  return _prospectCache;
+}
+async function _getCoursePromos(){
+  if(_promoCache)return _promoCache;
+  var r=await fetch("/api/course-promos");
+  var d=await r.json();
+  _promoCache=(d&&d.result)||[];
+  return _promoCache;
+}
+async function _getStoryPeople(){
+  const [partners, prospects] = await Promise.all([_getPartners(), _getProspects()]);
+  var seen={};
+  var people=[];
+  partners.forEach(function(p){
+    var name=(p.name||"").trim();
+    if(!name||seen[name])return;
+    seen[name]=1;
+    people.push({name:name, source:"夥伴", category:p.category||"", stage:p.stage||""});
+  });
+  prospects.forEach(function(p){
+    var name=(p.name||"").trim();
+    if(!name||seen[name])return;
+    seen[name]=1;
+    people.push({name:name, source:"潛在家人", category:p.category||"", stage:p.status||""});
+  });
+  people.sort(function(a,b){return a.name.localeCompare(b.name,"zh-Hant");});
+  return people;
+}
 async function _hydratePartnerSelect(formDef){
-  if(!_isUpdatePartnerForm(formDef)&&!_isFollowupAddForm(formDef)&&!_isFollowupForm(formDef)&&!_isMotivateForm(formDef))return;
+  if(!_isUpdatePartnerForm(formDef)&&!_isFollowupAddForm(formDef)&&!_isFollowupForm(formDef)&&!_isMotivateForm(formDef)&&!_isTrainingProgressForm(formDef)&&!_isMilestoneForm(formDef)&&!_isPartnerLookupForm(formDef))return;
   var el=document.getElementById("mf_n");
   if(!el)return;
   var partners=await _getPartners();
@@ -543,6 +591,54 @@ async function _hydratePartnerSelect(formDef){
     sel.addEventListener("change", function(){ _prefillPartnerForm(sel.value); });
     if(sel.value)_prefillPartnerForm(sel.value);
   }
+}
+async function _hydrateStoryPeopleSelect(formDef){
+  if(!_isStoryPersonForm(formDef))return;
+  var el=document.getElementById("mf_n");
+  if(!el)return;
+  var people=await _getStoryPeople();
+  var cur=el.value||"";
+  var sel=document.createElement("select");
+  sel.id=el.id;
+  sel.required=true;
+  var first=document.createElement("option");
+  first.value="";
+  first.textContent="請選擇人物";
+  sel.appendChild(first);
+  people.forEach(function(p){
+    var o=document.createElement("option");
+    o.value=p.name;
+    var extra=[];
+    if(p.source)extra.push(p.source);
+    if(p.category)extra.push("分類"+p.category);
+    if(p.stage)extra.push(p.stage);
+    o.textContent=extra.length?(p.name+"｜"+extra.join("｜")):p.name;
+    if(cur&&cur===p.name)o.selected=true;
+    sel.appendChild(o);
+  });
+  el.replaceWith(sel);
+}
+async function _hydratePromoSelect(formDef){
+  if(!_isPromoSelectForm(formDef))return;
+  var el=document.getElementById("mf_id");
+  if(!el)return;
+  var promos=await _getCoursePromos();
+  var cur=el.value||"";
+  var sel=document.createElement("select");
+  sel.id=el.id;
+  sel.required=true;
+  var first=document.createElement("option");
+  first.value="";
+  first.textContent="請選擇文宣";
+  sel.appendChild(first);
+  promos.forEach(function(p){
+    var o=document.createElement("option");
+    o.value=p.id;
+    o.textContent=(p.title||"").trim() ? (p.id+"｜"+p.title) : p.id;
+    if(cur&&cur===p.id)o.selected=true;
+    sel.appendChild(o);
+  });
+  el.replaceWith(sel);
 }
 async function _prefillPartnerForm(name){
   if(!name)return;
@@ -612,6 +708,8 @@ function openModal(f){
   });
   document.getElementById("overlay").classList.add("on");
   _hydratePartnerSelect(f);
+  _hydrateStoryPeopleSelect(f);
+  _hydratePromoSelect(f);
   var first=mf.querySelector("input,select,textarea");
   if(first)setTimeout(function(){first.focus();},120);
 }

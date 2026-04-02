@@ -74,8 +74,40 @@ def handle_line_command(
             reply_message(reply_token, f"✗ 每日報告失敗：{exc}")
         return True
 
+    if msg in ("\u67e5\u8a62\u4eca\u65e5\u884c\u4e8b\u66c6", "\u67e5\u8a62\u904e\u5f80\u884c\u4e8b\u66c6", "\u67e5\u8a62\u5168\u90e8\u884c\u4e8b\u66c6"):
+        try:
+            cal = load_calendar()
+            if msg == "\u67e5\u8a62\u4eca\u65e5\u884c\u4e8b\u66c6":
+                reply_message(reply_token, cal.format_events(cal.upcoming_events(), title="今天之後的行事曆："))
+            elif msg == "\u67e5\u8a62\u904e\u5f80\u884c\u4e8b\u66c6":
+                reply_message(reply_token, cal.format_events(cal.past_events(), title="過往的行事曆："))
+            else:
+                reply_message(reply_token, cal.format_events(cal.events_between(), title="全部行事曆："))
+            return True
+        except Exception as exc:
+            reply_message(reply_token, f"??銵???隞文仃??{exc}")
+            return True
+
     try:
         cal = load_calendar()
+        if msg == "查詢今日行事曆":
+            reply_message(reply_token, cal.format_events(cal.upcoming_events(), title="今天之後的行事曆："))
+            return True
+        if msg == "查詢過往行事曆":
+            reply_message(reply_token, cal.format_events(cal.past_events(), title="過往的行事曆："))
+            return True
+        if msg == "查詢全部行事曆":
+            reply_message(reply_token, cal.format_events(cal.events_between(), title="全部行事曆："))
+            return True
+        if msg == "\u67e5\u8a62\u4eca\u65e5\u884c\u4e8b\u66c6":
+            reply_message(reply_token, cal.format_events(cal.upcoming_events(), title="今天之後的行事曆："))
+            return True
+        if msg == "\u67e5\u8a62\u904e\u5f80\u884c\u4e8b\u66c6":
+            reply_message(reply_token, cal.format_events(cal.past_events(), title="過往的行事曆："))
+            return True
+        if msg == "\u67e5\u8a62\u5168\u90e8\u884c\u4e8b\u66c6":
+            reply_message(reply_token, cal.format_events(cal.events_between(), title="全部行事曆："))
+            return True
         result = cal.handle_calendar_command(msg)
         if result:
             reply_message(reply_token, result)
@@ -275,6 +307,18 @@ def handle_web_command(
         return dr.DailyReportAgent().run()
 
     cal = load_calendar()
+    if cmd == "查詢今日行事曆":
+        return cal.format_events(cal.upcoming_events(), title="今天之後的行事曆：")
+    if cmd == "查詢過往行事曆":
+        return cal.format_events(cal.past_events(), title="過往的行事曆：")
+    if cmd == "查詢全部行事曆":
+        return cal.format_events(cal.events_between(), title="全部行事曆：")
+    if cmd == "\u67e5\u8a62\u4eca\u65e5\u884c\u4e8b\u66c6":
+        return cal.format_events(cal.upcoming_events(), title="今天之後的行事曆：")
+    if cmd == "\u67e5\u8a62\u904e\u5f80\u884c\u4e8b\u66c6":
+        return cal.format_events(cal.past_events(), title="過往的行事曆：")
+    if cmd == "\u67e5\u8a62\u5168\u90e8\u884c\u4e8b\u66c6":
+        return cal.format_events(cal.events_between(), title="全部行事曆：")
     result = cal.handle_calendar_command(cmd)
     if result:
         return result

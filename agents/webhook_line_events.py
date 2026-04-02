@@ -22,6 +22,9 @@ def process_line_events(
     awaiting_partner_invite_category,
     awaiting_partner_invite_person,
     awaiting_partner_invite_meeting,
+    awaiting_prospect_invite_category,
+    awaiting_prospect_invite_person,
+    awaiting_prospect_invite_meeting,
     awaiting_invite_manage_select,
     awaiting_invite_manage_action,
     awaiting_invite_manage_edit,
@@ -30,7 +33,10 @@ def process_line_events(
     looks_like_explicit_command,
     normalize_partner_category_choice,
     partners_by_category,
+    prospect_category_menu,
+    prospects_by_category,
     format_partner_choice_menu,
+    format_prospect_choice_menu,
     format_meeting_choice_menu,
     format_invite_manage_list,
     format_invite_manage_actions,
@@ -147,6 +153,9 @@ def process_line_events(
             awaiting_partner_invite_category.pop(scope, None)
             awaiting_partner_invite_person.pop(scope, None)
             awaiting_partner_invite_meeting.pop(scope, None)
+            awaiting_prospect_invite_category.pop(scope, None)
+            awaiting_prospect_invite_person.pop(scope, None)
+            awaiting_prospect_invite_meeting.pop(scope, None)
             awaiting_invite_manage_select.pop(scope, None)
             awaiting_invite_manage_action.pop(scope, None)
             awaiting_invite_manage_edit.pop(scope, None)
@@ -175,6 +184,18 @@ def process_line_events(
                         "請直接上傳語音。\n\n建議說法：\n姓名王小美，目標月入三萬，下次跟進2026年4月5日，備註持續跟進，分類A\n\n輸入 NA 可取消。",
                     )
                     continue
+                if cmd == "邀約文宣 跟進夥伴":
+                    awaiting_partner_invite_category[scope] = True
+                    awaiting_partner_invite_person.pop(scope, None)
+                    awaiting_partner_invite_meeting.pop(scope, None)
+                    reply_message(reply_token, "📋 請先選擇夥伴分類屬性\n1. A 類：持續有使用產品、有積分額、且有聽過鐘老師演講\n2. B 類：偶爾使用產品，或有聽過鐘老師演講\n3. C 類：即將開始了解，或即將聽鐘老師演講\n\n請輸入 1、2、3 或 A、B、C，NA 取消")
+                    continue
+                if cmd == "邀約文宣 潛在家人":
+                    awaiting_prospect_invite_category[scope] = True
+                    awaiting_prospect_invite_person.pop(scope, None)
+                    awaiting_prospect_invite_meeting.pop(scope, None)
+                    reply_message(reply_token, prospect_category_menu())
+                    continue
                 handled = handle_training_command(cmd, reply_token, user_id, group_id)
                 if not handled:
                     reply_message(reply_token, "⚠️ 無法辨識指令，請輸入「說明」查看可用功能。")
@@ -187,6 +208,8 @@ def process_line_events(
             or awaiting_prospect_selection.get(scope) or awaiting_prospect_file.get(scope)
             or awaiting_invite_selection.get(scope) or awaiting_partner_invite_category.get(scope)
             or awaiting_partner_invite_person.get(scope) or awaiting_partner_invite_meeting.get(scope)
+            or awaiting_prospect_invite_category.get(scope) or awaiting_prospect_invite_person.get(scope)
+            or awaiting_prospect_invite_meeting.get(scope)
             or awaiting_invite_manage_select.get(scope) or awaiting_invite_manage_action.get(scope)
             or awaiting_invite_manage_edit.get(scope) or awaiting_promo_optimize_apply.get(scope)
             or awaiting_partner_voice_add.get(scope)
@@ -199,6 +222,9 @@ def process_line_events(
             awaiting_partner_invite_category.pop(scope, None)
             awaiting_partner_invite_person.pop(scope, None)
             awaiting_partner_invite_meeting.pop(scope, None)
+            awaiting_prospect_invite_category.pop(scope, None)
+            awaiting_prospect_invite_person.pop(scope, None)
+            awaiting_prospect_invite_meeting.pop(scope, None)
             awaiting_invite_manage_select.pop(scope, None)
             awaiting_invite_manage_action.pop(scope, None)
             awaiting_invite_manage_edit.pop(scope, None)
@@ -211,10 +237,16 @@ def process_line_events(
             awaiting_partner_invite_category.get(scope)
             or awaiting_partner_invite_person.get(scope)
             or awaiting_partner_invite_meeting.get(scope)
+            or awaiting_prospect_invite_category.get(scope)
+            or awaiting_prospect_invite_person.get(scope)
+            or awaiting_prospect_invite_meeting.get(scope)
         ):
             awaiting_partner_invite_category.pop(scope, None)
             awaiting_partner_invite_person.pop(scope, None)
             awaiting_partner_invite_meeting.pop(scope, None)
+            awaiting_prospect_invite_category.pop(scope, None)
+            awaiting_prospect_invite_person.pop(scope, None)
+            awaiting_prospect_invite_meeting.pop(scope, None)
             awaiting_invite_manage_select.pop(scope, None)
             awaiting_invite_manage_action.pop(scope, None)
             awaiting_invite_manage_edit.pop(scope, None)
@@ -237,6 +269,13 @@ def process_line_events(
             awaiting_partner_invite_person.pop(scope, None)
             awaiting_partner_invite_meeting.pop(scope, None)
             reply_message(reply_token, "📋 請先選擇夥伴分類屬性\n1. A 類：持續有使用產品、有積分額、且有聽過鐘老師演講\n2. B 類：偶爾使用產品，或有聽過鐘老師演講\n3. C 類：即將開始了解，或即將聽鐘老師演講\n\n請輸入 1、2、3 或 A、B、C，NA 取消")
+            continue
+
+        if user_msg.strip() == "邀約文宣 潛在家人":
+            awaiting_prospect_invite_category[scope] = True
+            awaiting_prospect_invite_person.pop(scope, None)
+            awaiting_prospect_invite_meeting.pop(scope, None)
+            reply_message(reply_token, prospect_category_menu())
             continue
 
         if awaiting_promo_optimize_apply.get(scope) and user_msg.strip().isdigit():
@@ -374,6 +413,58 @@ def process_line_events(
             try:
                 course = load_course_invite()
                 result = course.generate_partner_invite_for_meeting(person_name, meeting)
+                reply_message(reply_token, result if result else "⚠️ AI 無回應，請稍後再試")
+            except Exception as e:
+                reply_message(reply_token, f"✗ 邀約文宣產生失敗：{e}")
+            continue
+
+        if awaiting_prospect_invite_category.get(scope):
+            if looks_like_explicit_command(user_msg):
+                awaiting_prospect_invite_category.pop(scope, None)
+            else:
+                category = normalize_partner_category_choice(user_msg)
+                if not category:
+                    reply_message(reply_token, "⚠️ 請輸入 1、2、3 或 A、B、C，NA 取消")
+                    continue
+                people = prospects_by_category(category)
+                awaiting_prospect_invite_category.pop(scope, None)
+                if not people:
+                    reply_message(reply_token, f"⚠️ 目前沒有分類 {category} 的潛在家人。")
+                    continue
+                awaiting_prospect_invite_person[scope] = {"category": category, "people": people}
+                reply_message(reply_token, format_prospect_choice_menu(category, people))
+                continue
+
+        if awaiting_prospect_invite_person.get(scope) and user_msg.strip().isdigit():
+            state = awaiting_prospect_invite_person[scope]
+            people = state["people"]
+            idx = int(user_msg.strip())
+            if not (1 <= idx <= len(people)):
+                reply_message(reply_token, f"⚠️ 請輸入 1～{len(people)} 的編號，NA 取消")
+                continue
+            person = people[idx - 1]
+            course = load_course_invite()
+            meetings = course.list_meetings()
+            awaiting_prospect_invite_person.pop(scope, None)
+            if not meetings:
+                reply_message(reply_token, "⚠️ 目前沒有排定的課程會議，請先新增課程會議。")
+                continue
+            awaiting_prospect_invite_meeting[scope] = {"name": person.get("name", ""), "meetings": meetings}
+            reply_message(reply_token, format_meeting_choice_menu(person.get("name", ""), meetings))
+            continue
+
+        if awaiting_prospect_invite_meeting.get(scope) and user_msg.strip().isdigit():
+            state = awaiting_prospect_invite_meeting.pop(scope)
+            meetings = state["meetings"]
+            idx = int(user_msg.strip())
+            if not (1 <= idx <= len(meetings)):
+                reply_message(reply_token, f"⚠️ 請輸入 1～{len(meetings)} 的編號，NA 取消")
+                continue
+            meeting = meetings[idx - 1]
+            person_name = state["name"]
+            try:
+                course = load_course_invite()
+                result = course.generate_prospect_invite_for_meeting(person_name, meeting)
                 reply_message(reply_token, result if result else "⚠️ AI 無回應，請稍後再試")
             except Exception as e:
                 reply_message(reply_token, f"✗ 邀約文宣產生失敗：{e}")
