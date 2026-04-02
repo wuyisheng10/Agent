@@ -216,11 +216,11 @@ const GROUPS=[
         if(v.r)parts.push("備註:"+v.r);
         return parts.join("|");}}},
   ]},
-  {label:"📚 培訓系統",items:[
+  {label:"🎓 培訓系統",items:[
     {label:"新增培訓模組",tag:"表單",form:{title:"新增培訓模組",
       fields:[{id:"t",lbl:"模組名稱",type:"text",req:1,ph:"例：四個勇於"},
               {id:"c",lbl:"模組類型",type:"select",req:1,opts:["領導人特質","新人守則","帶線系統","市場實戰","畫畫培訓","產品培訓","事業培訓"]},
-              {id:"g",lbl:"學習目標",type:"textarea",ph:"例：建立領導人思維與承擔觀念"},
+              {id:"g",lbl:"學習目標",type:"textarea",ph:"例：建立領導人思維與承擔能力"},
               {id:"s",lbl:"核心摘要",type:"textarea",ph:"例：勇於學習、勇於認錯、勇於改變、勇於承擔"}],
       build:function(v){return "新增培訓模組 "+v.t+" | "+v.c+" | "+v.g+" | "+v.s;}}},
     {label:"查詢培訓模組",tag:"表單",form:{title:"查詢培訓模組",
@@ -233,24 +233,84 @@ const GROUPS=[
               {id:"tm",lbl:"時間",type:"time",req:1},
               {id:"loc",lbl:"地點",type:"text",req:1,ph:"例：台南教室"},
               {id:"sp",lbl:"講師",type:"text",ph:"例：鐘老師"},
-              {id:"aud",lbl:"對象",type:"select",req:1,opts:["潛在家人","夥伴","核心夥伴","領導人"]}],
+              {id:"aud",lbl:"對象",type:"select",req:1,opts:["潛在家人","夥伴","新手夥伴","核心夥伴"]}],
       build:function(v){return "新增培訓課程 "+v.t+" | "+v.m+" | "+v.d+" | "+v.tm+" | "+v.loc+" | "+v.sp+" | "+v.aud;}}},
     {label:"查詢培訓課程",tag:"表單",form:{title:"查詢培訓課程",
       fields:[{id:"d",lbl:"日期（選填）",type:"date"},
               {id:"m",lbl:"模組名稱（選填）",type:"text",ph:"空白則查全部"}],
       build:function(v){var q=v.d||v.m||"";return q?"查詢培訓課程 "+q:"查詢培訓課程";}}},
     {label:"新增培訓反思",tag:"表單",form:{title:"新增培訓反思",
-      fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"請選擇夥伴"},
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
               {id:"st",lbl:"課程名稱",type:"text",req:1,ph:"請選擇課程"},
-              {id:"i",lbl:"悟到",type:"textarea",ph:"今天最大的觀念突破"},
-              {id:"l",lbl:"學到",type:"textarea",ph:"具體學到的方法或系統"},
-              {id:"a",lbl:"做到",type:"textarea",ph:"接下來會採取的行動"},
-              {id:"g",lbl:"目標",type:"textarea",ph:"希望達到的結果與時間"}],
+              {id:"i",lbl:"悟到",type:"textarea",ph:"今天最大的提醒是什麼"},
+              {id:"l",lbl:"學到",type:"textarea",ph:"學到哪個觀念或方法"},
+              {id:"a",lbl:"做到",type:"textarea",ph:"接下來準備採取的行動"},
+              {id:"g",lbl:"目標",type:"textarea",ph:"希望達成的具體目標"}],
       build:function(v){return "新增培訓反思 "+v.n+" | "+v.st+" | "+v.i+" | "+v.l+" | "+v.a+" | "+v.g;}}},
     {label:"查詢培訓進度",tag:"表單",form:{title:"查詢培訓進度",
-      fields:[{id:"n",lbl:"夥伴名稱",type:"text",req:1,ph:"例：建德"}],
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"}],
       build:function(v){return "查詢培訓進度 "+v.n;}}},
     {label:"查詢培訓總表",tag:"執行",cmd:"查詢培訓總表"},
+    {label:"啟動七天法則",tag:"表單",form:{title:"啟動七天法則",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"d",lbl:"開始日期",type:"date",req:1},
+              {id:"note",lbl:"教練備註（選填）",type:"textarea",ph:"例：先陪他完成七天暖身"}],
+      build:function(v){return "啟動七天法則 "+v.n+" | "+v.d+" | "+v.note;}}},
+    {label:"七天法則回報",tag:"表單",form:{title:"七天法則回報",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"day",lbl:"第幾天",type:"select",req:1,opts:["第1天","第2天","第3天","第4天","第5天","第6天","第7天"]},
+              {id:"task",lbl:"任務內容",type:"textarea",req:1,ph:"例：聽 OPP、進教室、回報感想"},
+              {id:"done",lbl:"完成狀態",type:"select",req:1,opts:["已完成","未完成"]},
+              {id:"note",lbl:"備註（選填）",type:"textarea",ph:"例：今天對環境比較有感"}],
+      build:function(v){return "七天法則回報 "+v.n+" | "+v.day+" | "+v.task+" | "+v.done+" | "+v.note;}}},
+    {label:"查詢七天法則",tag:"表單",form:{title:"查詢七天法則",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"}],
+      build:function(v){return "查詢七天法則 "+v.n;}}},
+    {label:"新增課後行動",tag:"表單",form:{title:"新增課後行動",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"st",lbl:"課程名稱",type:"text",req:1,ph:"請選擇課程"},
+              {id:"content",lbl:"行動內容",type:"textarea",req:1,ph:"例：本週邀約 2 位新朋友"},
+              {id:"due",lbl:"截止日期",type:"date",req:1}],
+      build:function(v){return "新增課後行動 "+v.n+" | "+v.st+" | "+v.content+" | "+v.due;}}},
+    {label:"回報課後行動",tag:"表單",form:{title:"回報課後行動",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"aid",lbl:"行動 ID",type:"text",req:1,ph:"先查詢課後行動取得 ID"},
+              {id:"status",lbl:"狀態",type:"select",req:1,opts:["待執行","進行中","已完成","延後","需協助"]},
+              {id:"note",lbl:"備註（選填）",type:"textarea",ph:"例：已完成第一步"}],
+      build:function(v){return "回報課後行動 "+v.n+" | "+v.aid+" | "+v.status+" | "+v.note;}}},
+    {label:"查詢課後行動",tag:"表單",form:{title:"查詢課後行動",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"}],
+      build:function(v){return "查詢課後行動 "+v.n;}}},
+  ]},
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"d",lbl:"開始日期",type:"date",req:1},
+              {id:"note",lbl:"教練備註（選填）",type:"textarea",ph:"例：先陪他完成七天暖身"}],
+      build:function(v){return "啟動七天法則 "+v.n+" | "+v.d+" | "+v.note;}}},
+    {label:"七天法則回報",tag:"表單",form:{title:"七天法則回報",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"day",lbl:"第幾天",type:"select",req:1,opts:["第1天","第2天","第3天","第4天","第5天","第6天","第7天"]},
+              {id:"task",lbl:"任務內容",type:"textarea",req:1,ph:"例：聽 OPP、進教室、回報感想"},
+              {id:"done",lbl:"完成狀態",type:"select",req:1,opts:["已完成","未完成"]},
+              {id:"note",lbl:"備註（選填）",type:"textarea",ph:"例：今天對環境比較有感"}],
+      build:function(v){return "七天法則回報 "+v.n+" | "+v.day+" | "+v.task+" | "+v.done+" | "+v.note;}}},
+    {label:"查詢七天法則",tag:"表單",form:{title:"查詢七天法則",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"}],
+      build:function(v){return "查詢七天法則 "+v.n;}}},
+    {label:"新增課後行動",tag:"表單",form:{title:"新增課後行動",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"st",lbl:"課程名稱",type:"text",req:1,ph:"請選擇課程"},
+              {id:"content",lbl:"行動內容",type:"textarea",req:1,ph:"例：本週邀約 2 位新朋友"},
+              {id:"due",lbl:"截止日期",type:"date",req:1}],
+      build:function(v){return "新增課後行動 "+v.n+" | "+v.st+" | "+v.content+" | "+v.due;}}},
+    {label:"回報課後行動",tag:"表單",form:{title:"回報課後行動",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"aid",lbl:"行動 ID",type:"text",req:1,ph:"先查詢課後行動取得 ID"},
+              {id:"status",lbl:"狀態",type:"select",req:1,opts:["待執行","進行中","已完成","延後","需協助"]},
+              {id:"note",lbl:"備註（選填）",type:"textarea",ph:"例：已完成第一步"}],
+      build:function(v){return "回報課後行動 "+v.n+" | "+v.aid+" | "+v.status+" | "+v.note;}}},
+    {label:"查詢課後行動",tag:"表單",form:{title:"查詢課後行動",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"}],
+      build:function(v){return "查詢課後行動 "+v.n;}}},
   ]},
   {label:"🤝 夥伴陪伴",items:[
     {label:"跟進報告",tag:"執行",cmd:"跟進報告"},
@@ -550,6 +610,12 @@ function _isTrainingSessionLookupForm(f){
 function _isTrainingModuleLookupForm(f){
   return !!f && (f.title||"")==="查詢培訓模組";
 }
+function _isSevenDayForm(f){
+  return !!f && ((f.title||"")==="啟動七天法則"||(f.title||"")==="七天法則回報"||(f.title||"")==="查詢七天法則");
+}
+function _isTrainingActionForm(f){
+  return !!f && ((f.title||"")==="新增課後行動"||(f.title||"")==="回報課後行動"||(f.title||"")==="查詢課後行動");
+}
 function _isMilestoneForm(f){
   return !!f && (f.title||"")==="里程碑記錄";
 }
@@ -617,7 +683,7 @@ async function _getStoryPeople(){
   return people;
 }
 async function _hydratePartnerSelect(formDef){
-  if(!_isUpdatePartnerForm(formDef)&&!_isFollowupAddForm(formDef)&&!_isFollowupForm(formDef)&&!_isMotivateForm(formDef)&&!_isTrainingProgressForm(formDef)&&!_isTrainingReflectionForm(formDef)&&!_isMilestoneForm(formDef)&&!_isPartnerLookupForm(formDef))return;
+  if(!_isUpdatePartnerForm(formDef)&&!_isFollowupAddForm(formDef)&&!_isFollowupForm(formDef)&&!_isMotivateForm(formDef)&&!_isTrainingProgressForm(formDef)&&!_isTrainingReflectionForm(formDef)&&!_isSevenDayForm(formDef)&&!_isTrainingActionForm(formDef)&&!_isMilestoneForm(formDef)&&!_isPartnerLookupForm(formDef))return;
   var el=document.getElementById("mf_n");
   if(!el)return;
   var partners=await _getPartners();
@@ -1320,6 +1386,188 @@ def render_dashboard_html_v2() -> str:
 }})();
 </script>
 """
+
+    inject += """
+<script>
+(function(){
+  async function fetchJson(url){
+    try {
+      const r = await fetch(url);
+      return await r.json();
+    } catch (e) {
+      return {};
+    }
+  }
+
+  async function loadTrainingData(){
+    const [mods, sessions, partners] = await Promise.all([
+      fetchJson('/api/training-modules'),
+      fetchJson('/api/training-sessions'),
+      fetchJson('/api/partners')
+    ]);
+    return {
+      modules: (mods.result || []).map(x => ({ value: x.title, label: x.title })),
+      sessions: (sessions.result || []).map(x => ({ value: x.title, label: x.title })),
+      partners: (partners.result || []).map(x => ({ value: x.name, label: x.name }))
+    };
+  }
+
+  function makeSidebarItem(label, direct, onclick){
+    const btn = document.createElement('button');
+    btn.className = 'sbtn' + (direct ? ' direct' : ' form-btn');
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="tag">' + (direct ? '????' : '??') + '</span>';
+    btn.onclick = onclick;
+    return btn;
+  }
+
+  function makeMobileItem(label, direct, onclick){
+    const btn = document.createElement('button');
+    btn.className = 'mgbtn' + (direct ? ' direct' : ' form-btn');
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="mtag">' + (direct ? '????' : '??') + '</span>';
+    btn.onclick = onclick;
+    return btn;
+  }
+
+  async function openTrainingForm(kind){
+    const data = await loadTrainingData();
+    const defs = {
+      module_add: {
+        title: '??????',
+        fields: [
+          {id:'title', lbl:'????', type:'text', req:1},
+          {id:'kind', lbl:'????', type:'text', req:1},
+          {id:'goal', lbl:'????', type:'text', req:1},
+          {id:'summary', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.title} | ${v.kind} | ${v.goal} | ${v.summary || ''}`
+      },
+      session_add: {
+        title: '??????',
+        fields: [
+          {id:'title', lbl:'????', type:'text', req:1},
+          {id:'module', lbl:'????', type:'select', req:1, options:data.modules},
+          {id:'date', lbl:'??', type:'text', req:1, ph:'2026-04-10'},
+          {id:'time', lbl:'??', type:'text', req:1, ph:'19:30'},
+          {id:'location', lbl:'??', type:'text'},
+          {id:'teacher', lbl:'??', type:'text'},
+          {id:'audience', lbl:'??', type:'text'}
+        ],
+        build: v => `?????? ${v.title} | ${v.module} | ${v.date} | ${v.time} | ${v.location || ''} | ${v.teacher || ''} | ${v.audience || ''}`
+      },
+      reflection_add: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
+          {id:'realize', lbl:'??', type:'textarea', req:1},
+          {id:'learn', lbl:'??', type:'textarea', req:1},
+          {id:'doit', lbl:'??', type:'textarea', req:1},
+          {id:'goal', lbl:'??', type:'textarea', req:1}
+        ],
+        build: v => `?????? ${v.name} | ${v.session} | ${v.realize} | ${v.learn} | ${v.doit} | ${v.goal}`
+      },
+      progress_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      },
+      seven_start: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'date', lbl:'????', type:'text', req:1, ph:'2026-04-10'},
+          {id:'note', lbl:'????', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.date} | ${v.note || ''}`
+      },
+      seven_report: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'day', lbl:'???', type:'text', req:1, ph:'?1?'},
+          {id:'task', lbl:'????', type:'text', req:1},
+          {id:'status', lbl:'??', type:'select', req:1, options:[{value:'???',label:'???'},{value:'???',label:'???'}]},
+          {id:'note', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.day} | ${v.task} | ${v.status} | ${v.note || ''}`
+      },
+      seven_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      },
+      action_add: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
+          {id:'action', lbl:'????', type:'textarea', req:1},
+          {id:'deadline', lbl:'????', type:'text', req:1, ph:'2026-04-18'}
+        ],
+        build: v => `?????? ${v.name} | ${v.session} | ${v.action} | ${v.deadline}`
+      },
+      action_update: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'action_id', lbl:'ACTION-ID', type:'text', req:1},
+          {id:'status', lbl:'??', type:'text', req:1},
+          {id:'note', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.action_id} | ${v.status} | ${v.note || ''}`
+      },
+      action_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      }
+    };
+    openModal(defs[kind]);
+  }
+
+  function addTrainingButtons(){
+    const sidebar = document.getElementById('sidebar');
+    const mobcont = document.getElementById('mobcont');
+    if (!sidebar || !mobcont || document.getElementById('training-system-clean-group')) return;
+
+    const group = document.createElement('div');
+    group.className = 'sg';
+    group.id = 'training-system-clean-group';
+    group.innerHTML = '<div class="sghdr open"><span>?? ???? 2.0</span><span class="arr">?</span></div><div class="sgitems open"></div>';
+    const items = group.querySelector('.sgitems');
+    const defs = [
+      ['??????', false, () => openTrainingForm('module_add')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('session_add')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('reflection_add')],
+      ['??????', false, () => openTrainingForm('progress_query')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('seven_start')],
+      ['??????', false, () => openTrainingForm('seven_report')],
+      ['??????', false, () => openTrainingForm('seven_query')],
+      ['??????', false, () => openTrainingForm('action_add')],
+      ['??????', false, () => openTrainingForm('action_update')],
+      ['??????', false, () => openTrainingForm('action_query')]
+    ];
+    defs.forEach(([label, direct, onclick]) => items.appendChild(makeSidebarItem(label, direct, onclick)));
+    sidebar.appendChild(group);
+
+    const mg = document.createElement('div');
+    mg.className = 'mgg';
+    mg.innerHTML = '<div class="mgghdr">?? ???? 2.0</div>';
+    defs.forEach(([label, direct, onclick]) => mg.appendChild(makeMobileItem(label, direct, () => { closeMob(); onclick(); })));
+    mobcont.appendChild(mg);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', addTrainingButtons);
+  } else {
+    addTrainingButtons();
+  }
+})();
+</script>
+"""
     return html.replace("</body>", inject + "\n</body>")
 
 
@@ -1404,6 +1652,188 @@ def render_dashboard_html_v2() -> str:
     document.addEventListener("DOMContentLoaded", addFollowupSuggestionButtons);
   } else {
     addFollowupSuggestionButtons();
+  }
+})();
+</script>
+"""
+
+    inject += """
+<script>
+(function(){
+  async function fetchJson(url){
+    try {
+      const r = await fetch(url);
+      return await r.json();
+    } catch (e) {
+      return {};
+    }
+  }
+
+  async function loadTrainingData(){
+    const [mods, sessions, partners] = await Promise.all([
+      fetchJson('/api/training-modules'),
+      fetchJson('/api/training-sessions'),
+      fetchJson('/api/partners')
+    ]);
+    return {
+      modules: (mods.result || []).map(x => ({ value: x.title, label: x.title })),
+      sessions: (sessions.result || []).map(x => ({ value: x.title, label: x.title })),
+      partners: (partners.result || []).map(x => ({ value: x.name, label: x.name }))
+    };
+  }
+
+  function makeSidebarItem(label, direct, onclick){
+    const btn = document.createElement('button');
+    btn.className = 'sbtn' + (direct ? ' direct' : ' form-btn');
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="tag">' + (direct ? '????' : '??') + '</span>';
+    btn.onclick = onclick;
+    return btn;
+  }
+
+  function makeMobileItem(label, direct, onclick){
+    const btn = document.createElement('button');
+    btn.className = 'mgbtn' + (direct ? ' direct' : ' form-btn');
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="mtag">' + (direct ? '????' : '??') + '</span>';
+    btn.onclick = onclick;
+    return btn;
+  }
+
+  async function openTrainingForm(kind){
+    const data = await loadTrainingData();
+    const defs = {
+      module_add: {
+        title: '??????',
+        fields: [
+          {id:'title', lbl:'????', type:'text', req:1},
+          {id:'kind', lbl:'????', type:'text', req:1},
+          {id:'goal', lbl:'????', type:'text', req:1},
+          {id:'summary', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.title} | ${v.kind} | ${v.goal} | ${v.summary || ''}`
+      },
+      session_add: {
+        title: '??????',
+        fields: [
+          {id:'title', lbl:'????', type:'text', req:1},
+          {id:'module', lbl:'????', type:'select', req:1, options:data.modules},
+          {id:'date', lbl:'??', type:'text', req:1, ph:'2026-04-10'},
+          {id:'time', lbl:'??', type:'text', req:1, ph:'19:30'},
+          {id:'location', lbl:'??', type:'text'},
+          {id:'teacher', lbl:'??', type:'text'},
+          {id:'audience', lbl:'??', type:'text'}
+        ],
+        build: v => `?????? ${v.title} | ${v.module} | ${v.date} | ${v.time} | ${v.location || ''} | ${v.teacher || ''} | ${v.audience || ''}`
+      },
+      reflection_add: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
+          {id:'realize', lbl:'??', type:'textarea', req:1},
+          {id:'learn', lbl:'??', type:'textarea', req:1},
+          {id:'doit', lbl:'??', type:'textarea', req:1},
+          {id:'goal', lbl:'??', type:'textarea', req:1}
+        ],
+        build: v => `?????? ${v.name} | ${v.session} | ${v.realize} | ${v.learn} | ${v.doit} | ${v.goal}`
+      },
+      progress_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      },
+      seven_start: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'date', lbl:'????', type:'text', req:1, ph:'2026-04-10'},
+          {id:'note', lbl:'????', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.date} | ${v.note || ''}`
+      },
+      seven_report: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'day', lbl:'???', type:'text', req:1, ph:'?1?'},
+          {id:'task', lbl:'????', type:'text', req:1},
+          {id:'status', lbl:'??', type:'select', req:1, options:[{value:'???',label:'???'},{value:'???',label:'???'}]},
+          {id:'note', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.day} | ${v.task} | ${v.status} | ${v.note || ''}`
+      },
+      seven_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      },
+      action_add: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
+          {id:'action', lbl:'????', type:'textarea', req:1},
+          {id:'deadline', lbl:'????', type:'text', req:1, ph:'2026-04-18'}
+        ],
+        build: v => `?????? ${v.name} | ${v.session} | ${v.action} | ${v.deadline}`
+      },
+      action_update: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'action_id', lbl:'ACTION-ID', type:'text', req:1},
+          {id:'status', lbl:'??', type:'text', req:1},
+          {id:'note', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.action_id} | ${v.status} | ${v.note || ''}`
+      },
+      action_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      }
+    };
+    openModal(defs[kind]);
+  }
+
+  function addTrainingButtons(){
+    const sidebar = document.getElementById('sidebar');
+    const mobcont = document.getElementById('mobcont');
+    if (!sidebar || !mobcont || document.getElementById('training-system-clean-group')) return;
+
+    const group = document.createElement('div');
+    group.className = 'sg';
+    group.id = 'training-system-clean-group';
+    group.innerHTML = '<div class="sghdr open"><span>?? ???? 2.0</span><span class="arr">?</span></div><div class="sgitems open"></div>';
+    const items = group.querySelector('.sgitems');
+    const defs = [
+      ['??????', false, () => openTrainingForm('module_add')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('session_add')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('reflection_add')],
+      ['??????', false, () => openTrainingForm('progress_query')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('seven_start')],
+      ['??????', false, () => openTrainingForm('seven_report')],
+      ['??????', false, () => openTrainingForm('seven_query')],
+      ['??????', false, () => openTrainingForm('action_add')],
+      ['??????', false, () => openTrainingForm('action_update')],
+      ['??????', false, () => openTrainingForm('action_query')]
+    ];
+    defs.forEach(([label, direct, onclick]) => items.appendChild(makeSidebarItem(label, direct, onclick)));
+    sidebar.appendChild(group);
+
+    const mg = document.createElement('div');
+    mg.className = 'mgg';
+    mg.innerHTML = '<div class="mgghdr">?? ???? 2.0</div>';
+    defs.forEach(([label, direct, onclick]) => mg.appendChild(makeMobileItem(label, direct, () => { closeMob(); onclick(); })));
+    mobcont.appendChild(mg);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', addTrainingButtons);
+  } else {
+    addTrainingButtons();
   }
 })();
 </script>
@@ -1502,6 +1932,188 @@ def render_dashboard_html_v2() -> str:
     document.addEventListener("DOMContentLoaded", injectPartnerStatusButton);
   }else{
     injectPartnerStatusButton();
+  }
+})();
+</script>
+"""
+
+    inject += """
+<script>
+(function(){
+  async function fetchJson(url){
+    try {
+      const r = await fetch(url);
+      return await r.json();
+    } catch (e) {
+      return {};
+    }
+  }
+
+  async function loadTrainingData(){
+    const [mods, sessions, partners] = await Promise.all([
+      fetchJson('/api/training-modules'),
+      fetchJson('/api/training-sessions'),
+      fetchJson('/api/partners')
+    ]);
+    return {
+      modules: (mods.result || []).map(x => ({ value: x.title, label: x.title })),
+      sessions: (sessions.result || []).map(x => ({ value: x.title, label: x.title })),
+      partners: (partners.result || []).map(x => ({ value: x.name, label: x.name }))
+    };
+  }
+
+  function makeSidebarItem(label, direct, onclick){
+    const btn = document.createElement('button');
+    btn.className = 'sbtn' + (direct ? ' direct' : ' form-btn');
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="tag">' + (direct ? '????' : '??') + '</span>';
+    btn.onclick = onclick;
+    return btn;
+  }
+
+  function makeMobileItem(label, direct, onclick){
+    const btn = document.createElement('button');
+    btn.className = 'mgbtn' + (direct ? ' direct' : ' form-btn');
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="mtag">' + (direct ? '????' : '??') + '</span>';
+    btn.onclick = onclick;
+    return btn;
+  }
+
+  async function openTrainingForm(kind){
+    const data = await loadTrainingData();
+    const defs = {
+      module_add: {
+        title: '??????',
+        fields: [
+          {id:'title', lbl:'????', type:'text', req:1},
+          {id:'kind', lbl:'????', type:'text', req:1},
+          {id:'goal', lbl:'????', type:'text', req:1},
+          {id:'summary', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.title} | ${v.kind} | ${v.goal} | ${v.summary || ''}`
+      },
+      session_add: {
+        title: '??????',
+        fields: [
+          {id:'title', lbl:'????', type:'text', req:1},
+          {id:'module', lbl:'????', type:'select', req:1, options:data.modules},
+          {id:'date', lbl:'??', type:'text', req:1, ph:'2026-04-10'},
+          {id:'time', lbl:'??', type:'text', req:1, ph:'19:30'},
+          {id:'location', lbl:'??', type:'text'},
+          {id:'teacher', lbl:'??', type:'text'},
+          {id:'audience', lbl:'??', type:'text'}
+        ],
+        build: v => `?????? ${v.title} | ${v.module} | ${v.date} | ${v.time} | ${v.location || ''} | ${v.teacher || ''} | ${v.audience || ''}`
+      },
+      reflection_add: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
+          {id:'realize', lbl:'??', type:'textarea', req:1},
+          {id:'learn', lbl:'??', type:'textarea', req:1},
+          {id:'doit', lbl:'??', type:'textarea', req:1},
+          {id:'goal', lbl:'??', type:'textarea', req:1}
+        ],
+        build: v => `?????? ${v.name} | ${v.session} | ${v.realize} | ${v.learn} | ${v.doit} | ${v.goal}`
+      },
+      progress_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      },
+      seven_start: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'date', lbl:'????', type:'text', req:1, ph:'2026-04-10'},
+          {id:'note', lbl:'????', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.date} | ${v.note || ''}`
+      },
+      seven_report: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'day', lbl:'???', type:'text', req:1, ph:'?1?'},
+          {id:'task', lbl:'????', type:'text', req:1},
+          {id:'status', lbl:'??', type:'select', req:1, options:[{value:'???',label:'???'},{value:'???',label:'???'}]},
+          {id:'note', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.day} | ${v.task} | ${v.status} | ${v.note || ''}`
+      },
+      seven_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      },
+      action_add: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
+          {id:'action', lbl:'????', type:'textarea', req:1},
+          {id:'deadline', lbl:'????', type:'text', req:1, ph:'2026-04-18'}
+        ],
+        build: v => `?????? ${v.name} | ${v.session} | ${v.action} | ${v.deadline}`
+      },
+      action_update: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'action_id', lbl:'ACTION-ID', type:'text', req:1},
+          {id:'status', lbl:'??', type:'text', req:1},
+          {id:'note', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.action_id} | ${v.status} | ${v.note || ''}`
+      },
+      action_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      }
+    };
+    openModal(defs[kind]);
+  }
+
+  function addTrainingButtons(){
+    const sidebar = document.getElementById('sidebar');
+    const mobcont = document.getElementById('mobcont');
+    if (!sidebar || !mobcont || document.getElementById('training-system-clean-group')) return;
+
+    const group = document.createElement('div');
+    group.className = 'sg';
+    group.id = 'training-system-clean-group';
+    group.innerHTML = '<div class="sghdr open"><span>?? ???? 2.0</span><span class="arr">?</span></div><div class="sgitems open"></div>';
+    const items = group.querySelector('.sgitems');
+    const defs = [
+      ['??????', false, () => openTrainingForm('module_add')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('session_add')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('reflection_add')],
+      ['??????', false, () => openTrainingForm('progress_query')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('seven_start')],
+      ['??????', false, () => openTrainingForm('seven_report')],
+      ['??????', false, () => openTrainingForm('seven_query')],
+      ['??????', false, () => openTrainingForm('action_add')],
+      ['??????', false, () => openTrainingForm('action_update')],
+      ['??????', false, () => openTrainingForm('action_query')]
+    ];
+    defs.forEach(([label, direct, onclick]) => items.appendChild(makeSidebarItem(label, direct, onclick)));
+    sidebar.appendChild(group);
+
+    const mg = document.createElement('div');
+    mg.className = 'mgg';
+    mg.innerHTML = '<div class="mgghdr">?? ???? 2.0</div>';
+    defs.forEach(([label, direct, onclick]) => mg.appendChild(makeMobileItem(label, direct, () => { closeMob(); onclick(); })));
+    mobcont.appendChild(mg);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', addTrainingButtons);
+  } else {
+    addTrainingButtons();
   }
 })();
 </script>
@@ -1654,6 +2266,188 @@ def render_dashboard_html_v2() -> str:
     addAISkillButtons();
   }}
 }})();
+</script>
+"""
+
+    inject += """
+<script>
+(function(){
+  async function fetchJson(url){
+    try {
+      const r = await fetch(url);
+      return await r.json();
+    } catch (e) {
+      return {};
+    }
+  }
+
+  async function loadTrainingData(){
+    const [mods, sessions, partners] = await Promise.all([
+      fetchJson('/api/training-modules'),
+      fetchJson('/api/training-sessions'),
+      fetchJson('/api/partners')
+    ]);
+    return {
+      modules: (mods.result || []).map(x => ({ value: x.title, label: x.title })),
+      sessions: (sessions.result || []).map(x => ({ value: x.title, label: x.title })),
+      partners: (partners.result || []).map(x => ({ value: x.name, label: x.name }))
+    };
+  }
+
+  function makeSidebarItem(label, direct, onclick){
+    const btn = document.createElement('button');
+    btn.className = 'sbtn' + (direct ? ' direct' : ' form-btn');
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="tag">' + (direct ? '????' : '??') + '</span>';
+    btn.onclick = onclick;
+    return btn;
+  }
+
+  function makeMobileItem(label, direct, onclick){
+    const btn = document.createElement('button');
+    btn.className = 'mgbtn' + (direct ? ' direct' : ' form-btn');
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="mtag">' + (direct ? '????' : '??') + '</span>';
+    btn.onclick = onclick;
+    return btn;
+  }
+
+  async function openTrainingForm(kind){
+    const data = await loadTrainingData();
+    const defs = {
+      module_add: {
+        title: '??????',
+        fields: [
+          {id:'title', lbl:'????', type:'text', req:1},
+          {id:'kind', lbl:'????', type:'text', req:1},
+          {id:'goal', lbl:'????', type:'text', req:1},
+          {id:'summary', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.title} | ${v.kind} | ${v.goal} | ${v.summary || ''}`
+      },
+      session_add: {
+        title: '??????',
+        fields: [
+          {id:'title', lbl:'????', type:'text', req:1},
+          {id:'module', lbl:'????', type:'select', req:1, options:data.modules},
+          {id:'date', lbl:'??', type:'text', req:1, ph:'2026-04-10'},
+          {id:'time', lbl:'??', type:'text', req:1, ph:'19:30'},
+          {id:'location', lbl:'??', type:'text'},
+          {id:'teacher', lbl:'??', type:'text'},
+          {id:'audience', lbl:'??', type:'text'}
+        ],
+        build: v => `?????? ${v.title} | ${v.module} | ${v.date} | ${v.time} | ${v.location || ''} | ${v.teacher || ''} | ${v.audience || ''}`
+      },
+      reflection_add: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
+          {id:'realize', lbl:'??', type:'textarea', req:1},
+          {id:'learn', lbl:'??', type:'textarea', req:1},
+          {id:'doit', lbl:'??', type:'textarea', req:1},
+          {id:'goal', lbl:'??', type:'textarea', req:1}
+        ],
+        build: v => `?????? ${v.name} | ${v.session} | ${v.realize} | ${v.learn} | ${v.doit} | ${v.goal}`
+      },
+      progress_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      },
+      seven_start: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'date', lbl:'????', type:'text', req:1, ph:'2026-04-10'},
+          {id:'note', lbl:'????', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.date} | ${v.note || ''}`
+      },
+      seven_report: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'day', lbl:'???', type:'text', req:1, ph:'?1?'},
+          {id:'task', lbl:'????', type:'text', req:1},
+          {id:'status', lbl:'??', type:'select', req:1, options:[{value:'???',label:'???'},{value:'???',label:'???'}]},
+          {id:'note', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.day} | ${v.task} | ${v.status} | ${v.note || ''}`
+      },
+      seven_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      },
+      action_add: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
+          {id:'action', lbl:'????', type:'textarea', req:1},
+          {id:'deadline', lbl:'????', type:'text', req:1, ph:'2026-04-18'}
+        ],
+        build: v => `?????? ${v.name} | ${v.session} | ${v.action} | ${v.deadline}`
+      },
+      action_update: {
+        title: '??????',
+        fields: [
+          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'action_id', lbl:'ACTION-ID', type:'text', req:1},
+          {id:'status', lbl:'??', type:'text', req:1},
+          {id:'note', lbl:'??', type:'textarea'}
+        ],
+        build: v => `?????? ${v.name} | ${v.action_id} | ${v.status} | ${v.note || ''}`
+      },
+      action_query: {
+        title: '??????',
+        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
+        build: v => `?????? ${v.name}`
+      }
+    };
+    openModal(defs[kind]);
+  }
+
+  function addTrainingButtons(){
+    const sidebar = document.getElementById('sidebar');
+    const mobcont = document.getElementById('mobcont');
+    if (!sidebar || !mobcont || document.getElementById('training-system-clean-group')) return;
+
+    const group = document.createElement('div');
+    group.className = 'sg';
+    group.id = 'training-system-clean-group';
+    group.innerHTML = '<div class="sghdr open"><span>?? ???? 2.0</span><span class="arr">?</span></div><div class="sgitems open"></div>';
+    const items = group.querySelector('.sgitems');
+    const defs = [
+      ['??????', false, () => openTrainingForm('module_add')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('session_add')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('reflection_add')],
+      ['??????', false, () => openTrainingForm('progress_query')],
+      ['??????', true, () => doSend('??????')],
+      ['??????', false, () => openTrainingForm('seven_start')],
+      ['??????', false, () => openTrainingForm('seven_report')],
+      ['??????', false, () => openTrainingForm('seven_query')],
+      ['??????', false, () => openTrainingForm('action_add')],
+      ['??????', false, () => openTrainingForm('action_update')],
+      ['??????', false, () => openTrainingForm('action_query')]
+    ];
+    defs.forEach(([label, direct, onclick]) => items.appendChild(makeSidebarItem(label, direct, onclick)));
+    sidebar.appendChild(group);
+
+    const mg = document.createElement('div');
+    mg.className = 'mgg';
+    mg.innerHTML = '<div class="mgghdr">?? ???? 2.0</div>';
+    defs.forEach(([label, direct, onclick]) => mg.appendChild(makeMobileItem(label, direct, () => { closeMob(); onclick(); })));
+    mobcont.appendChild(mg);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', addTrainingButtons);
+  } else {
+    addTrainingButtons();
+  }
+})();
 </script>
 """
     return html.replace("</body>", inject + "\n</body>")

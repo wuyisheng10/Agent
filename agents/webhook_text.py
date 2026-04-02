@@ -322,3 +322,71 @@ EXEC_MENU_ITEMS[87] = {"label": "查詢培訓總表", "cmd": "查詢培訓總表
 EXEC_MENU_TEXT += "\n\n🎓 培訓系統 2.0\n 81. 新增培訓模組\n 82. 查詢培訓模組 ▶\n 83. 新增培訓課程\n 84. 查詢培訓課程 ▶\n 85. 新增培訓反思\n 86. 查詢培訓進度 ▶\n 87. 查詢培訓總表 ▶"
 
 HELP_TEXT += "\n\n🎓 培訓系統 2.0\n  新增培訓模組 模組名稱 | 模組類型 | 學習目標 | 核心摘要\n  查詢培訓模組 [模組名稱]\n  新增培訓課程 課程名稱 | 模組名稱 | 日期 | 時間 | 地點 | 講師 | 對象\n  查詢培訓課程 [日期或模組名稱]\n  新增培訓反思 姓名 | 課程名稱 | 悟到 | 學到 | 做到 | 目標\n  查詢培訓進度 姓名\n  查詢培訓總表\n"
+
+# Training system clean overrides
+EXEC_MENU_ITEMS[81] = {"label": "新增培訓模組", "cmd": None, "prompt": "請輸入：新增培訓模組 模組名稱 | 模組類型 | 學習目標 | 核心摘要"}
+EXEC_MENU_ITEMS[82] = {"label": "查詢培訓模組", "cmd": "查詢培訓模組", "prompt": None}
+EXEC_MENU_ITEMS[83] = {"label": "新增培訓課程", "cmd": None, "prompt": "請輸入：新增培訓課程 課程名稱 | 模組名稱 | 日期 | 時間 | 地點 | 講師 | 對象"}
+EXEC_MENU_ITEMS[84] = {"label": "查詢培訓課程", "cmd": "查詢培訓課程", "prompt": None}
+EXEC_MENU_ITEMS[85] = {"label": "新增培訓反思", "cmd": None, "prompt": "請輸入：新增培訓反思 姓名 | 課程名稱 | 悟到 | 學到 | 做到 | 目標"}
+EXEC_MENU_ITEMS[86] = {"label": "查詢培訓進度", "cmd": None, "prompt": "請輸入：查詢培訓進度 姓名"}
+EXEC_MENU_ITEMS[87] = {"label": "查詢培訓總表", "cmd": "查詢培訓總表", "prompt": None}
+EXEC_MENU_ITEMS[88] = {"label": "啟動七天法則", "cmd": None, "prompt": "請輸入：啟動七天法則 姓名 | 開始日期 | 教練備註"}
+EXEC_MENU_ITEMS[89] = {"label": "七天法則回報", "cmd": None, "prompt": "請輸入：七天法則回報 姓名 | 第幾天 | 任務內容 | 已完成/未完成 | 備註"}
+EXEC_MENU_ITEMS[90] = {"label": "查詢七天法則", "cmd": None, "prompt": "請輸入：查詢七天法則 姓名"}
+EXEC_MENU_ITEMS[91] = {"label": "新增課後行動", "cmd": None, "prompt": "請輸入：新增課後行動 姓名 | 課程名稱 | 行動內容 | 截止日期"}
+EXEC_MENU_ITEMS[92] = {"label": "回報課後行動", "cmd": None, "prompt": "請輸入：回報課後行動 姓名 | ACTION-ID | 狀態 | 備註"}
+EXEC_MENU_ITEMS[93] = {"label": "查詢課後行動", "cmd": None, "prompt": "請輸入：查詢課後行動 姓名"}
+EXEC_MENU_TEXT += "\n\n🎓 培訓系統 2.0（新版）\n 81. 新增培訓模組\n 82. 查詢培訓模組 ▶\n 83. 新增培訓課程\n 84. 查詢培訓課程 ▶\n 85. 新增培訓反思\n 86. 查詢培訓進度 ▶\n 87. 查詢培訓總表 ▶\n 88. 啟動七天法則\n 89. 七天法則回報\n 90. 查詢七天法則 ▶\n 91. 新增課後行動\n 92. 回報課後行動\n 93. 查詢課後行動 ▶"
+HELP_TEXT += "\n\n🎓 培訓系統 2.0（新版）\n  新增培訓模組 模組名稱 | 模組類型 | 學習目標 | 核心摘要\n  查詢培訓模組 [模組名稱]\n  新增培訓課程 課程名稱 | 模組名稱 | 日期 | 時間 | 地點 | 講師 | 對象\n  查詢培訓課程 [日期或模組名稱]\n  新增培訓反思 姓名 | 課程名稱 | 悟到 | 學到 | 做到 | 目標\n  查詢培訓進度 姓名\n  查詢培訓總表\n  啟動七天法則 姓名 | 開始日期 | 教練備註\n  七天法則回報 姓名 | 第幾天 | 任務內容 | 已完成/未完成 | 備註\n  查詢七天法則 姓名\n  新增課後行動 姓名 | 課程名稱 | 行動內容 | 截止日期\n  回報課後行動 姓名 | ACTION-ID | 狀態 | 備註\n  查詢課後行動 姓名\n"
+
+# Training system clean overrides
+EXEC_MENU_ITEMS[81] = {"label": "新增培訓模組", "cmd": None, "prompt": "請輸入：新增培訓模組 模組名稱 | 模組類型 | 學習目標 | 核心摘要"}
+EXEC_MENU_ITEMS[82] = {"label": "查詢培訓模組", "cmd": "查詢培訓模組", "prompt": None}
+EXEC_MENU_ITEMS[83] = {"label": "新增培訓課程", "cmd": None, "prompt": "請輸入：新增培訓課程 課程名稱 | 模組名稱 | 日期 | 時間 | 地點 | 講師 | 對象"}
+EXEC_MENU_ITEMS[84] = {"label": "查詢培訓課程", "cmd": "查詢培訓課程", "prompt": None}
+EXEC_MENU_ITEMS[85] = {"label": "新增培訓反思", "cmd": None, "prompt": "請輸入：新增培訓反思 姓名 | 課程名稱 | 悟到 | 學到 | 做到 | 目標"}
+EXEC_MENU_ITEMS[86] = {"label": "查詢培訓進度", "cmd": None, "prompt": "請輸入：查詢培訓進度 姓名"}
+EXEC_MENU_ITEMS[87] = {"label": "查詢培訓總表", "cmd": "查詢培訓總表", "prompt": None}
+EXEC_MENU_ITEMS[88] = {"label": "啟動七天法則", "cmd": None, "prompt": "請輸入：啟動七天法則 姓名 | 開始日期 | 教練備註"}
+EXEC_MENU_ITEMS[89] = {"label": "七天法則回報", "cmd": None, "prompt": "請輸入：七天法則回報 姓名 | 第幾天 | 任務內容 | 已完成/未完成 | 備註"}
+EXEC_MENU_ITEMS[90] = {"label": "查詢七天法則", "cmd": None, "prompt": "請輸入：查詢七天法則 姓名"}
+EXEC_MENU_ITEMS[91] = {"label": "新增課後行動", "cmd": None, "prompt": "請輸入：新增課後行動 姓名 | 課程名稱 | 行動內容 | 截止日期"}
+EXEC_MENU_ITEMS[92] = {"label": "回報課後行動", "cmd": None, "prompt": "請輸入：回報課後行動 姓名 | ACTION-ID | 狀態 | 備註"}
+EXEC_MENU_ITEMS[93] = {"label": "查詢課後行動", "cmd": None, "prompt": "請輸入：查詢課後行動 姓名"}
+EXEC_MENU_TEXT += "\n\n🎓 培訓系統 2.0（新版）\n 81. 新增培訓模組\n 82. 查詢培訓模組 ▶\n 83. 新增培訓課程\n 84. 查詢培訓課程 ▶\n 85. 新增培訓反思\n 86. 查詢培訓進度 ▶\n 87. 查詢培訓總表 ▶\n 88. 啟動七天法則\n 89. 七天法則回報\n 90. 查詢七天法則 ▶\n 91. 新增課後行動\n 92. 回報課後行動\n 93. 查詢課後行動 ▶"
+HELP_TEXT += "\n\n🎓 培訓系統 2.0（新版）\n  新增培訓模組 模組名稱 | 模組類型 | 學習目標 | 核心摘要\n  查詢培訓模組 [模組名稱]\n  新增培訓課程 課程名稱 | 模組名稱 | 日期 | 時間 | 地點 | 講師 | 對象\n  查詢培訓課程 [日期或模組名稱]\n  新增培訓反思 姓名 | 課程名稱 | 悟到 | 學到 | 做到 | 目標\n  查詢培訓進度 姓名\n  查詢培訓總表\n  啟動七天法則 姓名 | 開始日期 | 教練備註\n  七天法則回報 姓名 | 第幾天 | 任務內容 | 已完成/未完成 | 備註\n  查詢七天法則 姓名\n  新增課後行動 姓名 | 課程名稱 | 行動內容 | 截止日期\n  回報課後行動 姓名 | ACTION-ID | 狀態 | 備註\n  查詢課後行動 姓名\n"
+
+
+# Clean training system overrides appended last so line menu/help stay readable.
+EXEC_MENU_ITEMS[81] = {"label": "??????", "cmd": None, "prompt": "?????????? ???? | ???? | ???? | ??"}
+EXEC_MENU_ITEMS[82] = {"label": "??????", "cmd": "??????", "prompt": None}
+EXEC_MENU_ITEMS[83] = {"label": "??????", "cmd": None, "prompt": "?????????? ???? | ???? | ?? | ?? | ?? | ?? | ??"}
+EXEC_MENU_ITEMS[84] = {"label": "??????", "cmd": "??????", "prompt": None}
+EXEC_MENU_ITEMS[85] = {"label": "??????", "cmd": None, "prompt": "?????????? ?? | ???? | ?? | ?? | ?? | ??"}
+EXEC_MENU_ITEMS[86] = {"label": "??????", "cmd": None, "prompt": "?????????? ??"}
+EXEC_MENU_ITEMS[87] = {"label": "??????", "cmd": "??????", "prompt": None}
+EXEC_MENU_ITEMS[88] = {"label": "??????", "cmd": None, "prompt": "?????????? ?? | ???? | ????"}
+EXEC_MENU_ITEMS[89] = {"label": "??????", "cmd": None, "prompt": "?????????? ?? | ??? | ???? | ???/??? | ??"}
+EXEC_MENU_ITEMS[90] = {"label": "??????", "cmd": None, "prompt": "?????????? ??"}
+EXEC_MENU_ITEMS[91] = {"label": "??????", "cmd": None, "prompt": "?????????? ?? | ???? | ???? | ????"}
+EXEC_MENU_ITEMS[92] = {"label": "??????", "cmd": None, "prompt": "?????????? ?? | ACTION-ID | ?? | ??"}
+EXEC_MENU_ITEMS[93] = {"label": "??????", "cmd": None, "prompt": "?????????? ??"}
+EXEC_MENU_TEXT += "\n\n?? ???? 2.0?????\n 81. ??????\n 82. ?????? ?\n 83. ??????\n 84. ?????? ?\n 85. ??????\n 86. ?????? ?\n 87. ?????? ?\n 88. ??????\n 89. ??????\n 90. ?????? ?\n 91. ??????\n 92. ??????\n 93. ?????? ?"
+HELP_TEXT += "\n\n?? ???? 2.0?????\n  ?????? ???? | ???? | ???? | ??\n  ?????? [????]\n  ?????? ???? | ???? | ?? | ?? | ?? | ?? | ??\n  ?????? [????]\n  ?????? ?? | ???? | ?? | ?? | ?? | ??\n  ?????? ??\n  ??????\n  ?????? ?? | ???? | ????\n  ?????? ?? | ??? | ???? | ???/??? | ??\n  ?????? ??\n  ?????? ?? | ???? | ???? | ????\n  ?????? ?? | ACTION-ID | ?? | ??\n  ?????? ??\n"
+
+
+# Unicode-safe training system overrides.
+EXEC_MENU_ITEMS[81] = {"label": "\u65b0\u589e\u57f9\u8a13\u6a21\u7d44", "cmd": None, "prompt": "\u8acb\u8f38\u5165\uff1a\u65b0\u589e\u57f9\u8a13\u6a21\u7d44 \u6a21\u7d44\u540d\u7a31 | \u6a21\u7d44\u985e\u578b | \u5b78\u7fd2\u76ee\u6a19 | \u6458\u8981"}
+EXEC_MENU_ITEMS[82] = {"label": "\u67e5\u8a62\u57f9\u8a13\u6a21\u7d44", "cmd": "\u67e5\u8a62\u57f9\u8a13\u6a21\u7d44", "prompt": None}
+EXEC_MENU_ITEMS[83] = {"label": "\u65b0\u589e\u57f9\u8a13\u8ab2\u7a0b", "cmd": None, "prompt": "\u8acb\u8f38\u5165\uff1a\u65b0\u589e\u57f9\u8a13\u8ab2\u7a0b \u8ab2\u7a0b\u540d\u7a31 | \u6a21\u7d44\u540d\u7a31 | \u65e5\u671f | \u6642\u9593 | \u5730\u9ede | \u8b1b\u5e2b | \u5c0d\u8c61"}
+EXEC_MENU_ITEMS[84] = {"label": "\u67e5\u8a62\u57f9\u8a13\u8ab2\u7a0b", "cmd": "\u67e5\u8a62\u57f9\u8a13\u8ab2\u7a0b", "prompt": None}
+EXEC_MENU_ITEMS[85] = {"label": "\u65b0\u589e\u57f9\u8a13\u53cd\u601d", "cmd": None, "prompt": "\u8acb\u8f38\u5165\uff1a\u65b0\u589e\u57f9\u8a13\u53cd\u601d \u59d3\u540d | \u8ab2\u7a0b\u540d\u7a31 | \u609f\u5230 | \u5b78\u5230 | \u505a\u5230 | \u76ee\u6a19"}
+EXEC_MENU_ITEMS[86] = {"label": "\u67e5\u8a62\u57f9\u8a13\u9032\u5ea6", "cmd": None, "prompt": "\u8acb\u8f38\u5165\uff1a\u67e5\u8a62\u57f9\u8a13\u9032\u5ea6 \u59d3\u540d"}
+EXEC_MENU_ITEMS[87] = {"label": "\u67e5\u8a62\u57f9\u8a13\u7e3d\u8868", "cmd": "\u67e5\u8a62\u57f9\u8a13\u7e3d\u8868", "prompt": None}
+EXEC_MENU_ITEMS[88] = {"label": "\u555f\u52d5\u4e03\u5929\u6cd5\u5247", "cmd": None, "prompt": "\u8acb\u8f38\u5165\uff1a\u555f\u52d5\u4e03\u5929\u6cd5\u5247 \u59d3\u540d | \u958b\u59cb\u65e5\u671f | \u6559\u7df4\u5099\u8a3b"}
+EXEC_MENU_ITEMS[89] = {"label": "\u4e03\u5929\u6cd5\u5247\u56de\u5831", "cmd": None, "prompt": "\u8acb\u8f38\u5165\uff1a\u4e03\u5929\u6cd5\u5247\u56de\u5831 \u59d3\u540d | \u7b2c\u5e7e\u5929 | \u4efb\u52d9\u5167\u5bb9 | \u5df2\u5b8c\u6210/\u672a\u5b8c\u6210 | \u5099\u8a3b"}
+EXEC_MENU_ITEMS[90] = {"label": "\u67e5\u8a62\u4e03\u5929\u6cd5\u5247", "cmd": None, "prompt": "\u8acb\u8f38\u5165\uff1a\u67e5\u8a62\u4e03\u5929\u6cd5\u5247 \u59d3\u540d"}
+EXEC_MENU_ITEMS[91] = {"label": "\u65b0\u589e\u8ab2\u5f8c\u884c\u52d5", "cmd": None, "prompt": "\u8acb\u8f38\u5165\uff1a\u65b0\u589e\u8ab2\u5f8c\u884c\u52d5 \u59d3\u540d | \u8ab2\u7a0b\u540d\u7a31 | \u884c\u52d5\u5167\u5bb9 | \u622a\u6b62\u65e5\u671f"}
+EXEC_MENU_ITEMS[92] = {"label": "\u56de\u5831\u8ab2\u5f8c\u884c\u52d5", "cmd": None, "prompt": "\u8acb\u8f38\u5165\uff1a\u56de\u5831\u8ab2\u5f8c\u884c\u52d5 \u59d3\u540d | ACTION-ID | \u72c0\u614b | \u5099\u8a3b"}
+EXEC_MENU_ITEMS[93] = {"label": "\u67e5\u8a62\u8ab2\u5f8c\u884c\u52d5", "cmd": None, "prompt": "\u8acb\u8f38\u5165\uff1a\u67e5\u8a62\u8ab2\u5f8c\u884c\u52d5 \u59d3\u540d"}

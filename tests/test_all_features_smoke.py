@@ -89,6 +89,8 @@ class AllFeaturesSmokeTest(unittest.TestCase):
             patch.object(training_system, "SESSIONS_FILE", self.training_system_dir / "sessions.json"),
             patch.object(training_system, "REFLECTIONS_FILE", self.training_system_dir / "reflections.json"),
             patch.object(training_system, "PROGRESS_FILE", self.training_system_dir / "progress.json"),
+            patch.object(training_system, "SEVEN_DAY_FILE", self.training_system_dir / "seven_day.json"),
+            patch.object(training_system, "ACTIONS_FILE", self.training_system_dir / "actions.json"),
         ]
         for p in self.patches:
             p.start()
@@ -322,21 +324,15 @@ class AllFeaturesSmokeTest(unittest.TestCase):
 
     def test_training_system_phase1_flow(self):
         agent = training_system.TrainingSystemAgent()
-        self.assertIn(
-            "已新增培訓模組",
-            agent.handle_command("新增培訓模組 四個勇於 | 領導人特質 | 建立領導人思維 | 勇於學習、勇於認錯、勇於改變、勇於承擔"),
-        )
-        self.assertIn(
-            "已新增培訓課程",
-            agent.handle_command("新增培訓課程 領導人特質｜四個勇於 | 四個勇於 | 2026-04-10 | 19:30 | 台南教室 | 鐘老師 | 夥伴"),
-        )
-        self.assertIn(
-            "已新增培訓反思",
-            agent.handle_command("新增培訓反思 建德 | 領導人特質｜四個勇於 | 願意認錯 | 學到四個勇於 | 每天回報市場 | 建立帶線節奏"),
-        )
+        self.assertIn("已新增培訓模組", agent.handle_command("新增培訓模組 四個勇於 | 領導人特質 | 建立領導人思維 | 勇於學習、勇於認錯、勇於改變、勇於承擔"))
+        self.assertIn("已新增培訓課程", agent.handle_command("新增培訓課程 領導人特質｜四個勇於 | 四個勇於 | 2026-04-10 | 19:30 | 台南教室 | 鐘老師 | 夥伴"))
+        self.assertIn("已新增培訓反思", agent.handle_command("新增培訓反思 建德 | 領導人特質｜四個勇於 | 願意認錯 | 學到四個勇於 | 每天回報市場 | 建立帶線節奏"))
         self.assertIn("建德 的培訓進度", agent.handle_command("查詢培訓進度 建德"))
         self.assertIn("培訓總表", agent.handle_command("查詢培訓總表"))
-
+        self.assertIn("已啟動七天法則", agent.handle_command("啟動七天法則 建德 | 2026-04-12 | 先陪跑"))
+        self.assertIn("已回報七天法則", agent.handle_command("七天法則回報 建德 | 第1天 | 聽 OPP | 已完成 | 有回報感想"))
+        self.assertIn("已新增課後行動", agent.handle_command("新增課後行動 建德 | 領導人特質｜四個勇於 | 本週邀約 2 位朋友 | 2026-04-18"))
+        self.assertIn("建德 的課後行動", agent.handle_command("查詢課後行動 建德"))
 
 if __name__ == "__main__":
     unittest.main()
