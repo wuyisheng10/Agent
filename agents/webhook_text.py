@@ -300,3 +300,13 @@ EXEC_MENU_ITEMS[75] = {"label": "修改AI提示詞", "cmd": None, "prompt": "請
 EXEC_MENU_TEXT += "\n\n🤖 AI 提示詞管理\n 74. 查詢AI提示詞 ▶\n 75. 修改AI提示詞"
 
 HELP_TEXT += "\n\n🤖 AI 提示詞管理\n  查詢AI提示詞\n  查詢AI提示詞 key\n  更新AI提示詞 key | 新內容\n"
+
+EXEC_MENU_ITEMS[76] = {"label": "跟進建議－潛在家人", "cmd": None, "prompt": "請輸入：跟進建議 潛在家人\n\n系統會先列出清單，再用姓名產生建議。"}
+EXEC_MENU_ITEMS[77] = {"label": "跟進建議－夥伴", "cmd": None, "prompt": "請輸入：跟進建議 夥伴\n\n系統會先列出清單，再用姓名產生建議。"}
+EXEC_MENU_ITEMS[78] = {"label": "查詢夥伴狀態定義", "cmd": "查詢夥伴狀態定義", "prompt": None}
+
+EXEC_MENU_TEXT += "\n\n🧭 跟進建議\n 76. 跟進建議－潛在家人\n 77. 跟進建議－夥伴"
+EXEC_MENU_TEXT += "\n\n📚 夥伴狀態\n 78. 查詢夥伴狀態定義"
+
+HELP_TEXT += "\n\n🧭 跟進建議\n  跟進建議 潛在家人\n  跟進建議 潛在家人 姓名\n  跟進建議 夥伴\n  跟進建議 夥伴 姓名\n"
+HELP_TEXT += "\n📚 夥伴狀態\n  查詢夥伴狀態定義\n  夥伴狀態說明\n"

@@ -1037,13 +1037,52 @@ def render_dashboard_html_v2() -> str:
           lbl: "新內容",
           type: "textarea",
           req: 1,
-          ph: "請貼上新的提示詞內容"
+          ph: "系統會先載入目前提示詞內容，你再決定是否修改"
         }}
       ],
       build: function(v) {{
         return "更新AI提示詞 " + v.k + " | " + v.t;
       }}
     }});
+
+    const keyField = document.getElementById("mf_k");
+    const textField = document.getElementById("mf_t");
+    const fieldsWrap = document.getElementById("mfields");
+    if (!keyField || !textField || !fieldsWrap) return;
+
+    let preview = document.getElementById("ai-prompt-preview");
+    if (!preview) {{
+      preview = document.createElement("div");
+      preview.id = "ai-prompt-preview";
+      preview.style.cssText = "font-size:12px;color:#6c6c70;line-height:1.6;background:#f2f2f7;border-radius:10px;padding:10px;white-space:pre-wrap";
+      fieldsWrap.insertBefore(preview, textField.parentElement);
+    }}
+
+    async function loadCurrentPrompt() {{
+      const key = keyField.value;
+      preview.textContent = "正在載入目前提示詞...";
+      try {{
+        const r = await fetch("/api/ai-prompt/" + encodeURIComponent(key));
+        const d = await r.json();
+        if (!d.result) {{
+          preview.textContent = "找不到這組提示詞。";
+          return;
+        }}
+        const item = d.result;
+        preview.textContent =
+          "目前提示詞預覽\\n" +
+          "key: " + key + "\\n" +
+          "名稱: " + (item.label || "") + "\\n" +
+          "說明: " + (item.description || "") + "\\n\\n" +
+          (item.template || "");
+        textField.value = item.template || "";
+      }} catch (e) {{
+        preview.textContent = "載入目前提示詞失敗：" + e.message;
+      }}
+    }}
+
+    keyField.onchange = loadCurrentPrompt;
+    loadCurrentPrompt();
   }}
 
   window.openAIPromptModal = openAIPromptModal;
@@ -1053,6 +1092,192 @@ def render_dashboard_html_v2() -> str:
     addAIPromptButtons();
   }}
 }})();
+</script>
+"""
+    return html.replace("</body>", inject + "\n</body>")
+
+
+_RENDER_WITH_AI_PROMPTS = render_dashboard_html_v2
+
+
+def render_dashboard_html_v2() -> str:
+    html = _RENDER_WITH_AI_PROMPTS()
+    inject = """
+<script>
+(function(){
+  async function fetchJson(url){
+    const r = await fetch(url);
+    const d = await r.json();
+    return Array.isArray(d.result) ? d.result : [];
+  }
+
+  async function openFollowupSuggestionModal(kind){
+    const isPartner = kind === "partner";
+    const items = await fetchJson(isPartner ? "/api/partners" : "/api/prospects");
+    if(!items.length){
+      addMsg("目前沒有可選名單。","b");
+      return;
+    }
+    const options = items.map(function(item){
+      const name = item.name || "";
+      const tail = isPartner
+        ? [item.level || "", item.stage || "", item.category || ""].filter(Boolean).join(" / ")
+        : [item.job || "", item.area || "", item.tag || item.status || ""].filter(Boolean).join(" / ");
+      return { value:name, label: tail ? (name + "｜" + tail) : name };
+    });
+    openModal({
+      title: isPartner ? "跟進建議－夥伴" : "跟進建議－潛在家人",
+      fields: [
+        { id:"n", lbl:"選擇對象", type:"select", req:1, options:options }
+      ],
+      build: function(v){
+        return (isPartner ? "跟進建議 夥伴 " : "跟進建議 潛在家人 ") + v.n;
+      }
+    });
+  }
+
+  function addFollowupSuggestionButtons() {
+    const sidebar = document.getElementById("sidebar");
+    const mobcont = document.getElementById("mobcont");
+    if (!sidebar || !mobcont || document.getElementById("followup-suggestion-group")) return;
+
+    const makeItem = (label, onclick) => {
+      const btn = document.createElement("button");
+      btn.className = "sbtn form-btn";
+      btn.innerHTML = '<span class="lbl">'+label+'</span><span class="tag">表單</span>';
+      btn.onclick = onclick;
+      return btn;
+    };
+
+    const group = document.createElement("div");
+    group.className = "sg";
+    group.id = "followup-suggestion-group";
+    group.innerHTML = '<div class="sghdr open"><span>🧭 跟進建議</span><span class="arr">▶</span></div><div class="sgitems open"></div>';
+    const items = group.querySelector(".sgitems");
+    items.appendChild(makeItem("跟進建議－潛在家人", () => openFollowupSuggestionModal("prospect")));
+    items.appendChild(makeItem("跟進建議－夥伴", () => openFollowupSuggestionModal("partner")));
+    sidebar.appendChild(group);
+
+    const makeMobile = (label, kind) => {
+      const btn = document.createElement("button");
+      btn.className = "mgbtn form-btn";
+      btn.innerHTML = '<span class="lbl">'+label+'</span><span class="mtag">表單</span>';
+      btn.onclick = function(){ closeMob(); openFollowupSuggestionModal(kind); };
+      return btn;
+    };
+    const mg = document.createElement("div");
+    mg.className = "mgg";
+    mg.innerHTML = '<div class="mgghdr">🧭 跟進建議</div>';
+    mg.appendChild(makeMobile("跟進建議－潛在家人", "prospect"));
+    mg.appendChild(makeMobile("跟進建議－夥伴", "partner"));
+    mobcont.appendChild(mg);
+  }
+
+  window.openFollowupSuggestionModal = openFollowupSuggestionModal;
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", addFollowupSuggestionButtons);
+  } else {
+    addFollowupSuggestionButtons();
+  }
+})();
+</script>
+"""
+    return html.replace("</body>", inject + "\n</body>")
+
+
+_RENDER_WITH_FOLLOWUP_SUGGESTION = render_dashboard_html_v2
+
+
+def render_dashboard_html_v2() -> str:
+    html = _RENDER_WITH_FOLLOWUP_SUGGESTION()
+    inject = """
+<script>
+(function(){
+  let partnerStatuses = null;
+
+  async function getPartnerStatuses(){
+    if(partnerStatuses) return partnerStatuses;
+    const r = await fetch("/api/partner-statuses");
+    const d = await r.json();
+    partnerStatuses = Array.isArray(d.result) ? d.result : [];
+    return partnerStatuses;
+  }
+
+  function replaceStatusFieldWithSelect(required){
+    const oldEl = document.getElementById("mf_s");
+    if(!oldEl) return;
+    const wrap = oldEl.parentElement;
+    if(!wrap || wrap.dataset.partnerStatusEnhanced==="1") return;
+    getPartnerStatuses().then(function(items){
+      const currentValue = oldEl.value || "";
+      const sel = document.createElement("select");
+      sel.id = oldEl.id;
+      sel.required = !!required;
+      sel.dataset.userEdited = oldEl.dataset.userEdited || "";
+      const first = document.createElement("option");
+      first.value = "";
+      first.textContent = required ? "請選擇狀態" : "保留原狀態";
+      sel.appendChild(first);
+      items.forEach(function(item){
+        const o = document.createElement("option");
+        o.value = item.value;
+        o.textContent = item.label + "｜" + item.description;
+        if(currentValue && currentValue === item.value){ o.selected = true; }
+        sel.appendChild(o);
+      });
+      sel.addEventListener("input", function(){ sel.dataset.userEdited = "1"; });
+      sel.addEventListener("change", function(){ sel.dataset.userEdited = "1"; });
+      oldEl.replaceWith(sel);
+      wrap.dataset.partnerStatusEnhanced = "1";
+    }).catch(function(){});
+  }
+
+  function injectPartnerStatusButton(){
+    const sidebar = document.getElementById("sidebar");
+    const mobcont = document.getElementById("mobcont");
+    if(!sidebar || !mobcont || document.getElementById("partner-status-group")) return;
+
+    const group = document.createElement("div");
+    group.className = "sg";
+    group.id = "partner-status-group";
+    group.innerHTML = '<div class="sghdr open"><span>📚 夥伴狀態</span><span class="arr">▶</span></div><div class="sgitems open"></div>';
+    const items = group.querySelector(".sgitems");
+
+    const btn = document.createElement("button");
+    btn.className = "sbtn direct";
+    btn.innerHTML = '<span class="lbl">查詢夥伴狀態定義</span><span class="tag">直接</span>';
+    btn.onclick = function(){ doSend("查詢夥伴狀態定義"); };
+    items.appendChild(btn);
+    sidebar.appendChild(group);
+
+    const mg = document.createElement("div");
+    mg.className = "mgg";
+    mg.innerHTML = '<div class="mgghdr">📚 夥伴狀態</div>';
+    const mb = document.createElement("button");
+    mb.className = "mgbtn direct";
+    mb.innerHTML = '<span class="lbl">查詢夥伴狀態定義</span><span class="mtag">直接</span>';
+    mb.onclick = function(){ closeMob(); doSend("查詢夥伴狀態定義"); };
+    mg.appendChild(mb);
+    mobcont.appendChild(mg);
+  }
+
+  const originalOpenModal = window.openModal;
+  window.openModal = function(f){
+    originalOpenModal(f);
+    const title = (f && f.title) || "";
+    if(title.indexOf("更新夥伴") !== -1){
+      setTimeout(function(){ replaceStatusFieldWithSelect(false); }, 0);
+    } else if(title.indexOf("跟進夥伴") !== -1){
+      setTimeout(function(){ replaceStatusFieldWithSelect(true); }, 0);
+    }
+  };
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", injectPartnerStatusButton);
+  }else{
+    injectPartnerStatusButton();
+  }
+})();
 </script>
 """
     return html.replace("</body>", inject + "\n</body>")

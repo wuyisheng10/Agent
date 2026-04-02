@@ -41,6 +41,8 @@ class _FakeCalendarModule:
 class _FakePartnerModule:
     @staticmethod
     def handle_partner_command(cmd):
+        if cmd in {"查詢夥伴狀態定義", "夥伴狀態定義", "夥伴狀態說明"}:
+            return "夥伴狀態定義：\n- 待跟進：已列入跟進名單\n- 激勵中：目前重點是鼓勵與提振狀態"
         prefixes = (
             "查詢夥伴",
             "查詢待跟進夥伴",
@@ -238,6 +240,17 @@ class _FakeNutritionAssessmentModule:
         return f"ASSESS:{cmd}:{scope_id}"
 
 
+class _FakeFollowupSuggestionAgent:
+    @staticmethod
+    def handle_command(cmd):
+        return f"SUGGEST:{cmd}"
+
+
+class _FakeFollowupSuggestionModule:
+    def FollowupSuggestionAgent(self):
+        return _FakeFollowupSuggestionAgent()
+
+
 class _FakeTrainingAgent:
     @staticmethod
     def handle_query(cmd):
@@ -322,6 +335,7 @@ FORM_SAMPLES = {
     "激勵夥伴": "激勵 建德 最近需要鼓勵",
     "里程碑記錄": "里程碑 建德 首次達成目標",
     "新增夥伴": "新增夥伴 建德 | 月入三萬 | 2026-04-05 | 持續跟進 | A",
+    "新增跟進夥伴": "新增跟進夥伴 建德 | 2026-04-05 | 加入待跟進清單",
     "更新夥伴": "更新夥伴 建德 | 1 | 積極跟進 | 2026-04-05 | LINE:test | 備註 | 直銷商 | 7519213 | - | 陳薾云 | 2026-06-30 | 2026-03 | 翡翠 | 3% | 有 | 2821 | 有 | V | V | V | V | A",
     "查詢指定夥伴": "查詢夥伴 建德",
     "跟進夥伴": "跟進夥伴 建德 | 已邀約 | 2026-04-05 | 備註",
@@ -375,6 +389,7 @@ class FullLineWebValidationTest(unittest.TestCase):
         self.stack.enter_context(patch.object(webhook, "_load_daily_report", return_value=_FakeDailyReportModule()))
         self.stack.enter_context(patch.object(webhook, "_load_nutrition_dri", return_value=_FakeDRIModule()))
         self.stack.enter_context(patch.object(webhook, "_load_nutrition_assessment", return_value=_FakeNutritionAssessmentModule()))
+        self.stack.enter_context(patch.object(webhook, "_load_followup_suggestion", return_value=_FakeFollowupSuggestionModule()))
         self.stack.enter_context(patch.object(webhook, "_load_training_agent", return_value=_FakeTrainingAgentModule()))
         self.stack.enter_context(patch.object(webhook, "_load_followup", return_value=_FakeFollowupModule()))
         self.stack.enter_context(patch.object(webhook, "_load_motivation", return_value=_FakeMotivationModule()))
@@ -401,6 +416,7 @@ class FullLineWebValidationTest(unittest.TestCase):
             "awaiting_invite_manage_action": {},
             "awaiting_invite_manage_edit": {},
             "awaiting_promo_optimize_apply": {},
+            "awaiting_partner_voice_add": {},
         }
 
         def _reply(token, text):
@@ -450,6 +466,7 @@ class FullLineWebValidationTest(unittest.TestCase):
                     awaiting_invite_manage_action=state["awaiting_invite_manage_action"],
                     awaiting_invite_manage_edit=state["awaiting_invite_manage_edit"],
                     awaiting_promo_optimize_apply=state["awaiting_promo_optimize_apply"],
+                    awaiting_partner_voice_add=state["awaiting_partner_voice_add"],
                     looks_like_explicit_command=webhook._looks_like_explicit_command,
                     normalize_partner_category_choice=webhook._normalize_partner_category_choice,
                     partners_by_category=webhook._partners_by_category,
@@ -571,6 +588,33 @@ class FullLineWebValidationTest(unittest.TestCase):
         self.assertTrue(any("1. 查看文宣" in x for x in all_msgs))
         self.assertTrue(any("邀約文宣內容" in x for x in all_msgs))
         self.assertTrue(any("是否修改這份邀約文宣" in x for x in all_msgs))
+
+    def test_line_voice_add_partner_enters_waiting_state(self):
+        replies, pushes = self._run_line_sequence(["語音新增跟進夥伴"])
+        all_msgs = replies + pushes
+        self.assertTrue(any("請直接上傳語音" in x for x in all_msgs))
+
+
+    def test_web_followup_suggestion_commands(self):
+        result = webhook.process_web_command("跟進建議 潛在家人 Amy")
+        self.assertEqual(result, "SUGGEST:跟進建議 潛在家人 Amy")
+        result = webhook.process_web_command("跟進建議 夥伴 建德")
+        self.assertEqual(result, "SUGGEST:跟進建議 夥伴 建德")
+
+    def test_line_followup_suggestion_commands(self):
+        replies, pushes = self._run_line_sequence(["跟進建議 潛在家人 Amy", "跟進建議 夥伴 建德"])
+        all_msgs = replies + pushes
+        self.assertTrue(any("SUGGEST:跟進建議 潛在家人 Amy" in x for x in all_msgs))
+        self.assertTrue(any("SUGGEST:跟進建議 夥伴 建德" in x for x in all_msgs))
+
+    def test_partner_status_definition_available_in_line_and_web(self):
+        result = webhook.process_web_command("查詢夥伴狀態定義")
+        self.assertIn("夥伴狀態定義", result)
+        self.assertIn("待跟進", result)
+
+        html = webhook._render_dashboard_html_v2()
+        self.assertIn("/api/partner-statuses", html)
+        self.assertIn("查詢夥伴狀態定義", html)
 
 
 if __name__ == "__main__":

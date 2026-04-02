@@ -99,6 +99,30 @@ def register_api_routes(
         except Exception as e:
             return {"result": None, "error": str(e)}, 500
 
+    @app.route("/api/prospects", methods=["GET"])
+    def api_prospects():
+        try:
+            market = load_market_dev()
+            rows = market.MarketDevAgent().list_prospects()
+            items = []
+            for row in rows:
+                name = str(row.get("姓名", "")).strip()
+                if not name:
+                    continue
+                items.append(
+                    {
+                        "name": name,
+                        "job": str(row.get("職業", "")).strip(),
+                        "area": str(row.get("地區", "")).strip(),
+                        "status": str(row.get("接觸狀態", "")).strip(),
+                        "tag": str(row.get("需求標籤", "")).strip(),
+                    }
+                )
+            items.sort(key=lambda x: x.get("name", ""))
+            return {"result": items}
+        except Exception as e:
+            return {"result": [], "error": str(e)}, 500
+
     @app.route("/api/partners", methods=["GET"])
     def api_partners():
         try:
@@ -117,6 +141,14 @@ def register_api_routes(
             ]
             rows.sort(key=lambda x: (x.get("name", ""), x.get("amway_no", "")))
             return {"result": rows}
+        except Exception as e:
+            return {"result": [], "error": str(e)}, 500
+
+    @app.route("/api/partner-statuses", methods=["GET"])
+    def api_partner_statuses():
+        try:
+            partner = load_partner()
+            return {"result": partner.PARTNER_STAGE_DEFINITIONS}
         except Exception as e:
             return {"result": [], "error": str(e)}, 500
 
@@ -213,3 +245,14 @@ def register_api_routes(
             return {"result": pm.list_prompt_labels()}
         except Exception as e:
             return {"result": [], "error": str(e)}, 500
+
+    @app.route("/api/ai-prompt/<key>", methods=["GET"])
+    def api_ai_prompt_detail(key):
+        try:
+            pm = load_ai_prompt_manager()
+            item = pm.get_prompt(key)
+            if not item:
+                return {"result": None}, 404
+            return {"result": {"key": key, **item}}
+        except Exception as e:
+            return {"result": None, "error": str(e)}, 500

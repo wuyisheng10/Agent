@@ -127,14 +127,20 @@ class AllFeaturesSmokeTest(unittest.TestCase):
         self.assertIn(event_id, delete_msg)
         self.assertEqual(calendar.load_events(), [])
 
-    def test_partner_management_flow(self):
+    def _legacy_partner_management_flow(self):
         add_msg = partner.handle_partner_command(
             "新增夥伴 測試夥伴 | 建立穩定邀約節奏 | 2026-04-08 | 對課程有興趣 | A"
         )
         self.assertIn("已新增夥伴", add_msg)
 
+        add_follow_msg = partner.handle_partner_command(
+            "新增跟進夥伴 第二位夥伴 | 每週固定跟進 | 2026-04-11 | 先邀約體驗課 | B"
+        )
+        self.assertIn("已新增夥伴", add_follow_msg)
+
         list_msg = partner.handle_partner_command("查詢夥伴")
         self.assertIn("測試夥伴", list_msg)
+        self.assertIn("第二位夥伴", list_msg)
         self.assertIn("A", list_msg)
 
         update_msg = partner.handle_partner_command(
@@ -148,6 +154,53 @@ class AllFeaturesSmokeTest(unittest.TestCase):
 
         follow_msg = partner.handle_partner_command("跟進夥伴 測試夥伴 | 已邀約課程 | 2026-04-10 | 等待對方確認")
         self.assertIn("已更新跟進", follow_msg)
+
+    def test_partner_management_flow(self):
+        add_msg = partner.handle_partner_command(
+            "新增夥伴 第一位夥伴 | 月入三萬 | 2026-04-08 | 持續跟進中 | A"
+        )
+        self.assertIn("已新增夥伴", add_msg)
+
+        status_msg = partner.handle_partner_command("查詢夥伴狀態定義")
+        self.assertIn("夥伴狀態定義", status_msg)
+        self.assertIn("待跟進", status_msg)
+        self.assertIn("激勵中", status_msg)
+
+        add_second_msg = partner.handle_partner_command(
+            "新增夥伴 第二位夥伴 | 建立待跟進測試 | 2026-04-10 | 第二位夥伴備註 | B"
+        )
+        self.assertIn("已新增夥伴", add_second_msg)
+
+        add_follow_msg = partner.handle_partner_command(
+            "新增跟進夥伴 第二位夥伴 | 2026-04-11 | 先邀約體驗課"
+        )
+        self.assertIn("已加入待跟進", add_follow_msg)
+
+        list_msg = partner.handle_partner_command("查詢夥伴")
+        self.assertIn("第一位夥伴", list_msg)
+        self.assertIn("第二位夥伴", list_msg)
+        self.assertIn("A", list_msg)
+
+        update_msg = partner.handle_partner_command(
+            "更新夥伴 第一位夥伴 | 3 | 積極跟進 | 2026-04-09 | LINE:test123 | 備註更新 | 直銷商 | 1234567 | 伙伴甲 | 推薦人乙 | 2026-12-31 | 2026-04 | 翡翠 | 3% | 有 | 120 | 有 | 500 | 400 | 300 | 200 | B"
+        )
+        self.assertIn("已更新夥伴", update_msg)
+
+        detail_msg = partner.handle_partner_command("查詢夥伴 第一位夥伴")
+        self.assertIn("分類：B", detail_msg)
+        self.assertIn("1234567", detail_msg)
+
+        follow_msg = partner.handle_partner_command("跟進夥伴 第一位夥伴 | 已邀約體驗 | 2026-04-10 | 明天再確認")
+        self.assertIn("2026-04-10", follow_msg)
+
+        invalid_stage_msg = partner.handle_partner_command("跟進夥伴 第一位夥伴 | 不存在狀態 | 2026-04-10 | 測試")
+        self.assertIn("狀態不在定義清單內", invalid_stage_msg)
+
+        second_detail_msg = partner.handle_partner_command("查詢夥伴 第二位夥伴")
+        self.assertIn("狀態：待跟進", second_detail_msg)
+
+        due_msg = partner.handle_partner_command("查詢待跟進夥伴")
+        self.assertIn("第二位夥伴", due_msg)
 
     def test_motivation_flow(self):
         rows = [{
