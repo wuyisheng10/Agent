@@ -10,10 +10,30 @@ try:
 except ModuleNotFoundError:
     from agents.common_runtime import BASE_DIR, run_codex_cli
 
+import importlib.util as _ilu
+
 
 MARKET_CSV = BASE_DIR / "output" / "csv_data" / "market_list.csv"
 PARTNER_JSON = BASE_DIR / "output" / "partners" / "partners.json"
 LOG_FILE = BASE_DIR / "logs" / "followup_suggestion_log.txt"
+
+
+def _load_skill_manager():
+    spec = _ilu.spec_from_file_location(
+        "ai_skill_manager",
+        str(BASE_DIR / "agents" / "22_ai_skill_manager.py"),
+    )
+    module = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _with_followup_skill(prompt: str) -> str:
+    try:
+        skill_text = _load_skill_manager().render_skill("followup_suggestion_strategy").strip()
+    except Exception:
+        skill_text = ""
+    return f"{skill_text}\n\n{prompt}".strip() if skill_text else prompt
 
 
 def log(msg: str):
@@ -397,7 +417,7 @@ def suggest_for_prospect(name: str) -> str:
     profile_text = _format_prospect_profile(row)
     features = _prospect_features(row)
     strategy, reasons = _prospect_strategy(features)
-    prompt = _render_prompt("潛在家人", name, profile_text, strategy, reasons)
+    prompt = _with_followup_skill(_render_prompt("潛在家人", name, profile_text, strategy, reasons))
     try:
         return run_codex_cli(prompt, timeout=90)
     except Exception as exc:
@@ -412,7 +432,7 @@ def suggest_for_partner(name: str) -> str:
     profile_text = _format_partner_profile(item)
     features = _partner_features(item)
     strategy, reasons = _partner_strategy(features)
-    prompt = _render_prompt("夥伴", name, profile_text, strategy, reasons)
+    prompt = _with_followup_skill(_render_prompt("夥伴", name, profile_text, strategy, reasons))
     try:
         return run_codex_cli(prompt, timeout=90)
     except Exception as exc:

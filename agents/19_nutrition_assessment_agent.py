@@ -521,6 +521,24 @@ def _load_prompt_manager():
     return module
 
 
+def _load_skill_manager():
+    spec = _ilu.spec_from_file_location(
+        "ai_skill_manager",
+        str(BASE_DIR / "agents" / "22_ai_skill_manager.py"),
+    )
+    module = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _with_nutrition_skill(prompt: str) -> str:
+    try:
+        skill_text = _load_skill_manager().render_skill("nutrition_assessment_strategy").strip()
+    except Exception:
+        skill_text = ""
+    return f"{skill_text}\n\n{prompt}".strip() if skill_text else prompt
+
+
 def _analyze_image_with_codex(img_bytes: bytes, meal_label: str, timeout: int = 120) -> str:
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
     img_path = None
@@ -530,7 +548,7 @@ def _analyze_image_with_codex(img_bytes: bytes, meal_label: str, timeout: int = 
             img_path = fh.name
 
         pm = _load_prompt_manager()
-        prompt = pm.render_prompt("nutrition_meal_image_analysis", meal_label=meal_label)
+        prompt = _with_nutrition_skill(pm.render_prompt("nutrition_meal_image_analysis", meal_label=meal_label))
         return _run_codex_cli(prompt, timeout=timeout, image_path=img_path)
     finally:
         if img_path and os.path.exists(img_path):
@@ -554,7 +572,7 @@ def _assess_deficiencies(analyses: list[dict], water_ml: int, gender: str, age: 
         meals_text += f"\n【{item['label']}】\n{item['analysis']}\n"
 
     pm = _load_prompt_manager()
-    prompt = pm.render_prompt(
+    prompt = _with_nutrition_skill(pm.render_prompt(
         "nutrition_daily_assessment",
         gender_label=gender_label,
         age=age,
@@ -563,7 +581,7 @@ def _assess_deficiencies(analyses: list[dict], water_ml: int, gender: str, age: 
         water_ml=water_ml,
         water_target=dri_values.get("水", 2000),
         dri_summary=dri_summary,
-    )
+    ))
 
     try:
         assessment_text = _run_codex_cli(prompt, timeout=180)

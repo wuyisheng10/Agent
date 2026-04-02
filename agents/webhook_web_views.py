@@ -1281,3 +1281,153 @@ def render_dashboard_html_v2() -> str:
 </script>
 """
     return html.replace("</body>", inject + "\n</body>")
+
+
+try:
+    import importlib.util as _ilu
+    from pathlib import Path as _Path
+except Exception:  # pragma: no cover
+    _ilu = None
+    _Path = None
+
+
+def _load_ai_skill_manager():
+    if _ilu is None or _Path is None:
+        raise RuntimeError("ai skill loader unavailable")
+    path = _Path(r"C:\Users\user\claude AI_Agent") / "agents" / "22_ai_skill_manager.py"
+    spec = _ilu.spec_from_file_location("ai_skill_manager", str(path))
+    module = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_RENDER_WITH_PARTNER_STATUS = render_dashboard_html_v2
+
+
+def render_dashboard_html_v2() -> str:
+    html = _RENDER_WITH_PARTNER_STATUS()
+    try:
+        import json as _json
+
+        sm = _load_ai_skill_manager()
+        skill_items = sm.list_skill_labels()
+        skill_json = _json.dumps(skill_items, ensure_ascii=False)
+    except Exception:
+        skill_json = "[]"
+
+    inject = f"""
+<script>
+(function(){{
+  const skillItems = {skill_json};
+
+  function addAISkillButtons() {{
+    const sidebar = document.getElementById("sidebar");
+    const mobcont = document.getElementById("mobcont");
+    if (!sidebar || !mobcont || document.getElementById("ai-skill-group")) return;
+
+    const makeItem = (label, direct, onclick) => {{
+      const btn = document.createElement("button");
+      btn.className = "sbtn" + (direct ? " direct" : " form-btn");
+      btn.innerHTML = '<span class="lbl">'+label+'</span><span class="tag">'+(direct ? '直接執行' : '表單')+'</span>';
+      btn.onclick = onclick;
+      return btn;
+    }};
+
+    const group = document.createElement("div");
+    group.className = "sg";
+    group.id = "ai-skill-group";
+    group.innerHTML = '<div class="sghdr open"><span>🧠 AI 技能</span><span class="arr">▶</span></div><div class="sgitems open"></div>';
+    const items = group.querySelector(".sgitems");
+    items.appendChild(makeItem("查詢AI技能", true, () => doSend("查詢AI技能")));
+    items.appendChild(makeItem("修改AI技能", false, openAISkillModal));
+    sidebar.appendChild(group);
+
+    const makeMobile = (label, direct, onclick) => {{
+      const btn = document.createElement("button");
+      btn.className = "mgbtn" + (direct ? " direct" : " form-btn");
+      btn.innerHTML = '<span class="lbl">'+label+'</span><span class="mtag">'+(direct ? '直接執行' : '表單')+'</span>';
+      btn.onclick = onclick;
+      return btn;
+    }};
+    const mg = document.createElement("div");
+    mg.className = "mgg";
+    mg.innerHTML = '<div class="mgghdr">🧠 AI 技能</div>';
+    mg.appendChild(makeMobile("查詢AI技能", true, () => {{ closeMob(); doSend("查詢AI技能"); }}));
+    mg.appendChild(makeMobile("修改AI技能", false, () => {{ closeMob(); openAISkillModal(); }}));
+    mobcont.appendChild(mg);
+  }}
+
+  function openAISkillModal() {{
+    openModal({{
+      title: "修改AI技能",
+      fields: [
+        {{
+          id: "k",
+          lbl: "技能 key",
+          type: "select",
+          req: 1,
+          options: skillItems.map(x => ({{ value: x.key, label: x.key + "｜" + (x.label || "") }}))
+        }},
+        {{
+          id: "t",
+          lbl: "技能內容",
+          type: "textarea",
+          req: 1,
+          ph: "先預覽目前 skill，再決定要如何修改"
+        }}
+      ],
+      build: function(v) {{
+        return "更新AI技能 " + v.k + " | " + v.t;
+      }}
+    }});
+
+    const keyField = document.getElementById("mf_k");
+    const textField = document.getElementById("mf_t");
+    const fieldsWrap = document.getElementById("mfields");
+    if (!keyField || !textField || !fieldsWrap) return;
+
+    let preview = document.getElementById("ai-skill-preview");
+    if (!preview) {{
+      preview = document.createElement("div");
+      preview.id = "ai-skill-preview";
+      preview.style.cssText = "font-size:12px;color:#6c6c70;line-height:1.6;background:#f2f2f7;border-radius:10px;padding:10px;white-space:pre-wrap";
+      fieldsWrap.insertBefore(preview, textField.parentElement);
+    }}
+
+    async function loadCurrentSkill() {{
+      const key = keyField.value;
+      preview.textContent = "正在載入目前 AI 技能...";
+      try {{
+        const r = await fetch("/api/ai-skill/" + encodeURIComponent(key));
+        const d = await r.json();
+        if (!d.result) {{
+          preview.textContent = "查無目前技能內容";
+          return;
+        }}
+        const item = d.result;
+        preview.textContent =
+          "目前技能預覽\\n" +
+          "key: " + key + "\\n" +
+          "名稱: " + (item.label || "") + "\\n" +
+          "說明: " + (item.description || "") + "\\n\\n" +
+          (item.instruction || "");
+        textField.value = item.instruction || "";
+      }} catch (e) {{
+        preview.textContent = "載入目前 AI 技能失敗：" + e.message;
+      }}
+    }}
+
+    keyField.onchange = loadCurrentSkill;
+    loadCurrentSkill();
+  }}
+
+  window.openAISkillModal = openAISkillModal;
+  if (document.readyState === "loading") {{
+    document.addEventListener("DOMContentLoaded", addAISkillButtons);
+  }} else {{
+    addAISkillButtons();
+  }}
+}})();
+</script>
+"""
+    return html.replace("</body>", inject + "\n</body>")

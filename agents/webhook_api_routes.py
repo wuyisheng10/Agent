@@ -11,6 +11,7 @@ def register_api_routes(
     load_daily_report,
     load_nutrition_assessment,
     load_ai_prompt_manager,
+    load_ai_skill_manager,
 ):
     @app.route("/api/command", methods=["POST"])
     def api_command():
@@ -251,6 +252,25 @@ def register_api_routes(
         try:
             pm = load_ai_prompt_manager()
             item = pm.get_prompt(key)
+            if not item:
+                return {"result": None}, 404
+            return {"result": {"key": key, **item}}
+        except Exception as e:
+            return {"result": None, "error": str(e)}, 500
+
+    @app.route("/api/ai-skills", methods=["GET"])
+    def api_ai_skills():
+        try:
+            sm = load_ai_skill_manager()
+            return {"result": sm.list_skill_labels()}
+        except Exception as e:
+            return {"result": [], "error": str(e)}, 500
+
+    @app.route("/api/ai-skill/<key>", methods=["GET"])
+    def api_ai_skill_detail(key):
+        try:
+            sm = load_ai_skill_manager()
+            item = sm.get_skill(key)
             if not item:
                 return {"result": None}, 404
             return {"result": {"key": key, **item}}

@@ -17,6 +17,7 @@ def handle_line_command(
     load_nutrition_dri,
     load_nutrition_assessment,
     load_ai_prompt_manager,
+    load_ai_skill_manager,
     load_training_agent,
     load_followup,
     load_motivation,
@@ -31,6 +32,16 @@ def handle_line_command(
                 return True
         except Exception as exc:
             reply_message(reply_token, f"⚠️ AI 提示詞處理失敗：{exc}")
+            return True
+    if msg == "查詢AI技能" or msg.startswith("查詢AI技能 ") or msg.startswith("更新AI技能 "):
+        try:
+            sm = load_ai_skill_manager()
+            result = sm.handle_command(msg)
+            if result:
+                reply_message(reply_token, result)
+                return True
+        except Exception as exc:
+            reply_message(reply_token, f"⚠️ AI 技能處理失敗：{exc}")
             return True
     if msg in ("行事曆圖檔整理", "上傳行事曆圖片"):
         try:
@@ -227,6 +238,7 @@ def handle_web_command(
     load_nutrition_dri,
     load_nutrition_assessment,
     load_ai_prompt_manager,
+    load_ai_skill_manager,
     load_training_agent,
     load_followup,
     load_motivation,
@@ -235,6 +247,11 @@ def handle_web_command(
     if cmd == "查詢AI提示詞" or cmd.startswith("查詢AI提示詞 ") or cmd.startswith("更新AI提示詞 "):
         pm = load_ai_prompt_manager()
         result = pm.handle_command(cmd)
+        if result:
+            return result
+    if cmd == "查詢AI技能" or cmd.startswith("查詢AI技能 ") or cmd.startswith("更新AI技能 "):
+        sm = load_ai_skill_manager()
+        result = sm.handle_command(cmd)
         if result:
             return result
 
@@ -363,6 +380,7 @@ def handle_line_command(
     load_nutrition_dri,
     load_nutrition_assessment,
     load_ai_prompt_manager,
+    load_ai_skill_manager,
     load_followup_suggestion,
     load_training_agent,
     load_followup,
@@ -400,6 +418,7 @@ def handle_line_command(
         load_nutrition_dri=load_nutrition_dri,
         load_nutrition_assessment=load_nutrition_assessment,
         load_ai_prompt_manager=load_ai_prompt_manager,
+        load_ai_skill_manager=load_ai_skill_manager,
         load_training_agent=load_training_agent,
         load_followup=load_followup,
         load_motivation=load_motivation,
@@ -418,6 +437,7 @@ def handle_web_command(
     load_nutrition_dri,
     load_nutrition_assessment,
     load_ai_prompt_manager,
+    load_ai_skill_manager,
     load_followup_suggestion,
     load_training_agent,
     load_followup,
@@ -446,6 +466,7 @@ def handle_web_command(
         load_nutrition_dri=load_nutrition_dri,
         load_nutrition_assessment=load_nutrition_assessment,
         load_ai_prompt_manager=load_ai_prompt_manager,
+        load_ai_skill_manager=load_ai_skill_manager,
         load_training_agent=load_training_agent,
         load_followup=load_followup,
         load_motivation=load_motivation,

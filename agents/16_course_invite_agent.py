@@ -40,6 +40,22 @@ def _load_prompt_manager():
     module = _ilu.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _load_skill_manager():
+    path = BASE_DIR / "agents" / "22_ai_skill_manager.py"
+    spec = _ilu.spec_from_file_location("ai_skill_manager", str(path))
+    module = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _with_course_skill(prompt: str) -> str:
+    try:
+        skill_text = _load_skill_manager().render_skill("course_invite_strategy").strip()
+    except Exception:
+        skill_text = ""
+    return f"{skill_text}\n\n{prompt}".strip() if skill_text else prompt
 from hashlib import md5
 from pathlib import Path
 
@@ -983,12 +999,12 @@ def optimize_promo(promo_id: str) -> str:
     meetings = list_meetings()
     mtg_summary = format_meetings(meetings) if meetings else "目前沒有今日之後的課程會議。"
     pm = _load_prompt_manager()
-    prompt = pm.render_prompt(
+    prompt = _with_course_skill(pm.render_prompt(
         "course_promo_optimize",
         mtg_summary=mtg_summary,
         promo_title=promo["title"],
         promo_content=promo["content"],
-    )
+    ))
     _log(f"優化課程文宣 {promo_id}")
     optimized = _run_codex(prompt, timeout=90)
     promos = _load_promos()
@@ -1018,13 +1034,13 @@ def generate_prospect_invite(name: str = "") -> str:
         target_desc = "針對一般潛在家人產生邀約文宣"
         person_block = "未指定特定對象。"
     pm = _load_prompt_manager()
-    prompt = pm.render_prompt(
+    prompt = _with_course_skill(pm.render_prompt(
         "course_invite_prospect_general",
         mtg_summary=mtg_summary,
         promo_section=promo_section,
         target_desc=target_desc,
         person_block=person_block,
-    )
+    ))
     _log(f"產生潛在家人邀約文宣 {name or '(通用)'}")
     return _run_codex(prompt, timeout=90)
 
@@ -1042,12 +1058,12 @@ def generate_partner_invite(name: str = "") -> str:
         target_desc = "針對一般跟進夥伴產生邀約文宣"
         person_block = "未指定特定對象。"
     pm = _load_prompt_manager()
-    prompt = pm.render_prompt(
+    prompt = _with_course_skill(pm.render_prompt(
         "course_invite_partner_general",
         mtg_summary=mtg_summary,
         target_desc=target_desc,
         person_block=person_block,
-    )
+    ))
     _log(f"產生跟進夥伴邀約文宣 {name or '(通用)'}")
     return _run_codex(prompt, timeout=90)
 
@@ -1060,7 +1076,7 @@ def generate_prospect_invite_for_meeting(name: str, meeting: dict) -> str:
     promo_section = ("課程文宣內容：\n" + promo_content) if promo_content else "目前沒有課程文宣內容。"
     when = meeting["date"] + (f" {meeting['time']}" if meeting.get("time") else "")
     pm = _load_prompt_manager()
-    prompt = pm.render_prompt(
+    prompt = _with_course_skill(pm.render_prompt(
         "course_invite_prospect_meeting",
         name=name,
         meeting_title=_safe_text(meeting.get("title")),
@@ -1073,7 +1089,7 @@ def generate_prospect_invite_for_meeting(name: str, meeting: dict) -> str:
         topic_desc=_safe_text(meeting.get("topic_desc")) or "未提供",
         promo_section=promo_section,
         person_block=_person_block_from_info(name, info),
-    )
+    ))
     _log(f"產生潛在家人指定會議邀約 {name} / {meeting['title']}")
     result = _run_codex(prompt, timeout=90)
     save_invite(meeting["id"], name, "prospect", result)
@@ -1084,7 +1100,7 @@ def generate_partner_invite_for_meeting(name: str, meeting: dict) -> str:
     info = _load_partner_info(name)
     when = meeting["date"] + (f" {meeting['time']}" if meeting.get("time") else "")
     pm = _load_prompt_manager()
-    prompt = pm.render_prompt(
+    prompt = _with_course_skill(pm.render_prompt(
         "course_invite_partner_meeting",
         name=name,
         meeting_title=_safe_text(meeting.get("title")),
@@ -1096,7 +1112,7 @@ def generate_partner_invite_for_meeting(name: str, meeting: dict) -> str:
         topics=_safe_text(meeting.get("topics")) or "未提供",
         topic_desc=_safe_text(meeting.get("topic_desc")) or "未提供",
         person_block=_person_block_from_info(name, info),
-    )
+    ))
     _log(f"產生跟進夥伴指定會議邀約 {name} / {meeting['title']}")
     result = _run_codex(prompt, timeout=90)
     save_invite(meeting["id"], name, "partner", result)

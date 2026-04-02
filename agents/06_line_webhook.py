@@ -227,6 +227,16 @@ def _load_ai_prompt_manager():
     return m
 
 
+def _load_ai_skill_manager():
+    spec = _ilu.spec_from_file_location(
+        "ai_skill_manager",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "22_ai_skill_manager.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
 def _load_followup_suggestion():
     spec = _ilu.spec_from_file_location(
         "followup_suggestion_agent",
@@ -625,6 +635,11 @@ HELP_TEXT = TEXT_HELP_TEXT
 EXEC_MENU_ITEMS = TEXT_EXEC_MENU_ITEMS
 EXEC_MENU_TEXT = TEXT_EXEC_MENU_TEXT
 
+EXEC_MENU_ITEMS[79] = {"label": "查詢AI技能", "cmd": "查詢AI技能", "prompt": None}
+EXEC_MENU_ITEMS[80] = {"label": "修改AI技能", "cmd": None, "prompt": "請輸入：更新AI技能 key | 新內容"}
+EXEC_MENU_TEXT += "\n\n🤖 AI 技能管理\n 79. 查詢AI技能 ▶\n 80. 修改AI技能"
+HELP_TEXT += "\n\n🤖 AI 技能管理\n  查詢AI技能\n  查詢AI技能 key\n  更新AI技能 key | 新內容\n"
+
 _load_training = common_load_training
 _load_calendar = common_load_calendar
 _load_partner = common_load_partner
@@ -998,6 +1013,7 @@ def handle_training_command(user_msg: str, reply_token: str,
         load_nutrition_dri=_load_nutrition_dri,
         load_nutrition_assessment=_load_nutrition_assessment,
         load_ai_prompt_manager=_load_ai_prompt_manager,
+        load_ai_skill_manager=_load_ai_skill_manager,
         load_followup_suggestion=_load_followup_suggestion,
         load_training_agent=_load_training_agent,
         load_followup=_load_followup,
@@ -1501,6 +1517,7 @@ def process_web_command(cmd: str) -> str:
         load_nutrition_dri=_load_nutrition_dri,
         load_nutrition_assessment=_load_nutrition_assessment,
         load_ai_prompt_manager=_load_ai_prompt_manager,
+        load_ai_skill_manager=_load_ai_skill_manager,
         load_followup_suggestion=_load_followup_suggestion,
         load_training_agent=_load_training_agent,
         load_followup=_load_followup,
@@ -1739,6 +1756,7 @@ _webhook_api_routes.register_api_routes(
     load_daily_report=lambda: _load_daily_report(),
     load_nutrition_assessment=lambda: _load_nutrition_assessment(),
     load_ai_prompt_manager=lambda: _load_ai_prompt_manager(),
+    load_ai_skill_manager=lambda: _load_ai_skill_manager(),
 )
 
 
