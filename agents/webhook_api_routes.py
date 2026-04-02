@@ -12,6 +12,7 @@ def register_api_routes(
     load_nutrition_assessment,
     load_ai_prompt_manager,
     load_ai_skill_manager,
+    load_training_system,
 ):
     @app.route("/api/command", methods=["POST"])
     def api_command():
@@ -183,6 +184,22 @@ def register_api_routes(
                 )
             items.sort(key=lambda x: x.get("id", ""))
             return {"result": items}
+        except Exception as e:
+            return {"result": [], "error": str(e)}, 500
+
+    @app.route("/api/training-modules", methods=["GET"])
+    def api_training_modules():
+        try:
+            rows = load_training_system().list_module_options()
+            return {"result": rows}
+        except Exception as e:
+            return {"result": [], "error": str(e)}, 500
+
+    @app.route("/api/training-sessions", methods=["GET"])
+    def api_training_sessions():
+        try:
+            rows = load_training_system().list_session_options()
+            return {"result": rows}
         except Exception as e:
             return {"result": [], "error": str(e)}, 500
 

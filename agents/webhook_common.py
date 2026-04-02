@@ -46,6 +46,10 @@ def _load_training_agent():
     return _load_module("training_agent", "12_training_agent.py")
 
 
+def _load_training_system():
+    return _load_module("training_system_agent", "23_training_system_agent.py")
+
+
 def _load_followup():
     return _load_module("followup_agent", "13_followup_agent.py")
 

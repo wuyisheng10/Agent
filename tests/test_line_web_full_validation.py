@@ -290,6 +290,31 @@ class _FakeTrainingAgentModule:
         return _FakeTrainingAgent()
 
 
+class _FakeTrainingSystemAgent:
+    @staticmethod
+    def handle_command(cmd):
+        return f"TRAINING_SYSTEM:{cmd}"
+
+
+class _FakeTrainingSystemModule:
+    def TrainingSystemAgent(self):
+        return _FakeTrainingSystemAgent()
+
+    @staticmethod
+    def list_module_options():
+        return [
+            {"id": "TM-FOUR-COURAGE", "title": "四個勇於", "category": "領導人特質"},
+            {"id": "TM-SEVEN-DAY", "title": "七天法則", "category": "新人守則"},
+        ]
+
+    @staticmethod
+    def list_session_options():
+        return [
+            {"id": "TS-20260410-001", "title": "領導人特質｜四個勇於", "date": "2026-04-10", "module_id": "TM-FOUR-COURAGE"},
+            {"id": "TS-20260412-001", "title": "新人七天法則", "date": "2026-04-12", "module_id": "TM-SEVEN-DAY"},
+        ]
+
+
 class _FakeFollowupAgent:
     @staticmethod
     def generate_report_text():
@@ -359,7 +384,12 @@ FORM_SAMPLES = {
     "新增潛在家人": "新增潛在家人 王小美|老師|朋友介紹|備註",
     "加入潛在家人資訊": "潛在家人資料 王小美",
     "修改潛在家人資訊": "更新潛在家人 王小美|地區:台中西屯|地址:民生路123號|電話:0912345678",
-    "查詢培訓進度": "培訓 建德",
+    "新增培訓模組": "新增培訓模組 四個勇於 | 領導人特質 | 建立領導人思維 | 勇於學習、勇於認錯、勇於改變、勇於承擔",
+    "查詢培訓模組": "查詢培訓模組 四個勇於",
+    "新增培訓課程": "新增培訓課程 領導人特質｜四個勇於 | 四個勇於 | 2026-04-10 | 19:30 | 台南教室 | 鐘老師 | 夥伴",
+    "查詢培訓課程": "查詢培訓課程 四個勇於",
+    "新增培訓反思": "新增培訓反思 建德 | 領導人特質｜四個勇於 | 願意認錯 | 學到四個勇於 | 每天回報市場 | 建立帶線節奏",
+    "查詢培訓進度": "查詢培訓進度 建德",
     "激勵夥伴": "激勵 建德 最近需要鼓勵",
     "里程碑記錄": "里程碑 建德 首次達成目標",
     "新增夥伴": "新增夥伴 建德 | 月入三萬 | 2026-04-05 | 持續跟進 | A",
@@ -420,6 +450,7 @@ class FullLineWebValidationTest(unittest.TestCase):
         self.stack.enter_context(patch.object(webhook, "_load_nutrition_assessment", return_value=_FakeNutritionAssessmentModule()))
         self.stack.enter_context(patch.object(webhook, "_load_followup_suggestion", return_value=_FakeFollowupSuggestionModule()))
         self.stack.enter_context(patch.object(webhook, "_load_training_agent", return_value=_FakeTrainingAgentModule()))
+        self.stack.enter_context(patch.object(webhook, "_load_training_system", return_value=_FakeTrainingSystemModule()))
         self.stack.enter_context(patch.object(webhook, "_load_followup", return_value=_FakeFollowupModule()))
         self.stack.enter_context(patch.object(webhook, "_load_motivation", return_value=_FakeMotivationModule()))
         self.stack.enter_context(patch.object(webhook, "_load_training", return_value=_FakeTrainingLogModule()))
@@ -678,6 +709,14 @@ class FullLineWebValidationTest(unittest.TestCase):
         self.assertIn('pick:"people"', html)
         self.assertIn('pick:"promo"', html)
         self.assertIn("/api/course-promos", html)
+
+    def test_web_html_contains_training_module_and_session_sources(self):
+        html = webhook._render_dashboard_html_v2()
+        self.assertIn("新增培訓模組", html)
+        self.assertIn("新增培訓課程", html)
+        self.assertIn("新增培訓反思", html)
+        self.assertIn("/api/training-modules", html)
+        self.assertIn("/api/training-sessions", html)
 
 
     def test_training_progress_form_uses_partner_select(self):

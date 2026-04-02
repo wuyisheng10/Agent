@@ -38,6 +38,7 @@ try:
         _load_partner as common_load_partner,
         _load_training as common_load_training,
         _load_training_agent as common_load_training_agent,
+        _load_training_system as common_load_training_system,
     )
     from webhook_text import (
         EXEC_MENU_ITEMS as TEXT_EXEC_MENU_ITEMS,
@@ -68,6 +69,7 @@ except ModuleNotFoundError:
         _load_partner as common_load_partner,
         _load_training as common_load_training,
         _load_training_agent as common_load_training_agent,
+        _load_training_system as common_load_training_system,
     )
     from agents.webhook_text import (
         EXEC_MENU_ITEMS as TEXT_EXEC_MENU_ITEMS,
@@ -151,6 +153,16 @@ def _load_followup():
     spec = _ilu.spec_from_file_location(
         "followup_agent",
         str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "13_followup_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _load_training_system():
+    spec = _ilu.spec_from_file_location(
+        "training_system_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "23_training_system_agent.py")
     )
     m = _ilu.module_from_spec(spec)
     spec.loader.exec_module(m)
@@ -645,6 +657,7 @@ _load_calendar = common_load_calendar
 _load_partner = common_load_partner
 _load_market_dev = common_load_market_dev
 _load_training_agent = common_load_training_agent
+_load_training_system = common_load_training_system
 _load_followup = common_load_followup
 _load_motivation = common_load_motivation
 _load_classifier = common_load_classifier
@@ -1023,6 +1036,7 @@ def handle_training_command(user_msg: str, reply_token: str,
         load_ai_skill_manager=_load_ai_skill_manager,
         load_followup_suggestion=_load_followup_suggestion,
         load_training_agent=_load_training_agent,
+        load_training_system=_load_training_system,
         load_followup=_load_followup,
         load_motivation=_load_motivation,
     )
@@ -1557,6 +1571,7 @@ def process_web_command(cmd: str) -> str:
         load_ai_skill_manager=_load_ai_skill_manager,
         load_followup_suggestion=_load_followup_suggestion,
         load_training_agent=_load_training_agent,
+        load_training_system=_load_training_system,
         load_followup=_load_followup,
         load_motivation=_load_motivation,
     )
@@ -1841,6 +1856,7 @@ _webhook_api_routes.register_api_routes(
     load_nutrition_assessment=lambda: _load_nutrition_assessment(),
     load_ai_prompt_manager=lambda: _load_ai_prompt_manager(),
     load_ai_skill_manager=lambda: _load_ai_skill_manager(),
+    load_training_system=lambda: _load_training_system(),
 )
 
 

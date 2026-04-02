@@ -19,6 +19,7 @@ def handle_line_command(
     load_ai_prompt_manager,
     load_ai_skill_manager,
     load_training_agent,
+    load_training_system,
     load_followup,
     load_motivation,
 ):
@@ -223,6 +224,26 @@ def handle_line_command(
             reply_message(reply_token, f"✗ 飲食評估指令失敗：{exc}")
             return True
 
+    training_system_prefixes = (
+        "新增培訓模組",
+        "查詢培訓模組",
+        "新增培訓課程",
+        "查詢培訓課程",
+        "新增培訓反思",
+        "查詢培訓進度",
+        "查詢培訓總表",
+    )
+    if any(msg.startswith(prefix) for prefix in training_system_prefixes):
+        try:
+            training_system = load_training_system()
+            result = training_system.TrainingSystemAgent().handle_command(msg)
+            if result:
+                reply_message(reply_token, result)
+                return True
+        except Exception as exc:
+            reply_message(reply_token, f"✗ 培訓系統指令失敗：{exc}")
+            return True
+
     if msg.startswith("培訓"):
         try:
             training = load_training_agent()
@@ -272,6 +293,7 @@ def handle_web_command(
     load_ai_prompt_manager,
     load_ai_skill_manager,
     load_training_agent,
+    load_training_system,
     load_followup,
     load_motivation,
 ):
@@ -389,6 +411,21 @@ def handle_web_command(
         result = na_mod.handle_command(cmd, sessions, "web")
         return result if result else "⚠️ 無結果"
 
+    training_system_prefixes = (
+        "新增培訓模組",
+        "查詢培訓模組",
+        "新增培訓課程",
+        "查詢培訓課程",
+        "新增培訓反思",
+        "查詢培訓進度",
+        "查詢培訓總表",
+    )
+    if any(cmd.startswith(prefix) for prefix in training_system_prefixes):
+        training_system = load_training_system()
+        result = training_system.TrainingSystemAgent().handle_command(cmd)
+        if result:
+            return result
+
     if cmd.startswith("培訓"):
         training = load_training_agent()
         return training.TrainingAgent().handle_query(cmd)
@@ -427,6 +464,7 @@ def handle_line_command(
     load_ai_skill_manager,
     load_followup_suggestion,
     load_training_agent,
+    load_training_system,
     load_followup,
     load_motivation,
 ):
@@ -464,6 +502,7 @@ def handle_line_command(
         load_ai_prompt_manager=load_ai_prompt_manager,
         load_ai_skill_manager=load_ai_skill_manager,
         load_training_agent=load_training_agent,
+        load_training_system=load_training_system,
         load_followup=load_followup,
         load_motivation=load_motivation,
     )
@@ -484,6 +523,7 @@ def handle_web_command(
     load_ai_skill_manager,
     load_followup_suggestion,
     load_training_agent,
+    load_training_system,
     load_followup,
     load_motivation,
 ):
@@ -512,6 +552,7 @@ def handle_web_command(
         load_ai_prompt_manager=load_ai_prompt_manager,
         load_ai_skill_manager=load_ai_skill_manager,
         load_training_agent=load_training_agent,
+        load_training_system=load_training_system,
         load_followup=load_followup,
         load_motivation=load_motivation,
     )
