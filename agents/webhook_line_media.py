@@ -68,6 +68,8 @@ def handle_audio_message(
     download_line_content,
     reply_message,
     schedule_pending_menu,
+    awaiting_partner_voice_add,
+    load_partner,
 ):
     msg_id = event["message"]["id"]
     reply_token = event["replyToken"]
@@ -78,6 +80,27 @@ def handle_audio_message(
     data = download_line_content(msg_id, timeout=60)
     if data is None:
         reply_message(reply_token, "⚠️ 音檔下載失敗，請重試")
+        return
+
+    if awaiting_partner_voice_add.get(scope_id):
+        awaiting_partner_voice_add.pop(scope_id, None)
+        try:
+            transcript = _transcribe_audio_bytes(data)
+            command = normalize_voice_followup_add(transcript)
+            result = load_partner().handle_partner_command(command)
+            reply_message(
+                reply_token,
+                "🎙️ 已完成語音新增跟進夥伴\n"
+                f"轉文字內容：\n{transcript}\n\n{result}",
+            )
+        except Exception as e:
+            reply_message(
+                reply_token,
+                "⚠️ 語音新增跟進夥伴失敗\n"
+                f"{e}\n\n"
+                "請改用這個格式手動送出：\n"
+                "新增跟進夥伴 姓名 | 目標 | 下次跟進日期 | 備註 | 分類",
+            )
         return
 
     mode = (mode_info or {}).get("mode", "auto")
@@ -165,3 +188,77 @@ def handle_file_message(
     clf.stage_file(data, safe, "file", scope_id, content_type=event.get("message", {}).get("fileName", ""), source_name=orig_name)
     schedule_pending_menu(clf, scope_id, scope_id)
 
+import os
+import re
+from tempfile import NamedTemporaryFile
+
+try:
+    from webhook_partner_voice import normalize_voice_followup_add
+except Exception:  # pragma: no cover
+    from agents.webhook_partner_voice import normalize_voice_followup_add
+
+try:
+    import requests
+except Exception:  # pragma: no cover
+    requests = None
+
+
+def _transcribe_audio_bytes(audio_bytes: bytes, suffix: str = ".m4a") -> str:
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("未設定 OPENAI_API_KEY，無法執行語音轉文字")
+    if requests is None:
+        raise RuntimeError("缺少 requests，無法執行語音轉文字")
+    with NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(audio_bytes)
+        tmp_path = tmp.name
+    try:
+        with open(tmp_path, "rb") as f:
+            resp = requests.post(
+                "https://api.openai.com/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                data={"model": "gpt-4o-mini-transcribe", "language": "zh"},
+                files={"file": (os.path.basename(tmp_path), f, "audio/m4a")},
+                timeout=120,
+            )
+        if not resp.ok:
+            raise RuntimeError(f"語音轉文字失敗：{resp.status_code} {resp.text[:200]}")
+        return (resp.json().get("text", "") or "").strip()
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
+def _normalize_voice_add_command(transcript: str) -> str:
+    text = (transcript or "").strip()
+    if not text:
+        raise ValueError("語音內容為空")
+    text = text.replace("，", ",").replace("。", ",").replace("；", ",")
+    text = re.sub(r"\s+", " ", text)
+    name = goal = next_followup = note = category = ""
+    m = re.search(r"(?:姓名|夥伴|跟進夥伴)\s*[:：]?\s*([^\s,]+)", text)
+    if m:
+        name = m.group(1).strip()
+    m = re.search(r"目標\s*[:：]?\s*([^,]+)", text)
+    if m:
+        goal = m.group(1).strip()
+    m = re.search(r"(?:下次跟進|跟進日期|日期)\s*[:：]?\s*([^,]+)", text)
+    if m:
+        next_followup = m.group(1).strip()
+    m = re.search(r"備註\s*[:：]?\s*([^,]+)", text)
+    if m:
+        note = m.group(1).strip()
+    m = re.search(r"分類\s*[:：]?\s*([ABCabc])", text)
+    if m:
+        category = m.group(1).upper()
+    next_followup = (
+        next_followup.replace("年", "-").replace("月", "-").replace("日", "").replace("/", "-").replace(" ", "")
+    )
+    if re.fullmatch(r"\d{4}-\d{1,2}-\d{1,2}", next_followup or ""):
+        y, mo, d = next_followup.split("-")
+        next_followup = f"{int(y):04d}-{int(mo):02d}-{int(d):02d}"
+    if not name or not next_followup:
+        raise ValueError("語音內容缺少姓名或日期")
+    return f"新增跟進夥伴 {name} | {goal} | {next_followup} | {note} | {category}"

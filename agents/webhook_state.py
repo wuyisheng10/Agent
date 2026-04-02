@@ -12,6 +12,7 @@ _awaiting_invite_manage_select: dict = {}
 _awaiting_invite_manage_action: dict = {}
 _awaiting_invite_manage_edit: dict = {}
 _awaiting_promo_optimize_apply: dict = {}
+_awaiting_partner_voice_add: dict = {}
 _web_invite_combos: dict = {}
 _web_partner_invite_state: dict = {}
 _web_invite_manage_state: dict = {}

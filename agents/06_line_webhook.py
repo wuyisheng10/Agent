@@ -226,6 +226,16 @@ def _load_ai_prompt_manager():
     spec.loader.exec_module(m)
     return m
 
+
+def _load_followup_suggestion():
+    spec = _ilu.spec_from_file_location(
+        "followup_suggestion_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "21_followup_suggestion_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
 load_dotenv(dotenv_path=r"C:\Users\user\claude AI_Agent\.env")
 
 BASE_DIR        = Path(r"C:\Users\user\claude AI_Agent")
@@ -988,6 +998,7 @@ def handle_training_command(user_msg: str, reply_token: str,
         load_nutrition_dri=_load_nutrition_dri,
         load_nutrition_assessment=_load_nutrition_assessment,
         load_ai_prompt_manager=_load_ai_prompt_manager,
+        load_followup_suggestion=_load_followup_suggestion,
         load_training_agent=_load_training_agent,
         load_followup=_load_followup,
         load_motivation=_load_motivation,
@@ -1490,6 +1501,7 @@ def process_web_command(cmd: str) -> str:
         load_nutrition_dri=_load_nutrition_dri,
         load_nutrition_assessment=_load_nutrition_assessment,
         load_ai_prompt_manager=_load_ai_prompt_manager,
+        load_followup_suggestion=_load_followup_suggestion,
         load_training_agent=_load_training_agent,
         load_followup=_load_followup,
         load_motivation=_load_motivation,

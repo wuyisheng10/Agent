@@ -37,11 +37,11 @@ class AIPromptManagerTest(unittest.TestCase):
         detail = prompt_manager.handle_command("查詢AI提示詞 course_promo_optimize")
         self.assertIn("優化課程文宣", detail)
 
-        updated = prompt_manager.handle_command("更新AI提示詞 course_promo_optimize | 新提示詞內容")
-        self.assertIn("已更新 AI 提示詞", updated)
+        updated = prompt_manager.handle_command("更新AI提示詞 course_promo_optimize | 新版提示詞內容")
+        self.assertIn("已更新", updated)
 
         detail2 = prompt_manager.handle_command("查詢AI提示詞 course_promo_optimize")
-        self.assertIn("新提示詞內容", detail2)
+        self.assertIn("新版提示詞內容", detail2)
 
     def test_web_and_help_entry_present(self):
         self.assertIn("查詢AI提示詞", webhook.HELP_TEXT)
@@ -50,6 +50,8 @@ class AIPromptManagerTest(unittest.TestCase):
         html = webhook._render_dashboard_html_v2()
         self.assertIn("AI 提示詞", html)
         self.assertIn("修改AI提示詞", html)
+        self.assertIn("/api/ai-prompt/", html)
+        self.assertIn("目前提示詞預覽", html)
 
 
 if __name__ == "__main__":

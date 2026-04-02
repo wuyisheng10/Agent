@@ -341,3 +341,112 @@ def handle_web_command(
         return motivation.MotivationAgent().handle_realtime(cmd)
 
     return None
+
+
+_ORIGINAL_HANDLE_LINE_COMMAND = handle_line_command
+_ORIGINAL_HANDLE_WEB_COMMAND = handle_web_command
+
+
+def handle_line_command(
+    msg: str,
+    reply_token: str,
+    push_target: str,
+    sessions: dict,
+    reply_message: Callable[[str, str], None],
+    push_message: Callable[[str, str], None],
+    load_calendar,
+    load_partner,
+    load_classifier,
+    load_market_dev,
+    load_course_invite,
+    load_daily_report,
+    load_nutrition_dri,
+    load_nutrition_assessment,
+    load_ai_prompt_manager,
+    load_followup_suggestion,
+    load_training_agent,
+    load_followup,
+    load_motivation,
+):
+    msg = (msg or "").strip()
+    if (
+        msg == "跟進建議 潛在家人"
+        or msg == "跟進建議 夥伴"
+        or msg.startswith("跟進建議 潛在家人 ")
+        or msg.startswith("跟進建議 夥伴 ")
+    ):
+        try:
+            suggestion = load_followup_suggestion()
+            result = suggestion.FollowupSuggestionAgent().handle_command(msg)
+            if result:
+                reply_message(reply_token, result)
+                return True
+        except Exception as exc:
+            reply_message(reply_token, f"⚠️ 跟進建議產生失敗：{exc}")
+            return True
+    return _ORIGINAL_HANDLE_LINE_COMMAND(
+        msg=msg,
+        reply_token=reply_token,
+        push_target=push_target,
+        sessions=sessions,
+        reply_message=reply_message,
+        push_message=push_message,
+        load_calendar=load_calendar,
+        load_partner=load_partner,
+        load_classifier=load_classifier,
+        load_market_dev=load_market_dev,
+        load_course_invite=load_course_invite,
+        load_daily_report=load_daily_report,
+        load_nutrition_dri=load_nutrition_dri,
+        load_nutrition_assessment=load_nutrition_assessment,
+        load_ai_prompt_manager=load_ai_prompt_manager,
+        load_training_agent=load_training_agent,
+        load_followup=load_followup,
+        load_motivation=load_motivation,
+    )
+
+
+def handle_web_command(
+    cmd: str,
+    sessions: dict,
+    load_calendar,
+    load_partner,
+    load_classifier,
+    load_market_dev,
+    load_course_invite,
+    load_daily_report,
+    load_nutrition_dri,
+    load_nutrition_assessment,
+    load_ai_prompt_manager,
+    load_followup_suggestion,
+    load_training_agent,
+    load_followup,
+    load_motivation,
+):
+    cmd = (cmd or "").strip()
+    if (
+        cmd == "跟進建議 潛在家人"
+        or cmd == "跟進建議 夥伴"
+        or cmd.startswith("跟進建議 潛在家人 ")
+        or cmd.startswith("跟進建議 夥伴 ")
+    ):
+        suggestion = load_followup_suggestion()
+        result = suggestion.FollowupSuggestionAgent().handle_command(cmd)
+        if result:
+            return result
+    return _ORIGINAL_HANDLE_WEB_COMMAND(
+        cmd=cmd,
+        sessions=sessions,
+        load_calendar=load_calendar,
+        load_partner=load_partner,
+        load_classifier=load_classifier,
+        load_market_dev=load_market_dev,
+        load_course_invite=load_course_invite,
+        load_daily_report=load_daily_report,
+        load_nutrition_dri=load_nutrition_dri,
+        load_nutrition_assessment=load_nutrition_assessment,
+        load_ai_prompt_manager=load_ai_prompt_manager,
+        load_training_agent=load_training_agent,
+        load_followup=load_followup,
+        load_motivation=load_motivation,
+    )

@@ -26,6 +26,7 @@ def process_line_events(
     awaiting_invite_manage_action,
     awaiting_invite_manage_edit,
     awaiting_promo_optimize_apply,
+    awaiting_partner_voice_add,
     looks_like_explicit_command,
     normalize_partner_category_choice,
     partners_by_category,
@@ -141,6 +142,7 @@ def process_line_events(
             awaiting_invite_manage_action.pop(scope, None)
             awaiting_invite_manage_edit.pop(scope, None)
             awaiting_promo_optimize_apply.pop(scope, None)
+            awaiting_partner_voice_add.pop(scope, None)
             reply_message(reply_token, execute_menu_text)
             continue
 
@@ -157,6 +159,13 @@ def process_line_events(
                 reply_message(reply_token, prompt)
                 continue
             if cmd:
+                if cmd == "語音新增跟進夥伴":
+                    awaiting_partner_voice_add[scope] = True
+                    reply_message(
+                        reply_token,
+                        "請直接上傳語音。\n\n建議說法：\n姓名王小美，目標月入三萬，下次跟進2026年4月5日，備註持續跟進，分類A\n\n輸入 NA 可取消。",
+                    )
+                    continue
                 handled = handle_training_command(cmd, reply_token, user_id, group_id)
                 if not handled:
                     reply_message(reply_token, "⚠️ 無法辨識指令，請輸入「說明」查看可用功能。")
@@ -171,6 +180,7 @@ def process_line_events(
             or awaiting_partner_invite_person.get(scope) or awaiting_partner_invite_meeting.get(scope)
             or awaiting_invite_manage_select.get(scope) or awaiting_invite_manage_action.get(scope)
             or awaiting_invite_manage_edit.get(scope) or awaiting_promo_optimize_apply.get(scope)
+            or awaiting_partner_voice_add.get(scope)
         ):
             awaiting_person_for_mode.pop(scope, None)
             awaiting_exec_input.pop(scope, None)
@@ -184,6 +194,7 @@ def process_line_events(
             awaiting_invite_manage_action.pop(scope, None)
             awaiting_invite_manage_edit.pop(scope, None)
             awaiting_promo_optimize_apply.pop(scope, None)
+            awaiting_partner_voice_add.pop(scope, None)
             reply_message(reply_token, "↩️ 已取消，返回待機。")
             continue
 
@@ -199,6 +210,18 @@ def process_line_events(
             awaiting_invite_manage_action.pop(scope, None)
             awaiting_invite_manage_edit.pop(scope, None)
             awaiting_promo_optimize_apply.pop(scope, None)
+            awaiting_partner_voice_add.pop(scope, None)
+
+        if awaiting_partner_voice_add.get(scope) and looks_like_explicit_command(user_msg):
+            awaiting_partner_voice_add.pop(scope, None)
+
+        if user_msg.strip() == "語音新增跟進夥伴":
+            awaiting_partner_voice_add[scope] = True
+            reply_message(
+                reply_token,
+                "請直接上傳語音。\n\n建議說法：\n姓名王小美，目標月入三萬，下次跟進2026年4月5日，備註持續跟進，分類A\n\n輸入 NA 可取消。",
+            )
+            continue
 
         if user_msg.strip().startswith("邀約文宣 跟進夥伴"):
             awaiting_partner_invite_category[scope] = True

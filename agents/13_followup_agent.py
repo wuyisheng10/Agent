@@ -26,6 +26,7 @@ except ModuleNotFoundError:
 
 CSV_DIR      = BASE_DIR / "output" / "csv_data"
 PARTNERS_CSV = CSV_DIR / "partners.csv"
+PARTNERS_JSON = BASE_DIR / "output" / "partners" / "partners.json"
 LOG_FILE     = BASE_DIR / "logs" / "followup_agent_log.txt"
 CONFIG       = BASE_DIR / "config" / "settings.json"
 
@@ -48,9 +49,43 @@ FIELDNAMES = [
 
 def read_csv() -> list[dict]:
     if not PARTNERS_CSV.exists():
-        return []
+        return _read_partners_json()
     with open(PARTNERS_CSV, encoding="utf-8-sig", newline="") as f:
         return list(csv.DictReader(f))
+
+
+def _read_partners_json() -> list[dict]:
+    import json as _json
+
+    if not PARTNERS_JSON.exists():
+        return []
+    with open(PARTNERS_JSON, encoding="utf-8") as f:
+        raw = _json.load(f)
+
+    rows = []
+    for p in raw:
+        updated = (p.get("updated_at") or "")[:10]
+        next_followup = p.get("next_followup", "") or ""
+        records = p.get("records") or []
+        weekly_actions = sum(
+            1
+            for r in records
+            if (r.get("time") or "")[:10] >= (date.today().replace(day=max(1, date.today().day - 6)).isoformat())
+        )
+        rows.append({
+            "憪?": p.get("name", ""),
+            "LINE_UID": "",
+            "?餉店": "",
+            "??交?": (p.get("created_at") or "")[:10],
+            "撌脣??閮予": "",
+            "?敺閮?剜": next_followup or updated,
+            "?敺蝯⊥": updated,
+            "?祇勗?雿": str(weekly_actions),
+            "憸券蝑?": p.get("stage", ""),
+            "??蝣?": p.get("recent_title", "") or p.get("goal", ""),
+            "?酉": p.get("note", ""),
+        })
+    return rows
 
 
 def write_csv(rows: list[dict]):
