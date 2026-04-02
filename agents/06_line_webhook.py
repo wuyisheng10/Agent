@@ -881,7 +881,7 @@ _webhook_intent.configure(SENT_LOG, log)
 
 
 # ============================================================
-# ?? LINE ??????
+# LINE helper wrappers
 # ============================================================
 
 def verify_signature(body: bytes, signature: str) -> bool:
@@ -889,7 +889,7 @@ def verify_signature(body: bytes, signature: str) -> bool:
 
 
 # ============================================================
-# ?? ??????????????API ?????
+# Web API route registration
 # ============================================================
 
 def analyze_intent(user_message: str) -> dict:
@@ -897,7 +897,7 @@ def analyze_intent(user_message: str) -> dict:
 
 
 # ============================================================
-# ?? ??? LINE ???
+# LINE event dispatcher
 # ============================================================
 
 
@@ -914,7 +914,7 @@ def schedule_pending_menu(clf, scope_id: str, push_target: str, delay_sec: int =
 
 
 # ============================================================
-# ?? Webhook ???
+# Webhook entry
 # ============================================================
 
 def _download_line_content(msg_id: str, timeout: int = 30) -> bytes | None:
@@ -1769,7 +1769,7 @@ def update_status(user_id: str, intent: dict):
 
 
 # ============================================================
-# ?? ????????
+# General command handling
 # ============================================================
 
 

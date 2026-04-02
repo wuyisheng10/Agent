@@ -103,6 +103,15 @@ def process_line_events(
 
         if clf_agent:
             pending = clf_agent.get_pending(scope)
+            if pending and pending.get("status") == "awaiting_folder_name":
+                if user_msg.strip().upper() == "NA":
+                    count = len(pending.get("items", []))
+                    clf_agent.clear_pending(scope, remove_file=True)
+                    reply_message(reply_token, f"🗑️ 已取消歸檔，刪除 {count} 個待歸檔項目。")
+                    continue
+                folder_result = clf_agent.submit_pending_folder_name(scope, user_msg.strip())
+                reply_message(reply_token, folder_result or "目錄名稱不可空白，請重新輸入")
+                continue
             folder_result = clf_agent.submit_pending_folder_name(scope, user_msg.strip())
             if folder_result:
                 reply_message(reply_token, folder_result)

@@ -107,7 +107,7 @@ def _safe_name(name: str) -> str:
 
 def _safe_folder_name(name: str) -> str:
     forbidden = '<>:"/\\|?*'
-    cleaned = "".join(c for c in (name or "") if c not in forbidden and ord(c) >= 32)
+    cleaned = "".join("_" if c in forbidden else c for c in (name or "") if ord(c) >= 32)
     return cleaned.strip().strip(".")[:80]
 
 

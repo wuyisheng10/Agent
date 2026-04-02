@@ -279,5 +279,17 @@ class AllFeaturesSmokeTest(unittest.TestCase):
         self.assertEqual(rows[0]["content"], "更新後邀約文宣內容")
 
 
+    def test_classifier_folder_name_with_date_suffix_ascii(self):
+        agent = classifier.ClassifierAgent()
+        agent.stage_text("test archive text", "scope-date")
+        option_index = next(
+            idx for idx, opt in enumerate(agent._build_pending_options(), start=1)
+            if opt["label"] == "421故事歸檔"
+        )
+        agent.execute_pending_option("scope-date", option_index)
+        submit_msg = agent.submit_pending_folder_name("scope-date", "health-report 20260401")
+        self.assertIn("20260401", submit_msg)
+
+
 if __name__ == "__main__":
     unittest.main()

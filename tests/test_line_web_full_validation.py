@@ -68,9 +68,14 @@ class _FakeClassifierAgent:
         return self.pending.get(scope)
 
     def submit_pending_folder_name(self, scope, text):
-        return None
+        pending = self.pending.get(scope)
+        if not pending or pending.get("status") != "awaiting_folder_name":
+            return None
+        self.pending.pop(scope, None)
+        return f"FOLDER:{scope}:{text}"
 
     def execute_pending_option(self, scope, choice):
+        self.pending[scope] = {"status": "awaiting_folder_name"}
         return f"PENDING:{scope}:{choice}"
 
     def format_pending_menu(self, scope):
@@ -380,10 +385,12 @@ class FullLineWebValidationTest(unittest.TestCase):
         webhook._web_partner_invite_state.clear()
         webhook._web_invite_manage_state.clear()
         webhook._web_promo_optimize_state.clear()
+        self.fake_classifier_module = _FakeClassifierModule()
+        self.fake_classifier_agent = self.fake_classifier_module._agent
         self.stack = ExitStack()
         self.stack.enter_context(patch.object(webhook, "_load_calendar", return_value=_FakeCalendarModule()))
         self.stack.enter_context(patch.object(webhook, "_load_partner", return_value=_FakePartnerModule()))
-        self.stack.enter_context(patch.object(webhook, "_load_classifier", return_value=_FakeClassifierModule()))
+        self.stack.enter_context(patch.object(webhook, "_load_classifier", return_value=self.fake_classifier_module))
         self.stack.enter_context(patch.object(webhook, "_load_market_dev", return_value=_FakeMarketDevModule()))
         self.stack.enter_context(patch.object(webhook, "_load_course_invite", return_value=_FakeCourseInviteModule()))
         self.stack.enter_context(patch.object(webhook, "_load_daily_report", return_value=_FakeDailyReportModule()))
@@ -616,6 +623,15 @@ class FullLineWebValidationTest(unittest.TestCase):
         self.assertIn("/api/partner-statuses", html)
         self.assertIn("查詢夥伴狀態定義", html)
 
+
+    def test_line_pending_folder_name_is_consumed_before_intent(self):
+        self.fake_classifier_agent.pending["U-test"] = {
+            "status": "awaiting_folder_name",
+            "items": [{"type": "image", "name": "test.jpg"}],
+        }
+        replies, pushes = self._run_line_sequence(["health-report 20260401"])
+        all_msgs = replies + pushes
+        self.assertTrue(any("FOLDER:U-test:health-report 20260401" in x for x in all_msgs))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

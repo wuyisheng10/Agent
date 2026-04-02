@@ -189,4 +189,4 @@ Use this checklist after switching back to the refactor branch.
 - Multi-step LINE flows must be interruptible by explicit commands.
 - Archive-mode actions must not fall back to intent-analysis replies.
 - Web form dialogs must render select/date/time fields and submit successfully.
-- Side-effect actions should be checked with real output: ??, ????, ??????, ???????.
+- Side-effect actions should be checked with real output: 整理、再次整理、寄送每日報告、更新官方營養素標準。
