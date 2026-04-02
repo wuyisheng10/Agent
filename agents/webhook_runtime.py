@@ -67,7 +67,7 @@ def schedule_pending_menu(clf, scope_id: str, push_target: str, push_message_fun
         time.sleep(delay_sec)
         if clf.should_push_pending_menu(scope_id, token):
             push_message_func(push_target, clf.format_pending_menu(scope_id))
-            clf.mark_menu_sent(scope_id)
+            clf.mark_menu_sent(scope_id, token)
 
     threading.Thread(target=_worker, daemon=True).start()
 

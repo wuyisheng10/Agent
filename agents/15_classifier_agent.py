@@ -507,8 +507,9 @@ class ClassifierAgent:
             "source_name": source_name,
             "pending_path": str(pending_path),
         })
-        pending["status"] = "collecting"
-        pending["selected_option"] = None
+        if pending.get("status") != "awaiting_folder_name":
+            pending["status"] = "collecting"
+            pending["selected_option"] = None
         log(f"  待歸檔暫存：{pending_path}")
         self._save_pending(scope_id, pending)
         return self.get_stage_message(scope_id)
@@ -532,8 +533,9 @@ class ClassifierAgent:
             "source_name": "text",
             "pending_path": str(pending_path),
         })
-        pending["status"] = "collecting"
-        pending["selected_option"] = None
+        if pending.get("status") != "awaiting_folder_name":
+            pending["status"] = "collecting"
+            pending["selected_option"] = None
         self._save_pending(scope_id, pending)
         log(f"  待歸檔文字暫存：{pending_path}")
         return self.get_stage_message(scope_id)
@@ -562,9 +564,13 @@ class ClassifierAgent:
             and pending.get("items")
         )
 
-    def mark_menu_sent(self, scope_id: str):
+    def mark_menu_sent(self, scope_id: str, token: str = ""):
         pending = self.get_pending(scope_id)
         if not pending:
+            return
+        if pending.get("status") != "collecting":
+            return
+        if token and pending.get("menu_token") != token:
             return
         pending["status"] = "awaiting_choice"
         self._save_pending(scope_id, pending)
@@ -610,6 +616,7 @@ class ClassifierAgent:
         try:
             pending["status"] = "awaiting_folder_name"
             pending["selected_option"] = option
+            pending["menu_token"] = ""
             self._save_pending(scope_id, pending)
             return (f"已選擇：{label}\n"
                     f"請輸入歸檔目錄名稱\n"

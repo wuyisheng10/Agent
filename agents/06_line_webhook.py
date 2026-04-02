@@ -1463,6 +1463,26 @@ def archive_browse(subpath):
 
 def process_web_command(cmd: str) -> str:
     """Handle all bot commands and return a string result (no LINE reply)."""
+    web_scope = "web_user"
+    try:
+        clf = _load_classifier().ClassifierAgent()
+        pending = clf.get_pending(web_scope)
+        if pending and pending.get("status") == "awaiting_folder_name":
+            if cmd.strip().upper() == "NA":
+                count = len(pending.get("items", []))
+                clf.clear_pending(web_scope, remove_file=True)
+                return f"🗑️ 已取消歸檔，刪除 {count} 個待歸檔項目。"
+            return clf.submit_pending_folder_name(web_scope, cmd.strip()) or "目錄名稱不可空白，請重新輸入"
+        if pending and cmd.strip().isdigit():
+            return clf.execute_pending_option(web_scope, int(cmd.strip()))
+        if pending and cmd.strip() in {"待歸檔", "查詢待歸檔"}:
+            return clf.format_pending_menu(web_scope)
+        if pending and cmd.strip().upper() == "NA":
+            count = len(pending.get("items", []))
+            clf.clear_pending(web_scope, remove_file=True)
+            return f"🗑️ 已取消歸檔，刪除 {count} 個待歸檔項目。"
+    except Exception:
+        pass
     if cmd.strip() == "查詢已產生的今日之後會議邀約文宣":
         try:
             course = _load_course_invite()

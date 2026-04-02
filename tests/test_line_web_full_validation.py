@@ -633,5 +633,13 @@ class FullLineWebValidationTest(unittest.TestCase):
         all_msgs = replies + pushes
         self.assertTrue(any("FOLDER:U-test:health-report 20260401" in x for x in all_msgs))
 
+    def test_web_pending_folder_name_is_consumed_before_intent(self):
+        self.fake_classifier_agent.pending["web_user"] = {
+            "status": "awaiting_folder_name",
+            "items": [{"type": "image", "name": "test.jpg"}],
+        }
+        result = webhook.process_web_command("health-report 20260401")
+        self.assertEqual(result, "FOLDER:web_user:health-report 20260401")
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

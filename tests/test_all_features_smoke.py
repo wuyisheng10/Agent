@@ -290,6 +290,29 @@ class AllFeaturesSmokeTest(unittest.TestCase):
         submit_msg = agent.submit_pending_folder_name("scope-date", "health-report 20260401")
         self.assertIn("20260401", submit_msg)
 
+    def test_classifier_menu_sent_does_not_override_folder_name_state(self):
+        agent = classifier.ClassifierAgent()
+        agent.stage_text("test archive text", "scope-race")
+        token = agent.mark_pending_menu("scope-race")
+        option_index = next(
+            idx for idx, opt in enumerate(agent._build_pending_options(), start=1)
+            if opt["label"] == "421故事歸檔"
+        )
+        agent.execute_pending_option("scope-race", option_index)
+        agent.mark_menu_sent("scope-race", token)
+        pending = agent.get_pending("scope-race")
+        self.assertEqual(pending["status"], "awaiting_folder_name")
+
+    def test_classifier_late_file_does_not_reset_folder_name_state(self):
+        agent = classifier.ClassifierAgent()
+        agent.stage_text("test archive text", "scope-late-file")
+        agent.execute_pending_option("scope-late-file", 7)
+        initial_label = agent.get_pending("scope-late-file")["selected_option"]["label"]
+        agent.stage_file(b"img", "late.jpg", "image", "scope-late-file", content_type="image/jpeg")
+        pending = agent.get_pending("scope-late-file")
+        self.assertEqual(pending["status"], "awaiting_folder_name")
+        self.assertEqual(pending["selected_option"]["label"], initial_label)
+
 
 if __name__ == "__main__":
     unittest.main()
