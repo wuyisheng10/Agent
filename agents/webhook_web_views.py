@@ -282,36 +282,6 @@ const GROUPS=[
       fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"}],
       build:function(v){return "查詢課後行動 "+v.n;}}},
   ]},
-      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
-              {id:"d",lbl:"開始日期",type:"date",req:1},
-              {id:"note",lbl:"教練備註（選填）",type:"textarea",ph:"例：先陪他完成七天暖身"}],
-      build:function(v){return "啟動七天法則 "+v.n+" | "+v.d+" | "+v.note;}}},
-    {label:"七天法則回報",tag:"表單",form:{title:"七天法則回報",
-      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
-              {id:"day",lbl:"第幾天",type:"select",req:1,opts:["第1天","第2天","第3天","第4天","第5天","第6天","第7天"]},
-              {id:"task",lbl:"任務內容",type:"textarea",req:1,ph:"例：聽 OPP、進教室、回報感想"},
-              {id:"done",lbl:"完成狀態",type:"select",req:1,opts:["已完成","未完成"]},
-              {id:"note",lbl:"備註（選填）",type:"textarea",ph:"例：今天對環境比較有感"}],
-      build:function(v){return "七天法則回報 "+v.n+" | "+v.day+" | "+v.task+" | "+v.done+" | "+v.note;}}},
-    {label:"查詢七天法則",tag:"表單",form:{title:"查詢七天法則",
-      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"}],
-      build:function(v){return "查詢七天法則 "+v.n;}}},
-    {label:"新增課後行動",tag:"表單",form:{title:"新增課後行動",
-      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
-              {id:"st",lbl:"課程名稱",type:"text",req:1,ph:"請選擇課程"},
-              {id:"content",lbl:"行動內容",type:"textarea",req:1,ph:"例：本週邀約 2 位新朋友"},
-              {id:"due",lbl:"截止日期",type:"date",req:1}],
-      build:function(v){return "新增課後行動 "+v.n+" | "+v.st+" | "+v.content+" | "+v.due;}}},
-    {label:"回報課後行動",tag:"表單",form:{title:"回報課後行動",
-      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
-              {id:"aid",lbl:"行動 ID",type:"text",req:1,ph:"先查詢課後行動取得 ID"},
-              {id:"status",lbl:"狀態",type:"select",req:1,opts:["待執行","進行中","已完成","延後","需協助"]},
-              {id:"note",lbl:"備註（選填）",type:"textarea",ph:"例：已完成第一步"}],
-      build:function(v){return "回報課後行動 "+v.n+" | "+v.aid+" | "+v.status+" | "+v.note;}}},
-    {label:"查詢課後行動",tag:"表單",form:{title:"查詢課後行動",
-      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"}],
-      build:function(v){return "查詢課後行動 "+v.n;}}},
-  ]},
   {label:"🤝 夥伴陪伴",items:[
     {label:"跟進報告",tag:"執行",cmd:"跟進報告"},
     {label:"激勵夥伴",tag:"表單",form:{title:"激勵夥伴",
@@ -1415,7 +1385,7 @@ def render_dashboard_html_v2() -> str:
   function makeSidebarItem(label, direct, onclick){
     const btn = document.createElement('button');
     btn.className = 'sbtn' + (direct ? ' direct' : ' form-btn');
-    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="tag">' + (direct ? '????' : '??') + '</span>';
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="tag">' + (direct ? '直接' : '表單') + '</span>';
     btn.onclick = onclick;
     return btn;
   }
@@ -1423,7 +1393,7 @@ def render_dashboard_html_v2() -> str:
   function makeMobileItem(label, direct, onclick){
     const btn = document.createElement('button');
     btn.className = 'mgbtn' + (direct ? ' direct' : ' form-btn');
-    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="mtag">' + (direct ? '????' : '??') + '</span>';
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="mtag">' + (direct ? '直接' : '表單') + '</span>';
     btn.onclick = onclick;
     return btn;
   }
@@ -1432,94 +1402,94 @@ def render_dashboard_html_v2() -> str:
     const data = await loadTrainingData();
     const defs = {
       module_add: {
-        title: '??????',
+        title: '新增培訓模組',
         fields: [
-          {id:'title', lbl:'????', type:'text', req:1},
-          {id:'kind', lbl:'????', type:'text', req:1},
-          {id:'goal', lbl:'????', type:'text', req:1},
-          {id:'summary', lbl:'??', type:'textarea'}
+          {id:'title', lbl:'模組名稱', type:'text', req:1},
+          {id:'kind', lbl:'模組類型', type:'text', req:1},
+          {id:'goal', lbl:'學習目標', type:'text', req:1},
+          {id:'summary', lbl:'摘要', type:'textarea'}
         ],
-        build: v => `?????? ${v.title} | ${v.kind} | ${v.goal} | ${v.summary || ''}`
+        build: v => `新增培訓模組 ${v.title} | ${v.kind} | ${v.goal} | ${v.summary || ''}`
       },
       session_add: {
-        title: '??????',
+        title: '新增培訓課程',
         fields: [
-          {id:'title', lbl:'????', type:'text', req:1},
-          {id:'module', lbl:'????', type:'select', req:1, options:data.modules},
-          {id:'date', lbl:'??', type:'text', req:1, ph:'2026-04-10'},
-          {id:'time', lbl:'??', type:'text', req:1, ph:'19:30'},
-          {id:'location', lbl:'??', type:'text'},
-          {id:'teacher', lbl:'??', type:'text'},
-          {id:'audience', lbl:'??', type:'text'}
+          {id:'title', lbl:'課程名稱', type:'text', req:1},
+          {id:'module', lbl:'模組名稱', type:'select', req:1, options:data.modules},
+          {id:'date', lbl:'日期', type:'text', req:1, ph:'2026-04-10'},
+          {id:'time', lbl:'時間', type:'text', req:1, ph:'19:30'},
+          {id:'location', lbl:'地點', type:'text'},
+          {id:'teacher', lbl:'講師', type:'text'},
+          {id:'audience', lbl:'對象', type:'text'}
         ],
-        build: v => `?????? ${v.title} | ${v.module} | ${v.date} | ${v.time} | ${v.location || ''} | ${v.teacher || ''} | ${v.audience || ''}`
+        build: v => `新增培訓課程 ${v.title} | ${v.module} | ${v.date} | ${v.time} | ${v.location || ''} | ${v.teacher || ''} | ${v.audience || ''}`
       },
       reflection_add: {
-        title: '??????',
+        title: '新增培訓反思',
         fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
-          {id:'realize', lbl:'??', type:'textarea', req:1},
-          {id:'learn', lbl:'??', type:'textarea', req:1},
-          {id:'doit', lbl:'??', type:'textarea', req:1},
-          {id:'goal', lbl:'??', type:'textarea', req:1}
+          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'課程', type:'select', req:1, options:data.sessions},
+          {id:'realize', lbl:'悟到', type:'textarea', req:1},
+          {id:'learn', lbl:'學到', type:'textarea', req:1},
+          {id:'doit', lbl:'做到', type:'textarea', req:1},
+          {id:'goal', lbl:'目標', type:'textarea', req:1}
         ],
-        build: v => `?????? ${v.name} | ${v.session} | ${v.realize} | ${v.learn} | ${v.doit} | ${v.goal}`
+        build: v => `新增培訓反思 ${v.name} | ${v.session} | ${v.realize} | ${v.learn} | ${v.doit} | ${v.goal}`
       },
       progress_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
+        title: '查詢培訓進度',
+        fields: [{id:'name', lbl:'姓名', type:'select', req:1, options:data.partners}],
+        build: v => `查詢培訓進度 ${v.name}`
       },
       seven_start: {
-        title: '??????',
+        title: '啟動七天法則',
         fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'date', lbl:'????', type:'text', req:1, ph:'2026-04-10'},
-          {id:'note', lbl:'????', type:'textarea'}
+          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
+          {id:'date', lbl:'開始日期', type:'text', req:1, ph:'2026-04-10'},
+          {id:'note', lbl:'教練備註', type:'textarea'}
         ],
-        build: v => `?????? ${v.name} | ${v.date} | ${v.note || ''}`
+        build: v => `啟動七天法則 ${v.name} | ${v.date} | ${v.note || ''}`
       },
       seven_report: {
-        title: '??????',
+        title: '七天法則回報',
         fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'day', lbl:'???', type:'text', req:1, ph:'?1?'},
-          {id:'task', lbl:'????', type:'text', req:1},
-          {id:'status', lbl:'??', type:'select', req:1, options:[{value:'???',label:'???'},{value:'???',label:'???'}]},
-          {id:'note', lbl:'??', type:'textarea'}
+          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
+          {id:'day', lbl:'第幾天', type:'text', req:1, ph:'第1天'},
+          {id:'task', lbl:'任務內容', type:'text', req:1},
+          {id:'status', lbl:'狀態', type:'select', req:1, options:[{value:'已完成',label:'已完成'},{value:'未完成',label:'未完成'}]},
+          {id:'note', lbl:'備註', type:'textarea'}
         ],
-        build: v => `?????? ${v.name} | ${v.day} | ${v.task} | ${v.status} | ${v.note || ''}`
+        build: v => `七天法則回報 ${v.name} | ${v.day} | ${v.task} | ${v.status} | ${v.note || ''}`
       },
       seven_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
+        title: '查詢七天法則',
+        fields: [{id:'name', lbl:'姓名', type:'select', req:1, options:data.partners}],
+        build: v => `查詢七天法則 ${v.name}`
       },
       action_add: {
-        title: '??????',
+        title: '新增課後行動',
         fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
-          {id:'action', lbl:'????', type:'textarea', req:1},
-          {id:'deadline', lbl:'????', type:'text', req:1, ph:'2026-04-18'}
+          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'課程名稱', type:'select', req:1, options:data.sessions},
+          {id:'action', lbl:'行動內容', type:'textarea', req:1},
+          {id:'deadline', lbl:'截止日期', type:'text', req:1, ph:'2026-04-18'}
         ],
-        build: v => `?????? ${v.name} | ${v.session} | ${v.action} | ${v.deadline}`
+        build: v => `新增課後行動 ${v.name} | ${v.session} | ${v.action} | ${v.deadline}`
       },
       action_update: {
-        title: '??????',
+        title: '回報課後行動',
         fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
+          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
           {id:'action_id', lbl:'ACTION-ID', type:'text', req:1},
-          {id:'status', lbl:'??', type:'text', req:1},
-          {id:'note', lbl:'??', type:'textarea'}
+          {id:'status', lbl:'狀態', type:'text', req:1},
+          {id:'note', lbl:'備註', type:'textarea'}
         ],
-        build: v => `?????? ${v.name} | ${v.action_id} | ${v.status} | ${v.note || ''}`
+        build: v => `回報課後行動 ${v.name} | ${v.action_id} | ${v.status} | ${v.note || ''}`
       },
       action_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
+        title: '查詢課後行動',
+        fields: [{id:'name', lbl:'姓名', type:'select', req:1, options:data.partners}],
+        build: v => `查詢課後行動 ${v.name}`
       }
     };
     openModal(defs[kind]);
@@ -1533,29 +1503,29 @@ def render_dashboard_html_v2() -> str:
     const group = document.createElement('div');
     group.className = 'sg';
     group.id = 'training-system-clean-group';
-    group.innerHTML = '<div class="sghdr open"><span>?? ???? 2.0</span><span class="arr">?</span></div><div class="sgitems open"></div>';
+    group.innerHTML = '<div class="sghdr open"><span>🎓 培訓系統 2.0</span><span class="arr">▸</span></div><div class="sgitems open"></div>';
     const items = group.querySelector('.sgitems');
     const defs = [
-      ['??????', false, () => openTrainingForm('module_add')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('session_add')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('reflection_add')],
-      ['??????', false, () => openTrainingForm('progress_query')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('seven_start')],
-      ['??????', false, () => openTrainingForm('seven_report')],
-      ['??????', false, () => openTrainingForm('seven_query')],
-      ['??????', false, () => openTrainingForm('action_add')],
-      ['??????', false, () => openTrainingForm('action_update')],
-      ['??????', false, () => openTrainingForm('action_query')]
+      ['新增培訓模組', false, () => openTrainingForm('module_add')],
+      ['查詢培訓模組', true, () => doSend('查詢培訓模組')],
+      ['新增培訓課程', false, () => openTrainingForm('session_add')],
+      ['查詢培訓課程', true, () => doSend('查詢培訓課程')],
+      ['新增培訓反思', false, () => openTrainingForm('reflection_add')],
+      ['查詢培訓進度', false, () => openTrainingForm('progress_query')],
+      ['查詢培訓總表', true, () => doSend('查詢培訓總表')],
+      ['啟動七天法則', false, () => openTrainingForm('seven_start')],
+      ['七天法則回報', false, () => openTrainingForm('seven_report')],
+      ['查詢七天法則', false, () => openTrainingForm('seven_query')],
+      ['新增課後行動', false, () => openTrainingForm('action_add')],
+      ['回報課後行動', false, () => openTrainingForm('action_update')],
+      ['查詢課後行動', false, () => openTrainingForm('action_query')]
     ];
     defs.forEach(([label, direct, onclick]) => items.appendChild(makeSidebarItem(label, direct, onclick)));
     sidebar.appendChild(group);
 
     const mg = document.createElement('div');
     mg.className = 'mgg';
-    mg.innerHTML = '<div class="mgghdr">?? ???? 2.0</div>';
+    mg.innerHTML = '<div class="mgghdr">🎓 培訓系統 2.0</div>';
     defs.forEach(([label, direct, onclick]) => mg.appendChild(makeMobileItem(label, direct, () => { closeMob(); onclick(); })));
     mobcont.appendChild(mg);
   }
@@ -1657,187 +1627,6 @@ def render_dashboard_html_v2() -> str:
 </script>
 """
 
-    inject += """
-<script>
-(function(){
-  async function fetchJson(url){
-    try {
-      const r = await fetch(url);
-      return await r.json();
-    } catch (e) {
-      return {};
-    }
-  }
-
-  async function loadTrainingData(){
-    const [mods, sessions, partners] = await Promise.all([
-      fetchJson('/api/training-modules'),
-      fetchJson('/api/training-sessions'),
-      fetchJson('/api/partners')
-    ]);
-    return {
-      modules: (mods.result || []).map(x => ({ value: x.title, label: x.title })),
-      sessions: (sessions.result || []).map(x => ({ value: x.title, label: x.title })),
-      partners: (partners.result || []).map(x => ({ value: x.name, label: x.name }))
-    };
-  }
-
-  function makeSidebarItem(label, direct, onclick){
-    const btn = document.createElement('button');
-    btn.className = 'sbtn' + (direct ? ' direct' : ' form-btn');
-    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="tag">' + (direct ? '????' : '??') + '</span>';
-    btn.onclick = onclick;
-    return btn;
-  }
-
-  function makeMobileItem(label, direct, onclick){
-    const btn = document.createElement('button');
-    btn.className = 'mgbtn' + (direct ? ' direct' : ' form-btn');
-    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="mtag">' + (direct ? '????' : '??') + '</span>';
-    btn.onclick = onclick;
-    return btn;
-  }
-
-  async function openTrainingForm(kind){
-    const data = await loadTrainingData();
-    const defs = {
-      module_add: {
-        title: '??????',
-        fields: [
-          {id:'title', lbl:'????', type:'text', req:1},
-          {id:'kind', lbl:'????', type:'text', req:1},
-          {id:'goal', lbl:'????', type:'text', req:1},
-          {id:'summary', lbl:'??', type:'textarea'}
-        ],
-        build: v => `?????? ${v.title} | ${v.kind} | ${v.goal} | ${v.summary || ''}`
-      },
-      session_add: {
-        title: '??????',
-        fields: [
-          {id:'title', lbl:'????', type:'text', req:1},
-          {id:'module', lbl:'????', type:'select', req:1, options:data.modules},
-          {id:'date', lbl:'??', type:'text', req:1, ph:'2026-04-10'},
-          {id:'time', lbl:'??', type:'text', req:1, ph:'19:30'},
-          {id:'location', lbl:'??', type:'text'},
-          {id:'teacher', lbl:'??', type:'text'},
-          {id:'audience', lbl:'??', type:'text'}
-        ],
-        build: v => `?????? ${v.title} | ${v.module} | ${v.date} | ${v.time} | ${v.location || ''} | ${v.teacher || ''} | ${v.audience || ''}`
-      },
-      reflection_add: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
-          {id:'realize', lbl:'??', type:'textarea', req:1},
-          {id:'learn', lbl:'??', type:'textarea', req:1},
-          {id:'doit', lbl:'??', type:'textarea', req:1},
-          {id:'goal', lbl:'??', type:'textarea', req:1}
-        ],
-        build: v => `?????? ${v.name} | ${v.session} | ${v.realize} | ${v.learn} | ${v.doit} | ${v.goal}`
-      },
-      progress_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
-      },
-      seven_start: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'date', lbl:'????', type:'text', req:1, ph:'2026-04-10'},
-          {id:'note', lbl:'????', type:'textarea'}
-        ],
-        build: v => `?????? ${v.name} | ${v.date} | ${v.note || ''}`
-      },
-      seven_report: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'day', lbl:'???', type:'text', req:1, ph:'?1?'},
-          {id:'task', lbl:'????', type:'text', req:1},
-          {id:'status', lbl:'??', type:'select', req:1, options:[{value:'???',label:'???'},{value:'???',label:'???'}]},
-          {id:'note', lbl:'??', type:'textarea'}
-        ],
-        build: v => `?????? ${v.name} | ${v.day} | ${v.task} | ${v.status} | ${v.note || ''}`
-      },
-      seven_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
-      },
-      action_add: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
-          {id:'action', lbl:'????', type:'textarea', req:1},
-          {id:'deadline', lbl:'????', type:'text', req:1, ph:'2026-04-18'}
-        ],
-        build: v => `?????? ${v.name} | ${v.session} | ${v.action} | ${v.deadline}`
-      },
-      action_update: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'action_id', lbl:'ACTION-ID', type:'text', req:1},
-          {id:'status', lbl:'??', type:'text', req:1},
-          {id:'note', lbl:'??', type:'textarea'}
-        ],
-        build: v => `?????? ${v.name} | ${v.action_id} | ${v.status} | ${v.note || ''}`
-      },
-      action_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
-      }
-    };
-    openModal(defs[kind]);
-  }
-
-  function addTrainingButtons(){
-    const sidebar = document.getElementById('sidebar');
-    const mobcont = document.getElementById('mobcont');
-    if (!sidebar || !mobcont || document.getElementById('training-system-clean-group')) return;
-
-    const group = document.createElement('div');
-    group.className = 'sg';
-    group.id = 'training-system-clean-group';
-    group.innerHTML = '<div class="sghdr open"><span>?? ???? 2.0</span><span class="arr">?</span></div><div class="sgitems open"></div>';
-    const items = group.querySelector('.sgitems');
-    const defs = [
-      ['??????', false, () => openTrainingForm('module_add')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('session_add')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('reflection_add')],
-      ['??????', false, () => openTrainingForm('progress_query')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('seven_start')],
-      ['??????', false, () => openTrainingForm('seven_report')],
-      ['??????', false, () => openTrainingForm('seven_query')],
-      ['??????', false, () => openTrainingForm('action_add')],
-      ['??????', false, () => openTrainingForm('action_update')],
-      ['??????', false, () => openTrainingForm('action_query')]
-    ];
-    defs.forEach(([label, direct, onclick]) => items.appendChild(makeSidebarItem(label, direct, onclick)));
-    sidebar.appendChild(group);
-
-    const mg = document.createElement('div');
-    mg.className = 'mgg';
-    mg.innerHTML = '<div class="mgghdr">?? ???? 2.0</div>';
-    defs.forEach(([label, direct, onclick]) => mg.appendChild(makeMobileItem(label, direct, () => { closeMob(); onclick(); })));
-    mobcont.appendChild(mg);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', addTrainingButtons);
-  } else {
-    addTrainingButtons();
-  }
-})();
-</script>
-"""
     return html.replace("</body>", inject + "\n</body>")
 
 
@@ -1937,187 +1726,6 @@ def render_dashboard_html_v2() -> str:
 </script>
 """
 
-    inject += """
-<script>
-(function(){
-  async function fetchJson(url){
-    try {
-      const r = await fetch(url);
-      return await r.json();
-    } catch (e) {
-      return {};
-    }
-  }
-
-  async function loadTrainingData(){
-    const [mods, sessions, partners] = await Promise.all([
-      fetchJson('/api/training-modules'),
-      fetchJson('/api/training-sessions'),
-      fetchJson('/api/partners')
-    ]);
-    return {
-      modules: (mods.result || []).map(x => ({ value: x.title, label: x.title })),
-      sessions: (sessions.result || []).map(x => ({ value: x.title, label: x.title })),
-      partners: (partners.result || []).map(x => ({ value: x.name, label: x.name }))
-    };
-  }
-
-  function makeSidebarItem(label, direct, onclick){
-    const btn = document.createElement('button');
-    btn.className = 'sbtn' + (direct ? ' direct' : ' form-btn');
-    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="tag">' + (direct ? '????' : '??') + '</span>';
-    btn.onclick = onclick;
-    return btn;
-  }
-
-  function makeMobileItem(label, direct, onclick){
-    const btn = document.createElement('button');
-    btn.className = 'mgbtn' + (direct ? ' direct' : ' form-btn');
-    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="mtag">' + (direct ? '????' : '??') + '</span>';
-    btn.onclick = onclick;
-    return btn;
-  }
-
-  async function openTrainingForm(kind){
-    const data = await loadTrainingData();
-    const defs = {
-      module_add: {
-        title: '??????',
-        fields: [
-          {id:'title', lbl:'????', type:'text', req:1},
-          {id:'kind', lbl:'????', type:'text', req:1},
-          {id:'goal', lbl:'????', type:'text', req:1},
-          {id:'summary', lbl:'??', type:'textarea'}
-        ],
-        build: v => `?????? ${v.title} | ${v.kind} | ${v.goal} | ${v.summary || ''}`
-      },
-      session_add: {
-        title: '??????',
-        fields: [
-          {id:'title', lbl:'????', type:'text', req:1},
-          {id:'module', lbl:'????', type:'select', req:1, options:data.modules},
-          {id:'date', lbl:'??', type:'text', req:1, ph:'2026-04-10'},
-          {id:'time', lbl:'??', type:'text', req:1, ph:'19:30'},
-          {id:'location', lbl:'??', type:'text'},
-          {id:'teacher', lbl:'??', type:'text'},
-          {id:'audience', lbl:'??', type:'text'}
-        ],
-        build: v => `?????? ${v.title} | ${v.module} | ${v.date} | ${v.time} | ${v.location || ''} | ${v.teacher || ''} | ${v.audience || ''}`
-      },
-      reflection_add: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
-          {id:'realize', lbl:'??', type:'textarea', req:1},
-          {id:'learn', lbl:'??', type:'textarea', req:1},
-          {id:'doit', lbl:'??', type:'textarea', req:1},
-          {id:'goal', lbl:'??', type:'textarea', req:1}
-        ],
-        build: v => `?????? ${v.name} | ${v.session} | ${v.realize} | ${v.learn} | ${v.doit} | ${v.goal}`
-      },
-      progress_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
-      },
-      seven_start: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'date', lbl:'????', type:'text', req:1, ph:'2026-04-10'},
-          {id:'note', lbl:'????', type:'textarea'}
-        ],
-        build: v => `?????? ${v.name} | ${v.date} | ${v.note || ''}`
-      },
-      seven_report: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'day', lbl:'???', type:'text', req:1, ph:'?1?'},
-          {id:'task', lbl:'????', type:'text', req:1},
-          {id:'status', lbl:'??', type:'select', req:1, options:[{value:'???',label:'???'},{value:'???',label:'???'}]},
-          {id:'note', lbl:'??', type:'textarea'}
-        ],
-        build: v => `?????? ${v.name} | ${v.day} | ${v.task} | ${v.status} | ${v.note || ''}`
-      },
-      seven_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
-      },
-      action_add: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
-          {id:'action', lbl:'????', type:'textarea', req:1},
-          {id:'deadline', lbl:'????', type:'text', req:1, ph:'2026-04-18'}
-        ],
-        build: v => `?????? ${v.name} | ${v.session} | ${v.action} | ${v.deadline}`
-      },
-      action_update: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'action_id', lbl:'ACTION-ID', type:'text', req:1},
-          {id:'status', lbl:'??', type:'text', req:1},
-          {id:'note', lbl:'??', type:'textarea'}
-        ],
-        build: v => `?????? ${v.name} | ${v.action_id} | ${v.status} | ${v.note || ''}`
-      },
-      action_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
-      }
-    };
-    openModal(defs[kind]);
-  }
-
-  function addTrainingButtons(){
-    const sidebar = document.getElementById('sidebar');
-    const mobcont = document.getElementById('mobcont');
-    if (!sidebar || !mobcont || document.getElementById('training-system-clean-group')) return;
-
-    const group = document.createElement('div');
-    group.className = 'sg';
-    group.id = 'training-system-clean-group';
-    group.innerHTML = '<div class="sghdr open"><span>?? ???? 2.0</span><span class="arr">?</span></div><div class="sgitems open"></div>';
-    const items = group.querySelector('.sgitems');
-    const defs = [
-      ['??????', false, () => openTrainingForm('module_add')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('session_add')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('reflection_add')],
-      ['??????', false, () => openTrainingForm('progress_query')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('seven_start')],
-      ['??????', false, () => openTrainingForm('seven_report')],
-      ['??????', false, () => openTrainingForm('seven_query')],
-      ['??????', false, () => openTrainingForm('action_add')],
-      ['??????', false, () => openTrainingForm('action_update')],
-      ['??????', false, () => openTrainingForm('action_query')]
-    ];
-    defs.forEach(([label, direct, onclick]) => items.appendChild(makeSidebarItem(label, direct, onclick)));
-    sidebar.appendChild(group);
-
-    const mg = document.createElement('div');
-    mg.className = 'mgg';
-    mg.innerHTML = '<div class="mgghdr">?? ???? 2.0</div>';
-    defs.forEach(([label, direct, onclick]) => mg.appendChild(makeMobileItem(label, direct, () => { closeMob(); onclick(); })));
-    mobcont.appendChild(mg);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', addTrainingButtons);
-  } else {
-    addTrainingButtons();
-  }
-})();
-</script>
-"""
     return html.replace("</body>", inject + "\n</body>")
 
 
@@ -2269,183 +1877,36 @@ def render_dashboard_html_v2() -> str:
 </script>
 """
 
-    inject += """
+    return html.replace("</body>", inject + "\n</body>")
+
+
+_RENDER_WITH_CLEAN_MENUS = render_dashboard_html_v2
+
+
+def render_dashboard_html_v2() -> str:
+    html = _RENDER_WITH_CLEAN_MENUS()
+    inject = """
 <script>
 (function(){
-  async function fetchJson(url){
-    try {
-      const r = await fetch(url);
-      return await r.json();
-    } catch (e) {
-      return {};
-    }
+  function normalizeTags(root){
+    root.querySelectorAll('.tag').forEach(function(el){
+      const btn = el.closest('button');
+      el.textContent = btn && btn.classList.contains('direct') ? '直接執行' : '表單';
+    });
+    root.querySelectorAll('.mtag').forEach(function(el){
+      const btn = el.closest('button');
+      el.textContent = btn && btn.classList.contains('direct') ? '直接執行' : '表單';
+    });
   }
 
-  async function loadTrainingData(){
-    const [mods, sessions, partners] = await Promise.all([
-      fetchJson('/api/training-modules'),
-      fetchJson('/api/training-sessions'),
-      fetchJson('/api/partners')
-    ]);
-    return {
-      modules: (mods.result || []).map(x => ({ value: x.title, label: x.title })),
-      sessions: (sessions.result || []).map(x => ({ value: x.title, label: x.title })),
-      partners: (partners.result || []).map(x => ({ value: x.name, label: x.name }))
-    };
-  }
-
-  function makeSidebarItem(label, direct, onclick){
-    const btn = document.createElement('button');
-    btn.className = 'sbtn' + (direct ? ' direct' : ' form-btn');
-    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="tag">' + (direct ? '????' : '??') + '</span>';
-    btn.onclick = onclick;
-    return btn;
-  }
-
-  function makeMobileItem(label, direct, onclick){
-    const btn = document.createElement('button');
-    btn.className = 'mgbtn' + (direct ? ' direct' : ' form-btn');
-    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="mtag">' + (direct ? '????' : '??') + '</span>';
-    btn.onclick = onclick;
-    return btn;
-  }
-
-  async function openTrainingForm(kind){
-    const data = await loadTrainingData();
-    const defs = {
-      module_add: {
-        title: '??????',
-        fields: [
-          {id:'title', lbl:'????', type:'text', req:1},
-          {id:'kind', lbl:'????', type:'text', req:1},
-          {id:'goal', lbl:'????', type:'text', req:1},
-          {id:'summary', lbl:'??', type:'textarea'}
-        ],
-        build: v => `?????? ${v.title} | ${v.kind} | ${v.goal} | ${v.summary || ''}`
-      },
-      session_add: {
-        title: '??????',
-        fields: [
-          {id:'title', lbl:'????', type:'text', req:1},
-          {id:'module', lbl:'????', type:'select', req:1, options:data.modules},
-          {id:'date', lbl:'??', type:'text', req:1, ph:'2026-04-10'},
-          {id:'time', lbl:'??', type:'text', req:1, ph:'19:30'},
-          {id:'location', lbl:'??', type:'text'},
-          {id:'teacher', lbl:'??', type:'text'},
-          {id:'audience', lbl:'??', type:'text'}
-        ],
-        build: v => `?????? ${v.title} | ${v.module} | ${v.date} | ${v.time} | ${v.location || ''} | ${v.teacher || ''} | ${v.audience || ''}`
-      },
-      reflection_add: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
-          {id:'realize', lbl:'??', type:'textarea', req:1},
-          {id:'learn', lbl:'??', type:'textarea', req:1},
-          {id:'doit', lbl:'??', type:'textarea', req:1},
-          {id:'goal', lbl:'??', type:'textarea', req:1}
-        ],
-        build: v => `?????? ${v.name} | ${v.session} | ${v.realize} | ${v.learn} | ${v.doit} | ${v.goal}`
-      },
-      progress_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
-      },
-      seven_start: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'date', lbl:'????', type:'text', req:1, ph:'2026-04-10'},
-          {id:'note', lbl:'????', type:'textarea'}
-        ],
-        build: v => `?????? ${v.name} | ${v.date} | ${v.note || ''}`
-      },
-      seven_report: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'day', lbl:'???', type:'text', req:1, ph:'?1?'},
-          {id:'task', lbl:'????', type:'text', req:1},
-          {id:'status', lbl:'??', type:'select', req:1, options:[{value:'???',label:'???'},{value:'???',label:'???'}]},
-          {id:'note', lbl:'??', type:'textarea'}
-        ],
-        build: v => `?????? ${v.name} | ${v.day} | ${v.task} | ${v.status} | ${v.note || ''}`
-      },
-      seven_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
-      },
-      action_add: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'session', lbl:'????', type:'select', req:1, options:data.sessions},
-          {id:'action', lbl:'????', type:'textarea', req:1},
-          {id:'deadline', lbl:'????', type:'text', req:1, ph:'2026-04-18'}
-        ],
-        build: v => `?????? ${v.name} | ${v.session} | ${v.action} | ${v.deadline}`
-      },
-      action_update: {
-        title: '??????',
-        fields: [
-          {id:'name', lbl:'??', type:'select', req:1, options:data.partners},
-          {id:'action_id', lbl:'ACTION-ID', type:'text', req:1},
-          {id:'status', lbl:'??', type:'text', req:1},
-          {id:'note', lbl:'??', type:'textarea'}
-        ],
-        build: v => `?????? ${v.name} | ${v.action_id} | ${v.status} | ${v.note || ''}`
-      },
-      action_query: {
-        title: '??????',
-        fields: [{id:'name', lbl:'??', type:'select', req:1, options:data.partners}],
-        build: v => `?????? ${v.name}`
-      }
-    };
-    openModal(defs[kind]);
-  }
-
-  function addTrainingButtons(){
-    const sidebar = document.getElementById('sidebar');
-    const mobcont = document.getElementById('mobcont');
-    if (!sidebar || !mobcont || document.getElementById('training-system-clean-group')) return;
-
-    const group = document.createElement('div');
-    group.className = 'sg';
-    group.id = 'training-system-clean-group';
-    group.innerHTML = '<div class="sghdr open"><span>?? ???? 2.0</span><span class="arr">?</span></div><div class="sgitems open"></div>';
-    const items = group.querySelector('.sgitems');
-    const defs = [
-      ['??????', false, () => openTrainingForm('module_add')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('session_add')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('reflection_add')],
-      ['??????', false, () => openTrainingForm('progress_query')],
-      ['??????', true, () => doSend('??????')],
-      ['??????', false, () => openTrainingForm('seven_start')],
-      ['??????', false, () => openTrainingForm('seven_report')],
-      ['??????', false, () => openTrainingForm('seven_query')],
-      ['??????', false, () => openTrainingForm('action_add')],
-      ['??????', false, () => openTrainingForm('action_update')],
-      ['??????', false, () => openTrainingForm('action_query')]
-    ];
-    defs.forEach(([label, direct, onclick]) => items.appendChild(makeSidebarItem(label, direct, onclick)));
-    sidebar.appendChild(group);
-
-    const mg = document.createElement('div');
-    mg.className = 'mgg';
-    mg.innerHTML = '<div class="mgghdr">?? ???? 2.0</div>';
-    defs.forEach(([label, direct, onclick]) => mg.appendChild(makeMobileItem(label, direct, () => { closeMob(); onclick(); })));
-    mobcont.appendChild(mg);
+  function cleanMenuLabels(){
+    normalizeTags(document);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', addTrainingButtons);
+    document.addEventListener('DOMContentLoaded', cleanMenuLabels);
   } else {
-    addTrainingButtons();
+    cleanMenuLabels();
   }
 })();
 </script>
