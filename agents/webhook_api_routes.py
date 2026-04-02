@@ -6,9 +6,11 @@ def register_api_routes(
     nutrition_sessions,
     load_classifier,
     load_market_dev,
+    load_partner,
     load_course_invite,
     load_daily_report,
     load_nutrition_assessment,
+    load_ai_prompt_manager,
 ):
     @app.route("/api/command", methods=["POST"])
     def api_command():
@@ -97,6 +99,39 @@ def register_api_routes(
         except Exception as e:
             return {"result": None, "error": str(e)}, 500
 
+    @app.route("/api/partners", methods=["GET"])
+    def api_partners():
+        try:
+            partner = load_partner()
+            items = partner.load_partners()
+            rows = [
+                {
+                    "name": item.get("name", ""),
+                    "amway_no": item.get("amway_no", ""),
+                    "stage": item.get("stage", ""),
+                    "level": item.get("level", ""),
+                    "category": item.get("category", ""),
+                }
+                for item in items
+                if item.get("name")
+            ]
+            rows.sort(key=lambda x: (x.get("name", ""), x.get("amway_no", "")))
+            return {"result": rows}
+        except Exception as e:
+            return {"result": [], "error": str(e)}, 500
+
+    @app.route("/api/partner/<name>", methods=["GET"])
+    def api_partner_get(name):
+        try:
+            partner = load_partner()
+            items = partner.load_partners()
+            item = partner._find_partner(name, items)
+            if not item:
+                return {"result": None}, 404
+            return {"result": item}
+        except Exception as e:
+            return {"result": None, "error": str(e)}, 500
+
     @app.route("/api/course-invite", methods=["GET"])
     def api_course_invite_get():
         try:
@@ -170,3 +205,11 @@ def register_api_routes(
             return {"result": result}
         except Exception as e:
             return {"result": f"⚠️ 每日報告失敗：{e}"}, 500
+
+    @app.route("/api/ai-prompts", methods=["GET"])
+    def api_ai_prompts():
+        try:
+            pm = load_ai_prompt_manager()
+            return {"result": pm.list_prompt_labels()}
+        except Exception as e:
+            return {"result": [], "error": str(e)}, 500

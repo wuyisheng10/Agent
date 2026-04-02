@@ -16,11 +16,22 @@ def handle_line_command(
     load_daily_report,
     load_nutrition_dri,
     load_nutrition_assessment,
+    load_ai_prompt_manager,
     load_training_agent,
     load_followup,
     load_motivation,
 ):
     msg = (msg or "").strip()
+    if msg == "查詢AI提示詞" or msg.startswith("查詢AI提示詞 ") or msg.startswith("更新AI提示詞 "):
+        try:
+            pm = load_ai_prompt_manager()
+            result = pm.handle_command(msg)
+            if result:
+                reply_message(reply_token, result)
+                return True
+        except Exception as exc:
+            reply_message(reply_token, f"⚠️ AI 提示詞處理失敗：{exc}")
+            return True
     if msg in ("行事曆圖檔整理", "上傳行事曆圖片"):
         try:
             clf_mod = load_classifier()
@@ -215,11 +226,17 @@ def handle_web_command(
     load_daily_report,
     load_nutrition_dri,
     load_nutrition_assessment,
+    load_ai_prompt_manager,
     load_training_agent,
     load_followup,
     load_motivation,
 ):
     cmd = (cmd or "").strip()
+    if cmd == "查詢AI提示詞" or cmd.startswith("查詢AI提示詞 ") or cmd.startswith("更新AI提示詞 "):
+        pm = load_ai_prompt_manager()
+        result = pm.handle_command(cmd)
+        if result:
+            return result
 
     clf_mod = None
 

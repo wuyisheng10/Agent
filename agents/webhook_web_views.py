@@ -233,6 +233,11 @@ const GROUPS=[
       build:function(v){return "里程碑 "+v.n+(v.a?" "+v.a:"");}}},
     {label:"查詢所有夥伴",tag:"執行",cmd:"查詢夥伴"},
     {label:"查詢待跟進夥伴",tag:"執行",cmd:"查詢待跟進夥伴"},
+    {label:"新增跟進夥伴",tag:"表單",form:{title:"新增跟進夥伴",
+      fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"姓名"},
+              {id:"d",lbl:"下次跟進日期",type:"date",req:1},
+              {id:"r",lbl:"備註",type:"textarea",ph:"例如 加入待跟進清單"}],
+      build:function(v){return "新增跟進夥伴 "+v.n+" | "+v.d+" | "+v.r;}}},
     {label:"新增夥伴",tag:"表單",form:{title:"新增夥伴",
       fields:[{id:"n",lbl:"姓名",type:"text",req:1,ph:"姓名"},
               {id:"g",lbl:"目標",type:"text",ph:"例：月入三萬"},
@@ -479,6 +484,101 @@ function openMob(){document.getElementById("mobmenu").classList.add("on");}
 function closeMob(){document.getElementById("mobmenu").classList.remove("on");}
 // Modal
 var _build=null;
+var _partnerCache=null;
+function _fieldIds(f){return (f.fields||[]).map(function(x){return x.id;});}
+function _isUpdatePartnerForm(f){
+  var ids=_fieldIds(f);
+  return ids.includes("n")&&ids.includes("l")&&ids.includes("ci")&&ids.includes("cg");
+}
+function _isFollowupAddForm(f){
+  var ids=_fieldIds(f);
+  return ids.includes("n")&&ids.includes("d")&&ids.includes("r")&&!ids.includes("g")&&!ids.includes("s")&&!ids.includes("ci");
+}
+function _isFollowupForm(f){
+  var ids=_fieldIds(f);
+  return ids.includes("n")&&ids.includes("s")&&ids.includes("d")&&!ids.includes("ci");
+}
+function _isMotivateForm(f){
+  var ids=_fieldIds(f);
+  return ids.length===2&&ids.includes("n")&&ids.includes("s");
+}
+async function _getPartners(){
+  if(_partnerCache)return _partnerCache;
+  var r=await fetch("/api/partners");
+  var d=await r.json();
+  _partnerCache=(d&&d.result)||[];
+  return _partnerCache;
+}
+async function _hydratePartnerSelect(formDef){
+  if(!_isUpdatePartnerForm(formDef)&&!_isFollowupAddForm(formDef)&&!_isFollowupForm(formDef)&&!_isMotivateForm(formDef))return;
+  var el=document.getElementById("mf_n");
+  if(!el)return;
+  var partners=await _getPartners();
+  if(_isFollowupAddForm(formDef)||_isFollowupForm(formDef)){
+    partners=partners.filter(function(p){ return (p.stage||"")==="待跟進"; });
+  } else if(_isMotivateForm(formDef)){
+    partners=partners.filter(function(p){ return (p.stage||"").indexOf("激勵")!==-1; });
+  }
+  var cur=el.value||"";
+  var sel=document.createElement("select");
+  sel.id=el.id;
+  sel.required=true;
+  var first=document.createElement("option");
+  first.value="";
+  first.textContent="請選擇夥伴";
+  sel.appendChild(first);
+  partners.forEach(function(p){
+    var o=document.createElement("option");
+    o.value=p.name;
+    var extra=[];
+    if(p.level)extra.push("層級"+p.level);
+    if(p.stage)extra.push(p.stage);
+    if(p.category)extra.push("分類"+p.category);
+    o.textContent=extra.length?(p.name+"｜"+extra.join("｜")):p.name;
+    if(cur&&cur===p.name)o.selected=true;
+    sel.appendChild(o);
+  });
+  el.replaceWith(sel);
+  if(_isUpdatePartnerForm(formDef)){
+    sel.addEventListener("change", function(){ _prefillPartnerForm(sel.value); });
+    if(sel.value)_prefillPartnerForm(sel.value);
+  }
+}
+async function _prefillPartnerForm(name){
+  if(!name)return;
+  var r=await fetch("/api/partner/"+encodeURIComponent(name));
+  if(!r.ok)return;
+  var d=await r.json();
+  var p=(d&&d.result)||null;
+  if(!p)return;
+  var map={
+    l:p.level||"",
+    s:p.stage||"",
+    d:p.next_followup||"",
+    ci:p.contact_info||"",
+    r:p.note||"",
+    t:p.type||"",
+    no:p.amway_no||"",
+    p:p.partner||"",
+    sp:p.sponsor||"",
+    ed:p.expire_date||"",
+    ym:p.year_month||"",
+    rt:p.recent_title||"",
+    fb:p.first_bonus_percent||"",
+    cv:p.cash_voucher||"",
+    sp2:p.shopping_points||"",
+    cp:p.coupon||"",
+    m1:(p.purchase_flags&&p.purchase_flags.this_month)||"",
+    m2:(p.purchase_flags&&p.purchase_flags.last_month)||"",
+    m3:(p.purchase_flags&&p.purchase_flags.prev2_month)||"",
+    m4:(p.purchase_flags&&p.purchase_flags.prev3_month)||"",
+    cg:p.category||""
+  };
+  Object.keys(map).forEach(function(k){
+    var el=document.getElementById("mf_"+k);
+    if(el && !el.dataset.userEdited){el.value=map[k];}
+  });
+}
 function clickItem(item){
   if(item.cmd&&!item.form){doSend(item.cmd);}
   else if(item.form){openModal(item.form);}
@@ -506,9 +606,12 @@ function openModal(f){
       if(fd.req)el.required=true;
       if(fd.type==="date")el.value=new Date().toISOString().split("T")[0];
     }
+    el.addEventListener("input",function(){el.dataset.userEdited="1";});
+    el.addEventListener("change",function(){el.dataset.userEdited="1";});
     w.appendChild(el);mf.appendChild(w);
   });
   document.getElementById("overlay").classList.add("on");
+  _hydratePartnerSelect(f);
   var first=mf.querySelector("input,select,textarea");
   if(first)setTimeout(function(){first.focus();},120);
 }
@@ -849,3 +952,107 @@ refreshPend();
 </script>
 </body>
 </html>"""
+
+
+def _load_ai_prompt_manager():
+    import importlib.util as _ilu
+    from pathlib import Path
+
+    path = Path(r"C:\Users\user\claude AI_Agent") / "agents" / "20_ai_prompt_manager.py"
+    spec = _ilu.spec_from_file_location("ai_prompt_manager", str(path))
+    module = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_ORIGINAL_RENDER_DASHBOARD_HTML_V2 = render_dashboard_html_v2
+
+
+def render_dashboard_html_v2() -> str:
+    html = _ORIGINAL_RENDER_DASHBOARD_HTML_V2()
+    try:
+        import json as _json
+
+        pm = _load_ai_prompt_manager()
+        prompt_items = pm.list_prompt_labels()
+        prompt_json = _json.dumps(prompt_items, ensure_ascii=False)
+    except Exception:
+        prompt_json = "[]"
+
+    inject = f"""
+<script>
+(function(){{
+  const promptItems = {prompt_json};
+
+  function addAIPromptButtons() {{
+    const sidebar = document.getElementById("sidebar");
+    const mobcont = document.getElementById("mobcont");
+    if (!sidebar || !mobcont || document.getElementById("ai-prompt-group")) return;
+
+    const makeItem = (label, direct, onclick) => {{
+      const btn = document.createElement("button");
+      btn.className = "sbtn" + (direct ? " direct" : " form-btn");
+      btn.innerHTML = '<span class="lbl">'+label+'</span><span class="tag">'+(direct ? '直接' : '表單')+'</span>';
+      btn.onclick = onclick;
+      return btn;
+    }};
+
+    const group = document.createElement("div");
+    group.className = "sg";
+    group.id = "ai-prompt-group";
+    group.innerHTML = '<div class="sghdr open"><span>🤖 AI 提示詞</span><span class="arr">▶</span></div><div class="sgitems open"></div>';
+    const items = group.querySelector(".sgitems");
+    items.appendChild(makeItem("查詢AI提示詞", true, () => doSend("查詢AI提示詞")));
+    items.appendChild(makeItem("修改AI提示詞", false, openAIPromptModal));
+    sidebar.appendChild(group);
+
+    const mg = document.createElement("div");
+    mg.className = "mgg";
+    mg.innerHTML = '<div class="mgghdr">🤖 AI 提示詞</div>';
+    const makeMobile = (label, direct, onclick) => {{
+      const btn = document.createElement("button");
+      btn.className = "mgbtn" + (direct ? " direct" : " form-btn");
+      btn.innerHTML = '<span class="lbl">'+label+'</span><span class="mtag">'+(direct ? '直接' : '表單')+'</span>';
+      btn.onclick = onclick;
+      return btn;
+    }};
+    mg.appendChild(makeMobile("查詢AI提示詞", true, () => {{ closeMob(); doSend("查詢AI提示詞"); }}));
+    mg.appendChild(makeMobile("修改AI提示詞", false, () => {{ closeMob(); openAIPromptModal(); }}));
+    mobcont.appendChild(mg);
+  }}
+
+  function openAIPromptModal() {{
+    openModal({{
+      title: "修改AI提示詞",
+      fields: [
+        {{
+          id: "k",
+          lbl: "提示詞 key",
+          type: "select",
+          req: 1,
+          options: promptItems.map(x => ({{ value: x.key, label: x.key + "｜" + x.label }}))
+        }},
+        {{
+          id: "t",
+          lbl: "新內容",
+          type: "textarea",
+          req: 1,
+          ph: "請貼上新的提示詞內容"
+        }}
+      ],
+      build: function(v) {{
+        return "更新AI提示詞 " + v.k + " | " + v.t;
+      }}
+    }});
+  }}
+
+  window.openAIPromptModal = openAIPromptModal;
+  if (document.readyState === "loading") {{
+    document.addEventListener("DOMContentLoaded", addAIPromptButtons);
+  }} else {{
+    addAIPromptButtons();
+  }}
+}})();
+</script>
+"""
+    return html.replace("</body>", inject + "\n</body>")

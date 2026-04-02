@@ -30,6 +30,16 @@ import shutil
 import subprocess
 import tempfile
 from datetime import datetime, date
+
+import importlib.util as _ilu
+
+
+def _load_prompt_manager():
+    path = BASE_DIR / "agents" / "20_ai_prompt_manager.py"
+    spec = _ilu.spec_from_file_location("ai_prompt_manager", str(path))
+    module = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 from hashlib import md5
 from pathlib import Path
 
@@ -950,6 +960,147 @@ class CourseInviteAgent:
         else:
             _log("目前沒有接下來的課程會議。")
         _log("=== 課程邀約 Agent 完成 ===")
+
+
+def _safe_text(value) -> str:
+    return str(value or "").strip()
+
+
+def _person_block_from_info(name: str, info: dict) -> str:
+    lines = [f"姓名：{name}"]
+    for key, value in (info or {}).items():
+        text = _safe_text(value)
+        if not text or key in ("name",):
+            continue
+        lines.append(f"{key}：{text}")
+    return "\n".join(lines)
+
+
+def optimize_promo(promo_id: str) -> str:
+    promo = get_promo_detail(promo_id)
+    if not promo:
+        return f"找不到課程文宣：{promo_id}"
+    meetings = list_meetings()
+    mtg_summary = format_meetings(meetings) if meetings else "目前沒有今日之後的課程會議。"
+    pm = _load_prompt_manager()
+    prompt = pm.render_prompt(
+        "course_promo_optimize",
+        mtg_summary=mtg_summary,
+        promo_title=promo["title"],
+        promo_content=promo["content"],
+    )
+    _log(f"優化課程文宣 {promo_id}")
+    optimized = _run_codex(prompt, timeout=90)
+    promos = _load_promos()
+    for p in promos:
+        if p["id"] == promo_id:
+            p["optimized"] = optimized
+            p["updated_at"] = datetime.now().isoformat()
+            break
+    _save_promos(promos)
+    return f"已優化課程文宣：{promo_id}\n\n{optimized}"
+
+
+def generate_prospect_invite(name: str = "") -> str:
+    meetings = list_meetings()
+    if not meetings:
+        return "目前沒有排定的課程會議，請先新增課程會議。"
+    mtg_summary = format_meetings(meetings)
+    promos = _load_promos()
+    first_promo = promos[0] if promos else None
+    promo_content = ((first_promo or {}).get("optimized") or (first_promo or {}).get("content") or "").strip()
+    promo_section = ("課程文宣內容：\n" + promo_content) if promo_content else "目前沒有課程文宣內容。"
+    if name:
+        info = _load_prospect_info(name)
+        target_desc = f"針對潛在家人 {name} 產生邀約文宣"
+        person_block = _person_block_from_info(name, info)
+    else:
+        target_desc = "針對一般潛在家人產生邀約文宣"
+        person_block = "未指定特定對象。"
+    pm = _load_prompt_manager()
+    prompt = pm.render_prompt(
+        "course_invite_prospect_general",
+        mtg_summary=mtg_summary,
+        promo_section=promo_section,
+        target_desc=target_desc,
+        person_block=person_block,
+    )
+    _log(f"產生潛在家人邀約文宣 {name or '(通用)'}")
+    return _run_codex(prompt, timeout=90)
+
+
+def generate_partner_invite(name: str = "") -> str:
+    meetings = list_meetings()
+    if not meetings:
+        return "目前沒有排定的課程會議，請先新增課程會議。"
+    mtg_summary = format_meetings(meetings)
+    if name:
+        info = _load_partner_info(name)
+        target_desc = f"針對跟進夥伴 {name} 產生邀約文宣"
+        person_block = _person_block_from_info(name, info)
+    else:
+        target_desc = "針對一般跟進夥伴產生邀約文宣"
+        person_block = "未指定特定對象。"
+    pm = _load_prompt_manager()
+    prompt = pm.render_prompt(
+        "course_invite_partner_general",
+        mtg_summary=mtg_summary,
+        target_desc=target_desc,
+        person_block=person_block,
+    )
+    _log(f"產生跟進夥伴邀約文宣 {name or '(通用)'}")
+    return _run_codex(prompt, timeout=90)
+
+
+def generate_prospect_invite_for_meeting(name: str, meeting: dict) -> str:
+    info = _load_prospect_info(name)
+    promos = _load_promos()
+    first_promo = promos[0] if promos else None
+    promo_content = ((first_promo or {}).get("optimized") or (first_promo or {}).get("content") or "").strip()
+    promo_section = ("課程文宣內容：\n" + promo_content) if promo_content else "目前沒有課程文宣內容。"
+    when = meeting["date"] + (f" {meeting['time']}" if meeting.get("time") else "")
+    pm = _load_prompt_manager()
+    prompt = pm.render_prompt(
+        "course_invite_prospect_meeting",
+        name=name,
+        meeting_title=_safe_text(meeting.get("title")),
+        when=when,
+        loc=_safe_text(meeting.get("location")) or "未提供",
+        desc=_safe_text(meeting.get("description")) or "未提供",
+        speaker=_safe_text(meeting.get("speaker")) or "未提供",
+        speaker_bio=_safe_text(meeting.get("speaker_bio")) or "未提供",
+        topics=_safe_text(meeting.get("topics")) or "未提供",
+        topic_desc=_safe_text(meeting.get("topic_desc")) or "未提供",
+        promo_section=promo_section,
+        person_block=_person_block_from_info(name, info),
+    )
+    _log(f"產生潛在家人指定會議邀約 {name} / {meeting['title']}")
+    result = _run_codex(prompt, timeout=90)
+    save_invite(meeting["id"], name, "prospect", result)
+    return result
+
+
+def generate_partner_invite_for_meeting(name: str, meeting: dict) -> str:
+    info = _load_partner_info(name)
+    when = meeting["date"] + (f" {meeting['time']}" if meeting.get("time") else "")
+    pm = _load_prompt_manager()
+    prompt = pm.render_prompt(
+        "course_invite_partner_meeting",
+        name=name,
+        meeting_title=_safe_text(meeting.get("title")),
+        when=when,
+        loc=_safe_text(meeting.get("location")) or "未提供",
+        desc=_safe_text(meeting.get("description")) or "未提供",
+        speaker=_safe_text(meeting.get("speaker")) or "未提供",
+        speaker_bio=_safe_text(meeting.get("speaker_bio")) or "未提供",
+        topics=_safe_text(meeting.get("topics")) or "未提供",
+        topic_desc=_safe_text(meeting.get("topic_desc")) or "未提供",
+        person_block=_person_block_from_info(name, info),
+    )
+    _log(f"產生跟進夥伴指定會議邀約 {name} / {meeting['title']}")
+    result = _run_codex(prompt, timeout=90)
+    save_invite(meeting["id"], name, "partner", result)
+    return result
 
 
 if __name__ == "__main__":

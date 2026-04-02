@@ -216,6 +216,16 @@ def _load_nutrition_assessment():
     spec.loader.exec_module(m)
     return m
 
+
+def _load_ai_prompt_manager():
+    spec = _ilu.spec_from_file_location(
+        "ai_prompt_manager",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "20_ai_prompt_manager.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
 load_dotenv(dotenv_path=r"C:\Users\user\claude AI_Agent\.env")
 
 BASE_DIR        = Path(r"C:\Users\user\claude AI_Agent")
@@ -664,6 +674,7 @@ _awaiting_invite_manage_select = _webhook_state._awaiting_invite_manage_select
 _awaiting_invite_manage_action = _webhook_state._awaiting_invite_manage_action
 _awaiting_invite_manage_edit = _webhook_state._awaiting_invite_manage_edit
 _awaiting_promo_optimize_apply = _webhook_state._awaiting_promo_optimize_apply
+_awaiting_partner_voice_add = _webhook_state._awaiting_partner_voice_add
 _web_invite_combos = _webhook_state._web_invite_combos
 _web_partner_invite_state = _webhook_state._web_partner_invite_state
 _web_invite_manage_state = _webhook_state._web_invite_manage_state
@@ -908,6 +919,8 @@ def handle_audio_message(event: dict, mode_info: dict, clf):
         download_line_content=_download_line_content,
         reply_message=reply_message,
         schedule_pending_menu=schedule_pending_menu,
+        awaiting_partner_voice_add=_awaiting_partner_voice_add,
+        load_partner=_load_partner,
     )
 
 
@@ -974,6 +987,7 @@ def handle_training_command(user_msg: str, reply_token: str,
         load_daily_report=_load_daily_report,
         load_nutrition_dri=_load_nutrition_dri,
         load_nutrition_assessment=_load_nutrition_assessment,
+        load_ai_prompt_manager=_load_ai_prompt_manager,
         load_training_agent=_load_training_agent,
         load_followup=_load_followup,
         load_motivation=_load_motivation,
@@ -1180,6 +1194,7 @@ def webhook():
         awaiting_invite_manage_action=_awaiting_invite_manage_action,
         awaiting_invite_manage_edit=_awaiting_invite_manage_edit,
         awaiting_promo_optimize_apply=_awaiting_promo_optimize_apply,
+        awaiting_partner_voice_add=_awaiting_partner_voice_add,
         looks_like_explicit_command=_looks_like_explicit_command,
         normalize_partner_category_choice=_normalize_partner_category_choice,
         partners_by_category=_partners_by_category,
@@ -1474,6 +1489,7 @@ def process_web_command(cmd: str) -> str:
         load_daily_report=_load_daily_report,
         load_nutrition_dri=_load_nutrition_dri,
         load_nutrition_assessment=_load_nutrition_assessment,
+        load_ai_prompt_manager=_load_ai_prompt_manager,
         load_training_agent=_load_training_agent,
         load_followup=_load_followup,
         load_motivation=_load_motivation,
@@ -1706,9 +1722,11 @@ _webhook_api_routes.register_api_routes(
     nutrition_sessions=_nutrition_sessions,
     load_classifier=lambda: _load_classifier(),
     load_market_dev=lambda: _load_market_dev(),
+    load_partner=lambda: _load_partner(),
     load_course_invite=lambda: _load_course_invite(),
     load_daily_report=lambda: _load_daily_report(),
     load_nutrition_assessment=lambda: _load_nutrition_assessment(),
+    load_ai_prompt_manager=lambda: _load_ai_prompt_manager(),
 )
 
 
