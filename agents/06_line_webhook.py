@@ -265,7 +265,7 @@ SENT_LOG        = BASE_DIR / "output" / "sent_log.json"
 LOG_FILE        = BASE_DIR / "logs" / "webhook_log.txt"
 CLASSIFIED_DIR  = BASE_DIR / "output" / "classified"
 
-LINE_TOKEN    = os.getenv("LINE_CHANNEL_TOKEN", "")
+LINE_TOKEN    = os.getenv("LINE_CHANNEL_TOKEN", "").strip() or os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "").strip()
 LINE_SECRET   = os.getenv("LINE_CHANNEL_SECRET", "")
 LINE_REPLY    = "https://api.line.me/v2/bot/message/reply"
 LINE_PUSH     = "https://api.line.me/v2/bot/message/push"
