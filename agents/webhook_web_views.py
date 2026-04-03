@@ -667,8 +667,6 @@ async function _hydratePartnerSelect(formDef){
   var partners=await _getPartners();
   if(_isFollowupAddForm(formDef)||_isFollowupForm(formDef)){
     partners=partners.filter(function(p){ return (p.stage||"")==="待跟進"; });
-  } else if(_isMotivateForm(formDef)){
-    partners=partners.filter(function(p){ return (p.stage||"").indexOf("激勵")!==-1; });
   }
   var cur=el.value||"";
   var sel=document.createElement("select");

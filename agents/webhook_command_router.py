@@ -346,7 +346,7 @@ def handle_web_command(
     if _starts_with_any(cmd, PARTNER_PREFIXES):
         return _partner_query_text(load_partner, cmd)
 
-    if cmd.startswith("激勵夥伴") or cmd.startswith("里程碑記錄") or cmd.startswith("里程碑 "):
+    if cmd.startswith("激勵夥伴") or cmd.startswith("里程碑記錄") or cmd.startswith("里程碑 ") or cmd.startswith("激勵 "):
         return load_motivation().MotivationAgent().handle_realtime(cmd)
 
     cal_result = load_calendar().handle_calendar_command(cmd)
