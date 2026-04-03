@@ -1254,7 +1254,7 @@ def render_dashboard_html_v2() -> str:
     const makeItem = (label, direct, onclick) => {{
       const btn = document.createElement("button");
       btn.className = "sbtn" + (direct ? " direct" : " form-btn");
-      btn.innerHTML = '<span class="lbl">'+label+'</span><span class="tag">'+(direct ? '直接' : '表單')+'</span>';
+      btn.innerHTML = '<span class="lbl">'+label+'</span><span class="tag">'+(direct ? '直接執行' : '表單')+'</span>';
       btn.onclick = onclick;
       return btn;
     }};
@@ -1274,7 +1274,7 @@ def render_dashboard_html_v2() -> str:
     const makeMobile = (label, direct, onclick) => {{
       const btn = document.createElement("button");
       btn.className = "mgbtn" + (direct ? " direct" : " form-btn");
-      btn.innerHTML = '<span class="lbl">'+label+'</span><span class="mtag">'+(direct ? '直接' : '表單')+'</span>';
+      btn.innerHTML = '<span class="lbl">'+label+'</span><span class="mtag">'+(direct ? '直接執行' : '表單')+'</span>';
       btn.onclick = onclick;
       return btn;
     }};
@@ -1354,188 +1354,6 @@ def render_dashboard_html_v2() -> str:
     addAIPromptButtons();
   }}
 }})();
-</script>
-"""
-
-    inject += """
-<script>
-(function(){
-  async function fetchJson(url){
-    try {
-      const r = await fetch(url);
-      return await r.json();
-    } catch (e) {
-      return {};
-    }
-  }
-
-  async function loadTrainingData(){
-    const [mods, sessions, partners] = await Promise.all([
-      fetchJson('/api/training-modules'),
-      fetchJson('/api/training-sessions'),
-      fetchJson('/api/partners')
-    ]);
-    return {
-      modules: (mods.result || []).map(x => ({ value: x.title, label: x.title })),
-      sessions: (sessions.result || []).map(x => ({ value: x.title, label: x.title })),
-      partners: (partners.result || []).map(x => ({ value: x.name, label: x.name }))
-    };
-  }
-
-  function makeSidebarItem(label, direct, onclick){
-    const btn = document.createElement('button');
-    btn.className = 'sbtn' + (direct ? ' direct' : ' form-btn');
-    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="tag">' + (direct ? '直接' : '表單') + '</span>';
-    btn.onclick = onclick;
-    return btn;
-  }
-
-  function makeMobileItem(label, direct, onclick){
-    const btn = document.createElement('button');
-    btn.className = 'mgbtn' + (direct ? ' direct' : ' form-btn');
-    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="mtag">' + (direct ? '直接' : '表單') + '</span>';
-    btn.onclick = onclick;
-    return btn;
-  }
-
-  async function openTrainingForm(kind){
-    const data = await loadTrainingData();
-    const defs = {
-      module_add: {
-        title: '新增培訓模組',
-        fields: [
-          {id:'title', lbl:'模組名稱', type:'text', req:1},
-          {id:'kind', lbl:'模組類型', type:'text', req:1},
-          {id:'goal', lbl:'學習目標', type:'text', req:1},
-          {id:'summary', lbl:'摘要', type:'textarea'}
-        ],
-        build: v => `新增培訓模組 ${v.title} | ${v.kind} | ${v.goal} | ${v.summary || ''}`
-      },
-      session_add: {
-        title: '新增培訓課程',
-        fields: [
-          {id:'title', lbl:'課程名稱', type:'text', req:1},
-          {id:'module', lbl:'模組名稱', type:'select', req:1, options:data.modules},
-          {id:'date', lbl:'日期', type:'text', req:1, ph:'2026-04-10'},
-          {id:'time', lbl:'時間', type:'text', req:1, ph:'19:30'},
-          {id:'location', lbl:'地點', type:'text'},
-          {id:'teacher', lbl:'講師', type:'text'},
-          {id:'audience', lbl:'對象', type:'text'}
-        ],
-        build: v => `新增培訓課程 ${v.title} | ${v.module} | ${v.date} | ${v.time} | ${v.location || ''} | ${v.teacher || ''} | ${v.audience || ''}`
-      },
-      reflection_add: {
-        title: '新增培訓反思',
-        fields: [
-          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
-          {id:'session', lbl:'課程', type:'select', req:1, options:data.sessions},
-          {id:'realize', lbl:'悟到', type:'textarea', req:1},
-          {id:'learn', lbl:'學到', type:'textarea', req:1},
-          {id:'doit', lbl:'做到', type:'textarea', req:1},
-          {id:'goal', lbl:'目標', type:'textarea', req:1}
-        ],
-        build: v => `新增培訓反思 ${v.name} | ${v.session} | ${v.realize} | ${v.learn} | ${v.doit} | ${v.goal}`
-      },
-      progress_query: {
-        title: '查詢培訓進度',
-        fields: [{id:'name', lbl:'姓名', type:'select', req:1, options:data.partners}],
-        build: v => `查詢培訓進度 ${v.name}`
-      },
-      seven_start: {
-        title: '啟動七天法則',
-        fields: [
-          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
-          {id:'date', lbl:'開始日期', type:'text', req:1, ph:'2026-04-10'},
-          {id:'note', lbl:'教練備註', type:'textarea'}
-        ],
-        build: v => `啟動七天法則 ${v.name} | ${v.date} | ${v.note || ''}`
-      },
-      seven_report: {
-        title: '七天法則回報',
-        fields: [
-          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
-          {id:'day', lbl:'第幾天', type:'text', req:1, ph:'第1天'},
-          {id:'task', lbl:'任務內容', type:'text', req:1},
-          {id:'status', lbl:'狀態', type:'select', req:1, options:[{value:'已完成',label:'已完成'},{value:'未完成',label:'未完成'}]},
-          {id:'note', lbl:'備註', type:'textarea'}
-        ],
-        build: v => `七天法則回報 ${v.name} | ${v.day} | ${v.task} | ${v.status} | ${v.note || ''}`
-      },
-      seven_query: {
-        title: '查詢七天法則',
-        fields: [{id:'name', lbl:'姓名', type:'select', req:1, options:data.partners}],
-        build: v => `查詢七天法則 ${v.name}`
-      },
-      action_add: {
-        title: '新增課後行動',
-        fields: [
-          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
-          {id:'session', lbl:'課程名稱', type:'select', req:1, options:data.sessions},
-          {id:'action', lbl:'行動內容', type:'textarea', req:1},
-          {id:'deadline', lbl:'截止日期', type:'text', req:1, ph:'2026-04-18'}
-        ],
-        build: v => `新增課後行動 ${v.name} | ${v.session} | ${v.action} | ${v.deadline}`
-      },
-      action_update: {
-        title: '回報課後行動',
-        fields: [
-          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
-          {id:'action_id', lbl:'ACTION-ID', type:'text', req:1},
-          {id:'status', lbl:'狀態', type:'text', req:1},
-          {id:'note', lbl:'備註', type:'textarea'}
-        ],
-        build: v => `回報課後行動 ${v.name} | ${v.action_id} | ${v.status} | ${v.note || ''}`
-      },
-      action_query: {
-        title: '查詢課後行動',
-        fields: [{id:'name', lbl:'姓名', type:'select', req:1, options:data.partners}],
-        build: v => `查詢課後行動 ${v.name}`
-      }
-    };
-    openModal(defs[kind]);
-  }
-
-  function addTrainingButtons(){
-    const sidebar = document.getElementById('sidebar');
-    const mobcont = document.getElementById('mobcont');
-    if (!sidebar || !mobcont || document.getElementById('training-system-clean-group')) return;
-
-    const group = document.createElement('div');
-    group.className = 'sg';
-    group.id = 'training-system-clean-group';
-    group.innerHTML = '<div class="sghdr open"><span>🎓 培訓系統 2.0</span><span class="arr">▸</span></div><div class="sgitems open"></div>';
-    const items = group.querySelector('.sgitems');
-    const defs = [
-      ['新增培訓模組', false, () => openTrainingForm('module_add')],
-      ['查詢培訓模組', true, () => doSend('查詢培訓模組')],
-      ['新增培訓課程', false, () => openTrainingForm('session_add')],
-      ['查詢培訓課程', true, () => doSend('查詢培訓課程')],
-      ['新增培訓反思', false, () => openTrainingForm('reflection_add')],
-      ['查詢培訓進度', false, () => openTrainingForm('progress_query')],
-      ['查詢培訓總表', true, () => doSend('查詢培訓總表')],
-      ['啟動七天法則', false, () => openTrainingForm('seven_start')],
-      ['七天法則回報', false, () => openTrainingForm('seven_report')],
-      ['查詢七天法則', false, () => openTrainingForm('seven_query')],
-      ['新增課後行動', false, () => openTrainingForm('action_add')],
-      ['回報課後行動', false, () => openTrainingForm('action_update')],
-      ['查詢課後行動', false, () => openTrainingForm('action_query')]
-    ];
-    defs.forEach(([label, direct, onclick]) => items.appendChild(makeSidebarItem(label, direct, onclick)));
-    sidebar.appendChild(group);
-
-    const mg = document.createElement('div');
-    mg.className = 'mgg';
-    mg.innerHTML = '<div class="mgghdr">🎓 培訓系統 2.0</div>';
-    defs.forEach(([label, direct, onclick]) => mg.appendChild(makeMobileItem(label, direct, () => { closeMob(); onclick(); })));
-    mobcont.appendChild(mg);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', addTrainingButtons);
-  } else {
-    addTrainingButtons();
-  }
-})();
 </script>
 """
     return html.replace("</body>", inject + "\n</body>")
