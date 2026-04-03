@@ -181,22 +181,31 @@ def classify_risk(partner: dict, red_days: int, yellow_days: int) -> str:
 
 
 def generate_followup_draft(partner: dict, days: int) -> str:
-    prompt = f"""你是一位充滿熱情的直銷團隊導師。請為一位需要重新關心的夥伴，產生溫暖、具體、低壓的跟進訊息草稿。
+    name = partner.get(FIELD_NAME, "")
+    milestone = partner.get(FIELD_MILESTONE, "") or "尚無紀錄"
+    note = partner.get(FIELD_NOTE, "") or "無"
+    
+    prompt = f"""你是一位擁有 20 年經驗、語氣溫暖且充滿智慧的事業導師（Mentor）。
+請針對以下這位已經有段時間未深入互動的夥伴，產出精確的「跟進策略分析」與「溫暖低壓的訊息草稿」。
 
-夥伴資料：
-姓名：{partner.get(FIELD_NAME, '')}
-已沉默天數：{days}
-備註：{partner.get(FIELD_NOTE, '')}
-里程碑：{partner.get(FIELD_MILESTONE, '') or '尚無'}
+### 夥伴背景資料
+- 姓名：{name}
+- 沉默天數：{days} 天
+- 目前里程碑/獎銜：{milestone}
+- 備註資訊：{note}
 
-請提供：
-1. 一段可以直接傳訊息的關心文字
-2. 一個自然的後續提問
-3. 不要太有壓力，不要直接推銷
-4. 長度控制在 60 到 120 字
-5. 使用繁體中文"""
+### 要求
+1. 觀察分析：根據沉默天數與備註，判斷該夥伴目前的狀態。
+2. 跟進策略：給出具體的切入點建議。
+3. 建議訊息：產出一段約 60-120 字的 LINE 訊息草稿。語氣要像老朋友，帶一點 Emoji，絕對不要催促業績或提到產品，要專注於「人」的關懷。
 
-    return run_claude(prompt)
+請使用繁體中文回傳結果，直接顯示內容，不需開場白。"""
+
+    try:
+        return run_codex_cli(prompt, timeout=90)
+    except Exception as e:
+        log(f"  AI 生成失敗: {e}")
+        return "（建議先以輕鬆的語氣關心近況，避開事業話題，重建互動溫度。）"
 
 
 class FollowupAgent:
@@ -224,24 +233,31 @@ class FollowupAgent:
                 return f"🔍 找不到夥伴「{target_name}」的跟進資料。"
             
             days = days_silent(row.get(FIELD_LAST_CONTACT, ""))
-            risk = classify_risk(row, self.red_days, self.yellow_days)
-            risk_label = {"red": "🔴 高風險", "yellow": "🟡 中風險", "green": "🟢 正常"}[risk]
             
-            lines = [
-                f"📈 夥伴跟進報告：{target_name}",
-                f"⚠️ 風險等級：{risk_label}",
-                f"📅 最後聯絡：{row.get(FIELD_LAST_CONTACT, '無記錄') or '無記錄'} ({days} 天前)",
-                f"📊 本週動作：{row.get(FIELD_WEEKLY_ACTIONS, '0')} 次",
-                f"🚩 里程碑：{row.get(FIELD_MILESTONE, '尚無') or '尚無'}",
-                f"📝 備註：{row.get(FIELD_NOTE, '') or '無'}",
-                "",
-                "💡 跟進建議：",
-            ]
+            prompt = f"""你是一位擁有 20 年經驗、專精於「陪伴與成長」的事業導師。
+請針對以下夥伴的現況數據，產出一份「深度跟進建議報告」。
+
+### 夥伴原始數據
+- 姓名：{target_name}
+- 最後聯絡：{row.get(FIELD_LAST_CONTACT, '無記錄')} ({days} 天前)
+- 本週動作數：{row.get(FIELD_WEEKLY_ACTIONS, '0')} 次
+- 目前里程碑：{row.get(FIELD_MILESTONE, '尚無紀錄')}
+- 備註資訊：{row.get(FIELD_NOTE, '無')}
+
+### 要求
+1. 狀態診斷：分析該夥伴目前的心理與執行狀態（如：動力下降、遭遇挫折、或穩定成長中）。
+2. 核心切入點：建議導師這次應該以什麼「主題」或「心情」去聯繫他最有效。
+3. 具體跟進建議：給出 2-3 點具體行動。
+4. LINE 訊息草稿：產出一段約 80-120 字、溫暖、老朋友口吻的草稿。
+
+請以繁體中文回傳完整報告，直接顯示內容，不需開場白。"""
+
             try:
-                lines.append(generate_followup_draft(row, days))
-            except Exception:
-                lines.append("建議先以輕鬆的語氣關心近況，避開事業話題，重建互動溫度。")
-            return "\n".join(lines)
+                log(f"  🚀 正在為 {target_name} 生成 Codex 深度報告...")
+                return run_codex_cli(prompt, timeout=90)
+            except Exception as e:
+                log(f"  AI 生成失敗: {e}")
+                return f"📈 夥伴跟進報告：{target_name}\n（AI 生成暫時無法使用，請根據備註內容進行基礎關懷。）"
 
         red_list = []
         yellow_list = []

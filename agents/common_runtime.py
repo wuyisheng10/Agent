@@ -27,6 +27,16 @@ def load_json_config(path: Path) -> dict:
         return {}
 
 
+def _resolve_codex_command() -> list[str]:
+    import shutil
+    appdata = Path(os.getenv("APPDATA", r"C:\Users\user\AppData\Roaming"))
+    node_exe = shutil.which("node") or r"C:\Program Files\nodejs\node.exe"
+    script = appdata / "npm" / "node_modules" / "@openai" / "codex" / "bin" / "codex.js"
+    if script.exists():
+        return [node_exe, str(script)]
+    return ["codex"]
+
+
 def run_codex_cli(prompt: str, timeout: int = 60) -> str:
     response_path = None
     try:
@@ -37,11 +47,13 @@ def run_codex_cli(prompt: str, timeout: int = 60) -> str:
         ) as f:
             response_path = f.name
 
+        cmd = _resolve_codex_command() + [
+            "exec", "--skip-git-repo-check", "--sandbox", "read-only",
+            "--color", "never", "-C", str(BASE_DIR),
+            "-o", response_path, "-"
+        ]
         result = subprocess.run(
-            ["codex", "exec",
-             "--skip-git-repo-check", "--sandbox", "read-only",
-             "--color", "never", "-C", str(BASE_DIR),
-             "-o", response_path, "-"],
+            cmd,
             input=prompt,
             capture_output=True,
             text=True,
