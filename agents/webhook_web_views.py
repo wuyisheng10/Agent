@@ -898,6 +898,8 @@ function openModal(f){
     el.addEventListener("change",function(){el.dataset.userEdited="1";});
     w.appendChild(el);mf.appendChild(w);
   });
+  var mok=document.getElementById("mok");
+  mok.onclick=submitModal;
   document.getElementById("overlay").classList.add("on");
   _hydratePartnerSelect(f);
   _hydrateStoryPeopleSelect(f);

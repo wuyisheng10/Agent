@@ -334,6 +334,9 @@ def handle_web_command(
         # 處理 更新潛在家人 與 潛在家人資料
         return load_market_dev().MarketDevAgent().handle_command(cmd)
 
+    if cmd.startswith("激勵夥伴") or cmd.startswith("里程碑記錄") or cmd.startswith("里程碑 "):
+        return load_motivation().MotivationAgent().handle_realtime(cmd)
+
     cal_result = load_calendar().handle_calendar_command(cmd)
 
     if _starts_with_any(cmd, NUTRITION_DRI_PREFIXES):
@@ -343,7 +346,7 @@ def handle_web_command(
     if training_system_result:
         return training_system_result
 
-    if cmd.startswith("激勵夥伴") or cmd.startswith("里程碑記錄"):
+    if cmd.startswith("激勵夥伴") or cmd.startswith("里程碑記錄") or cmd.startswith("里程碑 "):
         return load_motivation().MotivationAgent().handle_realtime(cmd)
 
     return None
