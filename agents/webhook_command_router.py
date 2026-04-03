@@ -1,367 +1,134 @@
 from typing import Callable
 
 
-def handle_line_command(
-    msg: str,
-    reply_token: str,
-    push_target: str,
-    sessions: dict,
-    reply_message: Callable[[str, str], None],
-    push_message: Callable[[str, str], None],
-    load_calendar,
-    load_partner,
-    load_classifier,
-    load_market_dev,
-    load_course_invite,
-    load_daily_report,
-    load_nutrition_dri,
-    load_nutrition_assessment,
-    load_ai_prompt_manager,
-    load_ai_skill_manager,
-    load_training_agent,
-    load_followup,
-    load_motivation,
-):
-    msg = (msg or "").strip()
-    if msg == "查詢AI提示詞" or msg.startswith("查詢AI提示詞 ") or msg.startswith("更新AI提示詞 "):
-        try:
-            pm = load_ai_prompt_manager()
-            result = pm.handle_command(msg)
-            if result:
-                reply_message(reply_token, result)
-                return True
-        except Exception as exc:
-            reply_message(reply_token, f"⚠️ AI 提示詞處理失敗：{exc}")
-            return True
-    if msg == "查詢AI技能" or msg.startswith("查詢AI技能 ") or msg.startswith("更新AI技能 "):
-        try:
-            sm = load_ai_skill_manager()
-            result = sm.handle_command(msg)
-            if result:
-                reply_message(reply_token, result)
-                return True
-        except Exception as exc:
-            reply_message(reply_token, f"⚠️ AI 技能處理失敗：{exc}")
-            return True
-    if msg in ("行事曆圖檔整理", "上傳行事曆圖片"):
-        try:
-            clf_mod = load_classifier()
-            result = clf_mod.ClassifierAgent().set_mode("行事曆", "")
-            reply_message(reply_token, result + "\n\n請直接上傳行事曆圖片，系統會整理今天之後的活動。")
-            return True
-        except Exception as exc:
-            reply_message(reply_token, f"✗ 行事曆圖檔模式設定失敗：{exc}")
-            return True
-
-    try:
-        clf_mod = load_classifier()
-        available_modes = set(getattr(clf_mod, "AVAILABLE_MODES", []))
-        if msg in available_modes:
-            result = clf_mod.ClassifierAgent().set_mode(msg, "")
-            reply_message(reply_token, result)
-            return True
-    except Exception as exc:
-        reply_message(reply_token, f"✗ 歸檔模式設定失敗：{exc}")
-        return True
-
-    if msg == "寄送每日報告":
-        try:
-            reply_message(reply_token, "⏳ 正在產生每日報告並寄送，請稍候...")
-            dr = load_daily_report()
-            result = dr.DailyReportAgent().run()
-            push_message(push_target, result)
-        except Exception as exc:
-            reply_message(reply_token, f"✗ 每日報告失敗：{exc}")
-        return True
-
-    try:
-        cal = load_calendar()
-        result = cal.handle_calendar_command(msg)
-        if result:
-            reply_message(reply_token, result)
-            return True
-    except Exception as exc:
-        reply_message(reply_token, f"✗ 行事曆指令失敗：{exc}")
-        return True
-
-    try:
-        partner = load_partner()
-        result = partner.handle_partner_command(msg)
-        if result:
-            reply_message(reply_token, result)
-            return True
-    except Exception as exc:
-        reply_message(reply_token, f"✗ 夥伴指令失敗：{exc}")
-        return True
-
-    if msg.startswith("查詢歸檔"):
-        try:
-            clf_mod = load_classifier()
-            person = msg.replace("查詢歸檔", "", 1).strip() or None
-            result = clf_mod.ClassifierAgent().query_archive(person)
-            reply_message(reply_token, result)
-            return True
-        except Exception as exc:
-            reply_message(reply_token, f"✗ 查詢歸檔失敗：{exc}")
-            return True
-
-    if msg.startswith("新增潛在家人"):
-        try:
-            reply_message(reply_token, "⏳ 正在新增潛在家人並進行 AI 評分，請稍候...")
-            market = load_market_dev()
-            result = market.MarketDevAgent().handle_add_prospect(msg)
-            push_message(push_target, result)
-            return True
-        except Exception as exc:
-            reply_message(reply_token, f"✗ 新增潛在家人失敗：{exc}")
-            return True
-
-    if msg.startswith("更新潛在家人"):
-        return False
-
-    if msg == "潛在家人總表" or msg.startswith("查詢潛在家人"):
-        try:
-            keyword = None if msg == "潛在家人總表" else (msg.replace("查詢潛在家人", "", 1).strip() or None)
-            market = load_market_dev()
-            rows = market.MarketDevAgent().list_prospects(keyword)
-            if not rows:
-                reply_message(reply_token, "⚠️ 目前沒有潛在家人資料。")
-                return True
-            lines = [f"📋 潛在家人清單（共 {len(rows)} 位）", ""]
-            for i, row in enumerate(rows, 1):
-                lines.append(f"{i}. {row.get('姓名','')}｜{row.get('類型','')}")
-            reply_message(reply_token, "\n".join(lines))
-            return True
-        except Exception as exc:
-            reply_message(reply_token, f"✗ 查詢潛在家人失敗：{exc}")
-            return True
-
-    course_prefixes = (
-        "新增課程會議", "查詢課程會議", "刪除課程會議", "修改課程會議", "從行事曆加入課程",
-        "新增課程文宣", "查詢課程文宣", "優化課程文宣",
-        "查詢已產生的今日之後會議邀約文宣", "修改已產生的今日之後會議邀約文宣",
-        "邀約文宣 潛在家人",
-        "課程會議", "課程文宣", "課程",
-    )
-    if any(msg.startswith(prefix) for prefix in course_prefixes):
-        try:
-            course = load_course_invite()
-            if msg.startswith("優化課程文宣") or msg.startswith("邀約文宣 潛在家人"):
-                reply_message(reply_token, "⏳ 正在透過 AI 產生課程文宣，請稍候...")
-                result = course.CourseInviteAgent().handle_command(msg)
-                push_message(push_target, result if result else "⚠️ 課程指令無結果")
-            else:
-                result = course.CourseInviteAgent().handle_command(msg)
-                reply_message(reply_token, result if result else "⚠️ 課程指令無結果")
-            return True
-        except Exception as exc:
-            reply_message(reply_token, f"✗ 課程邀約失敗：{exc}")
-            return True
-
-    dri_prefixes = ("查詢營養素標準", "營養素運作原理", "列出營養素", "所有營養素", "下載營養素標準", "更新營養素標準")
-    if any(msg.startswith(prefix) for prefix in dri_prefixes) or msg in dri_prefixes:
-        try:
-            dri_mod = load_nutrition_dri()
-            result = dri_mod.NutritionDRIAgent().handle_command(msg)
-            if result:
-                reply_message(reply_token, result)
-                return True
-        except Exception as exc:
-            reply_message(reply_token, f"✗ 營養素查詢失敗：{exc}")
-            return True
-
-    assess_prefixes = ("開始飲食評估", "設定餐別", "設定評估對象", "評估飲食", "清除飲食評估", "取消飲食評估", "飲食評估狀態")
-    if any(msg.startswith(prefix) for prefix in assess_prefixes):
-        try:
-            na_mod = load_nutrition_assessment()
-            if msg.startswith("評估飲食"):
-                reply_message(reply_token, "⏳ 正在分析餐點照片並生成報告，請稍候（約30-60秒）...")
-                try:
-                    result = na_mod.handle_command(msg, sessions, push_target)
-                    if result:
-                        push_message(push_target, result)
-                except Exception as exc:
-                    push_message(push_target, f"✗ 飲食評估失敗：{exc}")
-            else:
-                result = na_mod.handle_command(msg, sessions, push_target)
-                if result:
-                    reply_message(reply_token, result)
-            return True
-        except Exception as exc:
-            reply_message(reply_token, f"✗ 飲食評估指令失敗：{exc}")
-            return True
-
-    if msg.startswith("培訓"):
-        try:
-            training = load_training_agent()
-            result = training.TrainingAgent().handle_query(msg)
-            reply_message(reply_token, result)
-            return True
-        except Exception as exc:
-            reply_message(reply_token, f"✗ 培訓查詢失敗：{exc}")
-            return True
-
-    if msg == "跟進報告":
-        try:
-            reply_message(reply_token, "⏳ 正在生成跟進報告，請稍候...")
-            followup = load_followup()
-            result = followup.FollowupAgent().generate_report_text()
-            push_message(push_target, result)
-            return True
-        except Exception as exc:
-            reply_message(reply_token, f"✗ 跟進報告失敗：{exc}")
-            return True
-
-    if msg.startswith("激勵") or msg.startswith("里程碑"):
-        try:
-            reply_message(reply_token, "⏳ 正在生成激勵訊息，請稍候...")
-            motivation = load_motivation()
-            result = motivation.MotivationAgent().handle_realtime(msg)
-            push_message(push_target, result)
-            return True
-        except Exception as exc:
-            reply_message(reply_token, f"✗ 激勵訊息失敗：{exc}")
-            return True
-
-    return False
+AI_PROMPT_PREFIXES = ("查詢AI提示詞", "更新AI提示詞")
+AI_SKILL_PREFIXES = ("查詢AI技能", "更新AI技能")
+FOLLOWUP_SUGGESTION_PREFIXES = ("跟進建議 潛在家人", "跟進建議 夥伴")
+DAILY_REPORT_PREFIXES = ("寄送每日報告",)
+CALENDAR_DIRECT_COMMANDS = ("查詢今日行事曆", "查詢過往行事曆", "查詢全部行事曆")
+CALENDAR_UPLOAD_COMMANDS = ("上傳行事曆圖片",)
+ARCHIVE_MODE_COMMANDS = (
+    "營養保健歸檔",
+    "美容保養歸檔",
+    "居家清潔歸檔",
+    "個人護理歸檔",
+    "廚具與生活用品",
+    "廚具生活歸檔",
+    "空氣與水處理設備",
+    "空水設備歸檔",
+    "體重管理與運動營養",
+    "體重管理歸檔",
+    "香氛與個人風格",
+    "香氛風格歸檔",
+    "事業工具與教育系統",
+    "事業工具歸檔",
+    "人物故事歸檔",
+    "產品故事歸檔",
+    "421故事歸檔",
+    "課程文宣歸檔",
+)
+COURSE_PREFIXES = (
+    "查詢課程會議",
+    "新增課程會議",
+    "修改課程會議",
+    "從行事曆加入課程",
+    "刪除課程會議",
+    "查詢課程文宣",
+    "新增課程文宣",
+    "優化課程文宣",
+    "邀約文宣",
+    "查詢已產生的今日之後會議邀約文宣",
+    "修改已產生的今日之後會議邀約文宣",
+)
+NUTRITION_DRI_PREFIXES = (
+    "查詢營養素標準",
+    "營養素運作原理",
+    "列出所有營養素",
+    "列出營養素",
+    "更新官方營養素標準",
+    "下載營養素標準",
+)
+NUTRITION_ASSESSMENT_PREFIXES = (
+    "開始飲食評估",
+    "執行飲食評估",
+    "設定下一張餐別",
+    "飲食評估狀態",
+    "清除飲食評估",
+    "設定歸檔對象",
+)
+TRAINING_SYSTEM_PREFIXES = (
+    "新增培訓模組",
+    "查詢培訓模組",
+    "新增培訓課程",
+    "查詢培訓課程",
+    "新增培訓反思",
+    "查詢培訓進度",
+    "查詢培訓總表",
+    "啟動七天法則",
+    "七天法則回報",
+    "查詢七天法則",
+    "新增課後行動",
+    "回報課後行動",
+    "查詢課後行動",
+)
 
 
-def handle_web_command(
-    cmd: str,
-    sessions: dict,
-    load_calendar,
-    load_partner,
-    load_classifier,
-    load_market_dev,
-    load_course_invite,
-    load_daily_report,
-    load_nutrition_dri,
-    load_nutrition_assessment,
-    load_ai_prompt_manager,
-    load_ai_skill_manager,
-    load_training_agent,
-    load_followup,
-    load_motivation,
-):
-    cmd = (cmd or "").strip()
-    if cmd == "查詢AI提示詞" or cmd.startswith("查詢AI提示詞 ") or cmd.startswith("更新AI提示詞 "):
-        pm = load_ai_prompt_manager()
-        result = pm.handle_command(cmd)
-        if result:
-            return result
-    if cmd == "查詢AI技能" or cmd.startswith("查詢AI技能 ") or cmd.startswith("更新AI技能 "):
-        sm = load_ai_skill_manager()
-        result = sm.handle_command(cmd)
-        if result:
-            return result
+def _starts_with_any(text: str, prefixes: tuple[str, ...]) -> bool:
+    return any(text.startswith(prefix) for prefix in prefixes)
 
-    clf_mod = None
 
-    def _get_classifier():
-        nonlocal clf_mod
-        if clf_mod is None:
-            clf_mod = load_classifier()
-        return clf_mod
 
-    if cmd in ("行事曆圖檔整理", "上傳行事曆圖片"):
-        return _get_classifier().ClassifierAgent().set_mode("行事曆", "") + "\n\n請直接上傳行事曆圖片，系統會整理今天之後的活動。"
 
-    available_modes = set(getattr(_get_classifier(), "AVAILABLE_MODES", []))
-    if cmd in available_modes:
-        return _get_classifier().ClassifierAgent().set_mode(cmd, "")
+def _list_prospects_text(load_market_dev, keyword=None):
+    rows = load_market_dev().MarketDevAgent().list_prospects(keyword)
+    if not rows:
+        return "找不到符合條件的潛在家人。"
+    lines = [f"潛在家人名單，共 {len(rows)} 筆", ""]
+    for idx, row in enumerate(rows, 1):
+        name = row.get("name") or row.get("姓名") or ""
+        cat = row.get("category") or row.get("分類") or row.get("status") or ""
+        lines.append(f"{idx}. {name}" + (f"｜{cat}" if cat else ""))
+    return "\n".join(lines)
 
-    if cmd == "寄送每日報告":
-        dr = load_daily_report()
-        return dr.DailyReportAgent().run()
 
-    cal = load_calendar()
-    result = cal.handle_calendar_command(cmd)
+def _partner_query_text(load_partner, cmd: str):
+    result = load_partner().handle_partner_command(cmd)
     if result:
         return result
+    if cmd in {"查詢所有夥伴", "查詢夥伴"}:
+        return "請輸入：查詢指定夥伴 姓名"
+    if cmd == "查詢待跟進夥伴":
+        return "請輸入：新增跟進夥伴 姓名 | 下次跟進日期 | 備註"
+    return None
 
-    partner = load_partner()
-    result = partner.handle_partner_command(cmd)
-    if result:
-        return result
-
-    if cmd.startswith("查詢歸檔"):
-        clf_mod = load_classifier()
-        person = cmd.replace("查詢歸檔", "", 1).strip() or None
-        return clf_mod.ClassifierAgent().query_archive(person)
-
-    if cmd.startswith("更新潛在家人"):
-        market = load_market_dev()
-        content = cmd.replace("更新潛在家人", "", 1).strip()
-        parts = [p.strip() for p in content.split("|")]
-        name = parts[0] if parts else ""
-        if not name:
-            return (
-                "⚠️ 格式：\n更新潛在家人 姓名|欄位:值|欄位:值\n\n"
-                "可用欄位：電話、地區、地址、接觸狀態、下次跟進日、使用產品、淨水器型號、備註"
-            )
-        fields = {}
-        for part in parts[1:]:
-            if ":" in part:
-                k, v = part.split(":", 1)
-                fields[k.strip()] = v.strip()
-        if not fields:
-            return "⚠️ 請提供要更新的欄位，格式：欄位:值"
-        return market.MarketDevAgent().update_prospect_fields(name, fields)
-
-    if cmd.startswith("新增潛在家人") or cmd.startswith("查詢潛在家人") or cmd == "潛在家人總表":
-        market = load_market_dev()
-        if cmd.startswith("新增潛在家人"):
-            return market.MarketDevAgent().handle_add_prospect(cmd)
-        keyword = None if cmd == "潛在家人總表" else (cmd.replace("查詢潛在家人", "", 1).strip() or None)
-        rows = market.MarketDevAgent().list_prospects(keyword)
-        if not rows:
-            return "⚠️ 目前沒有潛在家人資料。"
-        lines = [f"📋 潛在家人清單（共 {len(rows)} 位）", ""]
-        for i, row in enumerate(rows, 1):
-            lines.append(f"{i}. {row.get('姓名','')}｜{row.get('類型','')}")
-        return "\n".join(lines)
-
-    course_prefixes = (
-        "新增課程會議", "查詢課程會議", "刪除課程會議", "修改課程會議", "從行事曆加入課程",
-        "新增課程文宣", "查詢課程文宣", "優化課程文宣",
-        "查詢已產生的今日之後會議邀約文宣", "修改已產生的今日之後會議邀約文宣",
-        "邀約文宣 潛在家人",
-        "課程會議", "課程文宣", "課程",
-    )
-    if any(cmd.startswith(prefix) for prefix in course_prefixes):
-        course = load_course_invite()
-        result = course.CourseInviteAgent().handle_command(cmd)
-        return result if result else "⚠️ 課程指令無結果"
-
-    dri_prefixes = ("查詢營養素標準", "營養素運作原理", "列出營養素", "所有營養素", "下載營養素標準", "更新營養素標準")
-    if any(cmd.startswith(prefix) for prefix in dri_prefixes) or cmd in dri_prefixes:
-        dri_mod = load_nutrition_dri()
-        result = dri_mod.NutritionDRIAgent().handle_command(cmd)
-        return result if result else "⚠️ 無結果"
-
-    assess_prefixes = ("開始飲食評估", "設定餐別", "設定評估對象", "評估飲食", "清除飲食評估", "取消飲食評估", "飲食評估狀態")
-    if any(cmd.startswith(prefix) for prefix in assess_prefixes):
-        na_mod = load_nutrition_assessment()
-        result = na_mod.handle_command(cmd, sessions, "web")
-        return result if result else "⚠️ 無結果"
-
-    if cmd.startswith("培訓"):
-        training = load_training_agent()
-        return training.TrainingAgent().handle_query(cmd)
-
-    if cmd.startswith("跟進報告"):
-        followup = load_followup()
-        return followup.FollowupAgent().generate_report_text()
-
-    if cmd.startswith("激勵") or cmd.startswith("里程碑"):
-        motivation = load_motivation()
-        return motivation.MotivationAgent().handle_realtime(cmd)
-
+def _handle_training_system(cmd: str, load_training_system):
+    if _starts_with_any(cmd, TRAINING_SYSTEM_PREFIXES):
+        return load_training_system().TrainingSystemAgent().handle_command(cmd)
     return None
 
 
-_ORIGINAL_HANDLE_LINE_COMMAND = handle_line_command
-_ORIGINAL_HANDLE_WEB_COMMAND = handle_web_command
+def _format_direct_calendar(load_calendar, cmd: str) -> str:
+    cal = load_calendar()
+    if cmd == "查詢今日行事曆":
+        return cal.format_events(cal.upcoming_events(), title="今日之後行事曆")
+    if cmd == "查詢過往行事曆":
+        return cal.format_events(cal.past_events(), title="過往行事曆")
+    return cal.format_events(cal.events_between(), title="全部行事曆")
+
+
+def _format_archive_mode_result(load_classifier, mode: str) -> str:
+    alias_map = {
+        "廚具與生活用品": "廚具生活歸檔",
+        "空氣與水處理設備": "空水設備歸檔",
+        "體重管理與運動營養": "體重管理歸檔",
+        "香氛與個人風格": "香氛風格歸檔",
+        "事業工具與教育系統": "事業工具歸檔",
+    }
+    mode = alias_map.get(mode, mode)
+    result = load_classifier().ClassifierAgent().set_mode(mode)
+    if mode == "行事曆":
+        return f"{result}\n\n請直接上傳行事曆圖片。"
+    return result
 
 
 def handle_line_command(
@@ -383,46 +150,218 @@ def handle_line_command(
     load_ai_skill_manager,
     load_followup_suggestion,
     load_training_agent,
+    load_training_system,
     load_followup,
     load_motivation,
 ):
     msg = (msg or "").strip()
-    if (
-        msg == "跟進建議 潛在家人"
-        or msg == "跟進建議 夥伴"
-        or msg.startswith("跟進建議 潛在家人 ")
-        or msg.startswith("跟進建議 夥伴 ")
-    ):
-        try:
-            suggestion = load_followup_suggestion()
-            result = suggestion.FollowupSuggestionAgent().handle_command(msg)
+
+    try:
+        if msg == "查詢目前歸類模式":
+            reply_message(reply_token, load_classifier().ClassifierAgent().handle_mode_command("歸類模式"))
+            return True
+
+        if msg == "顯示所有指令":
+            reply_message(reply_token, "請輸入：5168")
+            return True
+
+        if msg == "跟進報告":
+            reply_message(reply_token, load_followup().FollowupAgent().generate_report_text())
+            return True
+
+        if msg in {"查詢今日行事曆", "查詢過往行事曆", "查詢全部行事曆"}:
+            if msg == "查詢今日行事曆":
+                reply_message(reply_token, _format_direct_calendar(load_calendar, "查詢今日行事曆"))
+            elif msg == "查詢過往行事曆":
+                reply_message(reply_token, _format_direct_calendar(load_calendar, "查詢過往行事曆"))
+            else:
+                reply_message(reply_token, _format_direct_calendar(load_calendar, "查詢全部行事曆"))
+            return True
+
+        if msg == "上傳行事曆圖片":
+            reply_message(reply_token, _format_archive_mode_result(load_classifier, "行事曆"))
+            return True
+
+        if msg in {"查詢所有夥伴", "查詢夥伴", "查詢待跟進夥伴"}:
+            reply_message(reply_token, _partner_query_text(load_partner, msg))
+            return True
+
+        if msg in {"查詢所有歸檔", "查詢歸檔"}:
+            reply_message(reply_token, load_classifier().ClassifierAgent().query_archive(None))
+            return True
+
+        if msg.startswith("查詢指定人員歸檔 ") or msg.startswith("查詢歸檔 "):
+            person = msg.split(" ", 1)[1].strip() or None
+            reply_message(reply_token, load_classifier().ClassifierAgent().query_archive(person))
+            return True
+
+        if msg in {
+            "營養保健歸檔",
+            "美容保養歸檔",
+            "居家清潔歸檔",
+            "個人護理歸檔",
+            "廚具與生活用品",
+            "廚具生活歸檔",
+            "空氣與水處理設備",
+            "空水設備歸檔",
+            "體重管理與運動營養",
+            "體重管理歸檔",
+            "香氛與個人風格",
+            "香氛風格歸檔",
+            "事業工具與教育系統",
+            "事業工具歸檔",
+            "人物故事歸檔",
+            "產品故事歸檔",
+            "421故事歸檔",
+            "課程文宣歸檔",
+        }:
+            reply_message(reply_token, _format_archive_mode_result(load_classifier, msg))
+            return True
+
+        if msg == "查詢潛在家人":
+            reply_message(reply_token, _list_prospects_text(load_market_dev))
+            return True
+        if _starts_with_any(msg, AI_PROMPT_PREFIXES):
+            result = load_ai_prompt_manager().handle_command(msg)
             if result:
                 reply_message(reply_token, result)
                 return True
-        except Exception as exc:
-            reply_message(reply_token, f"⚠️ 跟進建議產生失敗：{exc}")
+
+        if _starts_with_any(msg, AI_SKILL_PREFIXES):
+            result = load_ai_skill_manager().handle_command(msg)
+            if result:
+                reply_message(reply_token, result)
+                return True
+
+        if _starts_with_any(msg, FOLLOWUP_SUGGESTION_PREFIXES):
+            result = load_followup_suggestion().FollowupSuggestionAgent().handle_command(msg)
+            if result:
+                reply_message(reply_token, result)
+                return True
+
+        if _starts_with_any(msg, DAILY_REPORT_PREFIXES):
+            reply_message(reply_token, "正在寄送每日報告，完成後會再推送結果。")
+            push_message(push_target, load_daily_report().DailyReportAgent().run())
             return True
-    return _ORIGINAL_HANDLE_LINE_COMMAND(
-        msg=msg,
-        reply_token=reply_token,
-        push_target=push_target,
-        sessions=sessions,
-        reply_message=reply_message,
-        push_message=push_message,
-        load_calendar=load_calendar,
-        load_partner=load_partner,
-        load_classifier=load_classifier,
-        load_market_dev=load_market_dev,
-        load_course_invite=load_course_invite,
-        load_daily_report=load_daily_report,
-        load_nutrition_dri=load_nutrition_dri,
-        load_nutrition_assessment=load_nutrition_assessment,
-        load_ai_prompt_manager=load_ai_prompt_manager,
-        load_ai_skill_manager=load_ai_skill_manager,
-        load_training_agent=load_training_agent,
-        load_followup=load_followup,
-        load_motivation=load_motivation,
-    )
+
+        if msg in CALENDAR_DIRECT_COMMANDS:
+            reply_message(reply_token, _format_direct_calendar(load_calendar, msg))
+            return True
+
+        if msg in CALENDAR_UPLOAD_COMMANDS:
+            reply_message(reply_token, _format_archive_mode_result(load_classifier, "行事曆"))
+            return True
+
+        if msg in ARCHIVE_MODE_COMMANDS:
+            reply_message(reply_token, _format_archive_mode_result(load_classifier, msg))
+            return True
+
+        cal_result = load_calendar().handle_calendar_command(msg)
+        if cal_result:
+            reply_message(reply_token, cal_result)
+            return True
+
+        partner_result = _partner_query_text(load_partner, msg)
+        if partner_result:
+            reply_message(reply_token, partner_result)
+            return True
+
+        if msg.startswith("查詢所有歸檔") or msg == "查詢歸檔":
+            reply_message(reply_token, load_classifier().ClassifierAgent().query_archive(None))
+            return True
+
+        if msg.startswith("查詢歸檔 "):
+            person = msg.replace("查詢歸檔", "", 1).strip() or None
+            reply_message(reply_token, load_classifier().ClassifierAgent().query_archive(person))
+            return True
+
+        if msg.startswith("查詢指定人員歸檔"):
+            person = msg.replace("查詢指定人員歸檔", "", 1).strip() or None
+            reply_message(reply_token, load_classifier().ClassifierAgent().query_archive(person))
+            return True
+
+        if msg.startswith("新增潛在家人"):
+            reply_message(reply_token, "正在新增潛在家人，完成後會再推送結果。")
+            push_message(push_target, load_market_dev().MarketDevAgent().handle_add_prospect(msg))
+            return True
+
+        if msg.startswith("查詢潛在家人近況") or msg.startswith("查詢潛在家人") or msg == "潛在家人總表":
+            keyword = msg
+            keyword = keyword.replace("查詢潛在家人近況", "", 1)
+            keyword = keyword.replace("查詢潛在家人", "", 1).strip() or None
+            rows = load_market_dev().MarketDevAgent().list_prospects(keyword)
+            if not rows:
+                reply_message(reply_token, "找不到符合條件的潛在家人。")
+            else:
+                lines = [f"潛在家人名單，共 {len(rows)} 筆", ""]
+                for idx, row in enumerate(rows, 1):
+                    name = row.get("name") or row.get("姓名") or ""
+                    cat = row.get("category") or row.get("分類") or row.get("status") or ""
+                    lines.append(f"{idx}. {name}" + (f"｜{cat}" if cat else ""))
+                reply_message(reply_token, "\n".join(lines))
+            return True
+
+        if msg.startswith("修改潛在家人資訊") or msg.startswith("更新潛在家人"):
+            content = msg
+            content = content.replace("修改潛在家人資訊", "", 1)
+            content = content.replace("更新潛在家人", "", 1).strip()
+            parts = [p.strip() for p in content.split("|")]
+            name = parts[0] if parts else ""
+            fields = {}
+            for part in parts[1:]:
+                if ":" in part:
+                    key, value = part.split(":", 1)
+                    fields[key.strip()] = value.strip()
+            reply_message(reply_token, load_market_dev().MarketDevAgent().update_prospect_fields(name, fields))
+            return True
+
+        if _starts_with_any(msg, COURSE_PREFIXES):
+            course = load_course_invite()
+            if msg.startswith("邀約文宣"):
+                reply_message(reply_token, "正在產生邀約文宣，完成後會再推送結果。")
+                push_message(push_target, course.CourseInviteAgent().handle_command(msg) or "邀約文宣已完成。")
+            else:
+                reply_message(reply_token, course.CourseInviteAgent().handle_command(msg) or "課程邀約指令已處理。")
+            return True
+
+        if _starts_with_any(msg, NUTRITION_DRI_PREFIXES):
+            reply_message(reply_token, load_nutrition_dri().NutritionDRIAgent().handle_command(msg))
+            return True
+
+        if _starts_with_any(msg, NUTRITION_ASSESSMENT_PREFIXES):
+            assessment = load_nutrition_assessment()
+            if msg.startswith("執行飲食評估"):
+                reply_message(reply_token, "正在分析飲食內容並產生報告，完成後會再推送結果。")
+                result = assessment.handle_command(msg, sessions, push_target)
+                if result:
+                    push_message(push_target, result)
+            else:
+                result = assessment.handle_command(msg, sessions, push_target)
+                if result:
+                    reply_message(reply_token, result)
+            return True
+
+        training_system_result = _handle_training_system(msg, load_training_system)
+        if training_system_result:
+            reply_message(reply_token, training_system_result)
+            return True
+
+        if msg.startswith("查詢培訓進度 "):
+            reply_message(reply_token, load_training_agent().TrainingAgent().handle_query(msg))
+            return True
+
+        if msg == "跟進報告":
+            reply_message(reply_token, load_followup().FollowupAgent().generate_report_text())
+            return True
+
+        if msg.startswith("激勵夥伴") or msg.startswith("里程碑記錄") or msg.startswith("里程碑 "):
+            reply_message(reply_token, load_motivation().MotivationAgent().handle_realtime(msg))
+            return True
+
+        return False
+    except Exception as exc:
+        reply_message(reply_token, f"⚠️ 指令處理失敗：{exc}")
+        return True
 
 
 def handle_web_command(
@@ -440,34 +379,137 @@ def handle_web_command(
     load_ai_skill_manager,
     load_followup_suggestion,
     load_training_agent,
+    load_training_system,
     load_followup,
     load_motivation,
 ):
     cmd = (cmd or "").strip()
-    if (
-        cmd == "跟進建議 潛在家人"
-        or cmd == "跟進建議 夥伴"
-        or cmd.startswith("跟進建議 潛在家人 ")
-        or cmd.startswith("跟進建議 夥伴 ")
-    ):
-        suggestion = load_followup_suggestion()
-        result = suggestion.FollowupSuggestionAgent().handle_command(cmd)
-        if result:
-            return result
-    return _ORIGINAL_HANDLE_WEB_COMMAND(
-        cmd=cmd,
-        sessions=sessions,
-        load_calendar=load_calendar,
-        load_partner=load_partner,
-        load_classifier=load_classifier,
-        load_market_dev=load_market_dev,
-        load_course_invite=load_course_invite,
-        load_daily_report=load_daily_report,
-        load_nutrition_dri=load_nutrition_dri,
-        load_nutrition_assessment=load_nutrition_assessment,
-        load_ai_prompt_manager=load_ai_prompt_manager,
-        load_ai_skill_manager=load_ai_skill_manager,
-        load_training_agent=load_training_agent,
-        load_followup=load_followup,
-        load_motivation=load_motivation,
-    )
+
+    if cmd == "查詢目前歸類模式":
+        return load_classifier().ClassifierAgent().handle_mode_command("歸類模式")
+
+    if cmd == "顯示所有指令":
+        return "請輸入：5168"
+
+    if cmd == "????":
+        return load_followup().FollowupAgent().generate_report_text()
+
+    if cmd in {"???????", "???????", "???????"}:
+        if cmd == "???????":
+            return _format_direct_calendar(load_calendar, "???????????")
+        if cmd == "???????":
+            return _format_direct_calendar(load_calendar, "???????????")
+        return _format_direct_calendar(load_calendar, "???????????")
+
+    if cmd == "???????":
+        return _format_archive_mode_result(load_classifier, "?????")
+
+    if cmd in {"??????", "????", "???????"}:
+        return _partner_query_text(load_partner, cmd)
+
+    if cmd in {"??????", "????"}:
+        return load_classifier().ClassifierAgent().query_archive(None)
+
+    if cmd.startswith("???????? ") or cmd.startswith("???? "):
+        person = cmd.split(" ", 1)[1].strip() or None
+        return load_classifier().ClassifierAgent().query_archive(person)
+
+    if cmd in {"??????", "??????", "??????", "??????", "???????", "????????", "?????????", "???????", "?????????", "??????", "??????", "421????", "??????"}:
+        return _format_archive_mode_result(load_classifier, cmd)
+
+    if cmd == "??????":
+        return _list_prospects_text(load_market_dev)
+
+    if _starts_with_any(cmd, AI_PROMPT_PREFIXES):
+        return load_ai_prompt_manager().handle_command(cmd)
+
+    if _starts_with_any(cmd, AI_SKILL_PREFIXES):
+        return load_ai_skill_manager().handle_command(cmd)
+
+    if _starts_with_any(cmd, FOLLOWUP_SUGGESTION_PREFIXES):
+        return load_followup_suggestion().FollowupSuggestionAgent().handle_command(cmd)
+
+    if _starts_with_any(cmd, DAILY_REPORT_PREFIXES):
+        return load_daily_report().DailyReportAgent().run()
+
+    if cmd in CALENDAR_DIRECT_COMMANDS:
+        return _format_direct_calendar(load_calendar, cmd)
+
+    if cmd in CALENDAR_UPLOAD_COMMANDS:
+        return _format_archive_mode_result(load_classifier, "行事曆")
+
+    if cmd in ARCHIVE_MODE_COMMANDS:
+        return _format_archive_mode_result(load_classifier, cmd)
+
+    cal_result = load_calendar().handle_calendar_command(cmd)
+    if cal_result:
+        return cal_result
+
+    partner_result = _partner_query_text(load_partner, cmd)
+    if partner_result:
+        return partner_result
+
+    if cmd.startswith("查詢所有歸檔") or cmd == "查詢歸檔":
+        return load_classifier().ClassifierAgent().query_archive(None)
+
+    if cmd.startswith("查詢歸檔 "):
+        person = cmd.replace("查詢歸檔", "", 1).strip() or None
+        return load_classifier().ClassifierAgent().query_archive(person)
+
+    if cmd.startswith("查詢指定人員歸檔"):
+        person = cmd.replace("查詢指定人員歸檔", "", 1).strip() or None
+        return load_classifier().ClassifierAgent().query_archive(person)
+
+    if cmd.startswith("新增潛在家人"):
+        return load_market_dev().MarketDevAgent().handle_add_prospect(cmd)
+
+    if cmd.startswith("查詢潛在家人近況") or cmd.startswith("查詢潛在家人") or cmd == "潛在家人總表":
+        keyword = cmd
+        keyword = keyword.replace("查詢潛在家人近況", "", 1)
+        keyword = keyword.replace("查詢潛在家人", "", 1).strip() or None
+        rows = load_market_dev().MarketDevAgent().list_prospects(keyword)
+        if not rows:
+            return "找不到符合條件的潛在家人。"
+        lines = [f"潛在家人名單，共 {len(rows)} 筆", ""]
+        for idx, row in enumerate(rows, 1):
+            name = row.get("name") or row.get("姓名") or ""
+            cat = row.get("category") or row.get("分類") or row.get("status") or ""
+            lines.append(f"{idx}. {name}" + (f"｜{cat}" if cat else ""))
+        return "\n".join(lines)
+
+    if cmd.startswith("修改潛在家人資訊") or cmd.startswith("更新潛在家人"):
+        content = cmd
+        content = content.replace("修改潛在家人資訊", "", 1)
+        content = content.replace("更新潛在家人", "", 1).strip()
+        parts = [p.strip() for p in content.split("|")]
+        name = parts[0] if parts else ""
+        fields = {}
+        for part in parts[1:]:
+            if ":" in part:
+                key, value = part.split(":", 1)
+                fields[key.strip()] = value.strip()
+        return load_market_dev().MarketDevAgent().update_prospect_fields(name, fields)
+
+    if _starts_with_any(cmd, COURSE_PREFIXES):
+        return load_course_invite().CourseInviteAgent().handle_command(cmd)
+
+    if _starts_with_any(cmd, NUTRITION_DRI_PREFIXES):
+        return load_nutrition_dri().NutritionDRIAgent().handle_command(cmd)
+
+    if _starts_with_any(cmd, NUTRITION_ASSESSMENT_PREFIXES):
+        return load_nutrition_assessment().handle_command(cmd, sessions, "web", push_fn=None, reply_fn=None)
+
+    training_system_result = _handle_training_system(cmd, load_training_system)
+    if training_system_result:
+        return training_system_result
+
+    if cmd.startswith("查詢培訓進度 "):
+        return load_training_agent().TrainingAgent().handle_query(cmd)
+
+    if cmd == "跟進報告":
+        return load_followup().FollowupAgent().generate_report_text()
+
+    if cmd.startswith("激勵夥伴") or cmd.startswith("里程碑記錄") or cmd.startswith("里程碑 "):
+        return load_motivation().MotivationAgent().handle_realtime(cmd)
+
+    return None

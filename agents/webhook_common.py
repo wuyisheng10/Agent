@@ -12,7 +12,7 @@ SENT_LOG = BASE_DIR / "output" / "sent_log.json"
 LOG_FILE = BASE_DIR / "logs" / "webhook_log.txt"
 CLASSIFIED_DIR = BASE_DIR / "output" / "classified"
 
-LINE_TOKEN = os.getenv("LINE_CHANNEL_TOKEN", "")
+LINE_TOKEN = os.getenv("LINE_CHANNEL_TOKEN", "").strip() or os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "").strip()
 LINE_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
 LINE_REPLY = "https://api.line.me/v2/bot/message/reply"
 LINE_PUSH = "https://api.line.me/v2/bot/message/push"
@@ -44,6 +44,10 @@ def _load_market_dev():
 
 def _load_training_agent():
     return _load_module("training_agent", "12_training_agent.py")
+
+
+def _load_training_system():
+    return _load_module("training_system_agent", "23_training_system_agent.py")
 
 
 def _load_followup():

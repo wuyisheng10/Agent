@@ -38,6 +38,7 @@ try:
         _load_partner as common_load_partner,
         _load_training as common_load_training,
         _load_training_agent as common_load_training_agent,
+        _load_training_system as common_load_training_system,
     )
     from webhook_text import (
         EXEC_MENU_ITEMS as TEXT_EXEC_MENU_ITEMS,
@@ -68,6 +69,7 @@ except ModuleNotFoundError:
         _load_partner as common_load_partner,
         _load_training as common_load_training,
         _load_training_agent as common_load_training_agent,
+        _load_training_system as common_load_training_system,
     )
     from agents.webhook_text import (
         EXEC_MENU_ITEMS as TEXT_EXEC_MENU_ITEMS,
@@ -151,6 +153,16 @@ def _load_followup():
     spec = _ilu.spec_from_file_location(
         "followup_agent",
         str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "13_followup_agent.py")
+    )
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _load_training_system():
+    spec = _ilu.spec_from_file_location(
+        "training_system_agent",
+        str(Path(r"C:\Users\user\claude AI_Agent") / "agents" / "23_training_system_agent.py")
     )
     m = _ilu.module_from_spec(spec)
     spec.loader.exec_module(m)
@@ -253,7 +265,7 @@ SENT_LOG        = BASE_DIR / "output" / "sent_log.json"
 LOG_FILE        = BASE_DIR / "logs" / "webhook_log.txt"
 CLASSIFIED_DIR  = BASE_DIR / "output" / "classified"
 
-LINE_TOKEN    = os.getenv("LINE_CHANNEL_TOKEN", "")
+LINE_TOKEN    = os.getenv("LINE_CHANNEL_TOKEN", "").strip() or os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "").strip()
 LINE_SECRET   = os.getenv("LINE_CHANNEL_SECRET", "")
 LINE_REPLY    = "https://api.line.me/v2/bot/message/reply"
 LINE_PUSH     = "https://api.line.me/v2/bot/message/push"
@@ -645,6 +657,7 @@ _load_calendar = common_load_calendar
 _load_partner = common_load_partner
 _load_market_dev = common_load_market_dev
 _load_training_agent = common_load_training_agent
+_load_training_system = common_load_training_system
 _load_followup = common_load_followup
 _load_motivation = common_load_motivation
 _load_classifier = common_load_classifier
@@ -695,6 +708,9 @@ _awaiting_invite_selection = _webhook_state._awaiting_invite_selection
 _awaiting_partner_invite_category = _webhook_state._awaiting_partner_invite_category
 _awaiting_partner_invite_person = _webhook_state._awaiting_partner_invite_person
 _awaiting_partner_invite_meeting = _webhook_state._awaiting_partner_invite_meeting
+_awaiting_prospect_invite_category = _webhook_state._awaiting_prospect_invite_category
+_awaiting_prospect_invite_person = _webhook_state._awaiting_prospect_invite_person
+_awaiting_prospect_invite_meeting = _webhook_state._awaiting_prospect_invite_meeting
 _awaiting_invite_manage_select = _webhook_state._awaiting_invite_manage_select
 _awaiting_invite_manage_action = _webhook_state._awaiting_invite_manage_action
 _awaiting_invite_manage_edit = _webhook_state._awaiting_invite_manage_edit
@@ -702,6 +718,7 @@ _awaiting_promo_optimize_apply = _webhook_state._awaiting_promo_optimize_apply
 _awaiting_partner_voice_add = _webhook_state._awaiting_partner_voice_add
 _web_invite_combos = _webhook_state._web_invite_combos
 _web_partner_invite_state = _webhook_state._web_partner_invite_state
+_web_prospect_invite_state = _webhook_state._web_prospect_invite_state
 _web_invite_manage_state = _webhook_state._web_invite_manage_state
 _web_promo_optimize_state = _webhook_state._web_promo_optimize_state
 
@@ -858,8 +875,11 @@ def _looks_like_explicit_command(msg: str) -> bool:
 _load_partner_rows = lambda: _webhook_router_helpers.load_partner_rows(BASE_DIR)
 _partners_by_category = lambda category: _webhook_router_helpers.partners_by_category(BASE_DIR, category)
 _partner_category_menu = _webhook_router_helpers.partner_category_menu
+_prospects_by_category = lambda category: _webhook_router_helpers.prospects_by_category(BASE_DIR, category)
+_prospect_category_menu = _webhook_router_helpers.prospect_category_menu
 _normalize_partner_category_choice = _webhook_router_helpers.normalize_partner_category_choice
 _format_partner_choice_menu = _webhook_router_helpers.format_partner_choice_menu
+_format_prospect_choice_menu = _webhook_router_helpers.format_prospect_choice_menu
 _format_meeting_choice_menu = _webhook_router_helpers.format_meeting_choice_menu
 _format_invite_manage_list = _webhook_router_helpers.format_invite_manage_list
 _format_invite_manage_actions = _webhook_router_helpers.format_invite_manage_actions
@@ -881,7 +901,7 @@ _webhook_intent.configure(SENT_LOG, log)
 
 
 # ============================================================
-# ?? LINE ??????
+# LINE helper wrappers
 # ============================================================
 
 def verify_signature(body: bytes, signature: str) -> bool:
@@ -889,7 +909,7 @@ def verify_signature(body: bytes, signature: str) -> bool:
 
 
 # ============================================================
-# ?? ??????????????API ?????
+# Web API route registration
 # ============================================================
 
 def analyze_intent(user_message: str) -> dict:
@@ -897,7 +917,7 @@ def analyze_intent(user_message: str) -> dict:
 
 
 # ============================================================
-# ?? ??? LINE ???
+# LINE event dispatcher
 # ============================================================
 
 
@@ -914,7 +934,7 @@ def schedule_pending_menu(clf, scope_id: str, push_target: str, delay_sec: int =
 
 
 # ============================================================
-# ?? Webhook ???
+# Webhook entry
 # ============================================================
 
 def _download_line_content(msg_id: str, timeout: int = 30) -> bytes | None:
@@ -1016,6 +1036,7 @@ def handle_training_command(user_msg: str, reply_token: str,
         load_ai_skill_manager=_load_ai_skill_manager,
         load_followup_suggestion=_load_followup_suggestion,
         load_training_agent=_load_training_agent,
+        load_training_system=_load_training_system,
         load_followup=_load_followup,
         load_motivation=_load_motivation,
     )
@@ -1217,6 +1238,9 @@ def webhook():
         awaiting_partner_invite_category=_awaiting_partner_invite_category,
         awaiting_partner_invite_person=_awaiting_partner_invite_person,
         awaiting_partner_invite_meeting=_awaiting_partner_invite_meeting,
+        awaiting_prospect_invite_category=_awaiting_prospect_invite_category,
+        awaiting_prospect_invite_person=_awaiting_prospect_invite_person,
+        awaiting_prospect_invite_meeting=_awaiting_prospect_invite_meeting,
         awaiting_invite_manage_select=_awaiting_invite_manage_select,
         awaiting_invite_manage_action=_awaiting_invite_manage_action,
         awaiting_invite_manage_edit=_awaiting_invite_manage_edit,
@@ -1226,6 +1250,9 @@ def webhook():
         normalize_partner_category_choice=_normalize_partner_category_choice,
         partners_by_category=_partners_by_category,
         format_partner_choice_menu=_format_partner_choice_menu,
+        prospect_category_menu=_prospect_category_menu,
+        prospects_by_category=_prospects_by_category,
+        format_prospect_choice_menu=_format_prospect_choice_menu,
         format_meeting_choice_menu=_format_meeting_choice_menu,
         format_invite_manage_list=_format_invite_manage_list,
         format_invite_manage_actions=_format_invite_manage_actions,
@@ -1463,6 +1490,26 @@ def archive_browse(subpath):
 
 def process_web_command(cmd: str) -> str:
     """Handle all bot commands and return a string result (no LINE reply)."""
+    web_scope = "web_user"
+    try:
+        clf = _load_classifier().ClassifierAgent()
+        pending = clf.get_pending(web_scope)
+        if pending and pending.get("status") == "awaiting_folder_name":
+            if cmd.strip().upper() == "NA":
+                count = len(pending.get("items", []))
+                clf.clear_pending(web_scope, remove_file=True)
+                return f"🗑️ 已取消歸檔，刪除 {count} 個待歸檔項目。"
+            return clf.submit_pending_folder_name(web_scope, cmd.strip()) or "目錄名稱不可空白，請重新輸入"
+        if pending and cmd.strip().isdigit():
+            return clf.execute_pending_option(web_scope, int(cmd.strip()))
+        if pending and cmd.strip() in {"待歸檔", "查詢待歸檔"}:
+            return clf.format_pending_menu(web_scope)
+        if pending and cmd.strip().upper() == "NA":
+            count = len(pending.get("items", []))
+            clf.clear_pending(web_scope, remove_file=True)
+            return f"🗑️ 已取消歸檔，刪除 {count} 個待歸檔項目。"
+    except Exception:
+        pass
     if cmd.strip() == "查詢已產生的今日之後會議邀約文宣":
         try:
             course = _load_course_invite()
@@ -1478,6 +1525,10 @@ def process_web_command(cmd: str) -> str:
     if cmd.strip().startswith("邀約文宣 跟進夥伴"):
         _web_partner_invite_state["web"] = {"step": "category"}
         return _partner_category_menu()
+
+    if cmd.strip() == "邀約文宣 潛在家人":
+        _web_prospect_invite_state["web"] = {"step": "category"}
+        return _prospect_category_menu()
 
     if _web_promo_optimize_state.get("web") and cmd.strip().isdigit():
         state = _web_promo_optimize_state.pop("web")
@@ -1520,6 +1571,7 @@ def process_web_command(cmd: str) -> str:
         load_ai_skill_manager=_load_ai_skill_manager,
         load_followup_suggestion=_load_followup_suggestion,
         load_training_agent=_load_training_agent,
+        load_training_system=_load_training_system,
         load_followup=_load_followup,
         load_motivation=_load_motivation,
     )
@@ -1528,11 +1580,14 @@ def process_web_command(cmd: str) -> str:
     if cmd.strip().upper() == "NA":
         _web_invite_combos.pop("web", None)
         _web_partner_invite_state.pop("web", None)
+        _web_prospect_invite_state.pop("web", None)
         _web_invite_manage_state.pop("web", None)
         return "↩️ 已取消，返回待機。"
 
     if _looks_like_explicit_command(cmd) and _web_partner_invite_state.get("web"):
         _web_partner_invite_state.pop("web", None)
+    if _looks_like_explicit_command(cmd) and _web_prospect_invite_state.get("web"):
+        _web_prospect_invite_state.pop("web", None)
     if _looks_like_explicit_command(cmd) and _web_invite_manage_state.get("web"):
         _web_invite_manage_state.pop("web", None)
 
@@ -1577,6 +1632,50 @@ def process_web_command(cmd: str) -> str:
             try:
                 course = _load_course_invite()
                 return course.generate_partner_invite_for_meeting(name, meeting)
+            except Exception as e:
+                return f"✗ 邀約文宣產生失敗：{e}"
+
+    if _web_prospect_invite_state.get("web"):
+        state = _web_prospect_invite_state["web"]
+        if _looks_like_explicit_command(cmd):
+            _web_prospect_invite_state.pop("web", None)
+            state = None
+        if not state:
+            pass
+        elif state.get("step") == "category":
+            category = _normalize_partner_category_choice(cmd)
+            if not category:
+                return "⚠️ 請輸入 1、2、3 或 A、B、C"
+            people = _prospects_by_category(category)
+            if not people:
+                _web_prospect_invite_state.pop("web", None)
+                return f"⚠️ 目前沒有分類 {category} 的潛在家人。"
+            _web_prospect_invite_state["web"] = {"step": "person", "category": category, "people": people}
+            return _format_prospect_choice_menu(category, people)
+        elif state.get("step") == "person" and cmd.strip().isdigit():
+            people = state["people"]
+            idx = int(cmd.strip())
+            if not (1 <= idx <= len(people)):
+                return f"⚠️ 請輸入 1～{len(people)} 的編號"
+            course = _load_course_invite()
+            meetings = course.list_meetings()
+            if not meetings:
+                _web_prospect_invite_state.pop("web", None)
+                return "⚠️ 目前沒有排定的課程會議，請先新增課程會議。"
+            person = people[idx - 1]
+            _web_prospect_invite_state["web"] = {"step": "meeting", "name": person.get("name", ""), "meetings": meetings}
+            return _format_meeting_choice_menu(person.get("name", ""), meetings)
+        elif state.get("step") == "meeting" and cmd.strip().isdigit():
+            meetings = state["meetings"]
+            idx = int(cmd.strip())
+            if not (1 <= idx <= len(meetings)):
+                return f"⚠️ 請輸入 1～{len(meetings)} 的編號"
+            meeting = meetings[idx - 1]
+            name = state["name"]
+            _web_prospect_invite_state.pop("web", None)
+            try:
+                course = _load_course_invite()
+                return course.generate_prospect_invite_for_meeting(name, meeting)
             except Exception as e:
                 return f"✗ 邀約文宣產生失敗：{e}"
 
@@ -1757,6 +1856,7 @@ _webhook_api_routes.register_api_routes(
     load_nutrition_assessment=lambda: _load_nutrition_assessment(),
     load_ai_prompt_manager=lambda: _load_ai_prompt_manager(),
     load_ai_skill_manager=lambda: _load_ai_skill_manager(),
+    load_training_system=lambda: _load_training_system(),
 )
 
 
@@ -1769,7 +1869,7 @@ def update_status(user_id: str, intent: dict):
 
 
 # ============================================================
-# ?? ????????
+# General command handling
 # ============================================================
 
 

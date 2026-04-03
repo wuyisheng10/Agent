@@ -17,6 +17,9 @@ LINE 指令：
 """
 
 import json
+import os
+import sys
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -107,7 +110,7 @@ def _safe_name(name: str) -> str:
 
 def _safe_folder_name(name: str) -> str:
     forbidden = '<>:"/\\|?*'
-    cleaned = "".join(c for c in (name or "") if c not in forbidden and ord(c) >= 32)
+    cleaned = "".join("_" if c in forbidden else c for c in (name or "") if ord(c) >= 32)
     return cleaned.strip().strip(".")[:80]
 
 
@@ -507,8 +510,9 @@ class ClassifierAgent:
             "source_name": source_name,
             "pending_path": str(pending_path),
         })
-        pending["status"] = "collecting"
-        pending["selected_option"] = None
+        if pending.get("status") != "awaiting_folder_name":
+            pending["status"] = "collecting"
+            pending["selected_option"] = None
         log(f"  待歸檔暫存：{pending_path}")
         self._save_pending(scope_id, pending)
         return self.get_stage_message(scope_id)
@@ -532,8 +536,9 @@ class ClassifierAgent:
             "source_name": "text",
             "pending_path": str(pending_path),
         })
-        pending["status"] = "collecting"
-        pending["selected_option"] = None
+        if pending.get("status") != "awaiting_folder_name":
+            pending["status"] = "collecting"
+            pending["selected_option"] = None
         self._save_pending(scope_id, pending)
         log(f"  待歸檔文字暫存：{pending_path}")
         return self.get_stage_message(scope_id)
@@ -562,9 +567,13 @@ class ClassifierAgent:
             and pending.get("items")
         )
 
-    def mark_menu_sent(self, scope_id: str):
+    def mark_menu_sent(self, scope_id: str, token: str = ""):
         pending = self.get_pending(scope_id)
         if not pending:
+            return
+        if pending.get("status") != "collecting":
+            return
+        if token and pending.get("menu_token") != token:
             return
         pending["status"] = "awaiting_choice"
         self._save_pending(scope_id, pending)
@@ -610,6 +619,7 @@ class ClassifierAgent:
         try:
             pending["status"] = "awaiting_folder_name"
             pending["selected_option"] = option
+            pending["menu_token"] = ""
             self._save_pending(scope_id, pending)
             return (f"已選擇：{label}\n"
                     f"請輸入歸檔目錄名稱\n"
@@ -757,6 +767,10 @@ class ClassifierAgent:
         dest = dest_dir / filename
         dest.write_bytes(data)
         log(f"  自訂目錄歸檔：{dest}")
+        
+        # 觸發媒體自動總結 (PPTX)
+        self._trigger_auto_slide_if_media(dest)
+        
         return dest
 
     def _archive_training_image(self, data: bytes, filename: str):
@@ -810,7 +824,33 @@ class ClassifierAgent:
         dest = dest_dir / filename
         dest.write_bytes(data)
         log(f"  歸檔：{dest}")
+        
+        # 觸發媒體自動總結 (PPTX)
+        self._trigger_auto_slide_if_media(dest)
+        
         return dest
+
+    def _trigger_auto_slide_if_media(self, file_path: Path):
+        """若為媒體檔案，則啟動自動總結產生 PPTX"""
+        ext = file_path.suffix.lower()
+        # 支援的影音格式
+        media_exts = [".mp4", ".mov", ".avi", ".mkv", ".webm", ".mp3", ".wav", ".m4a", ".aac"]
+        if ext in media_exts:
+            log(f"  偵測到媒體檔案，啟動自動總結：{file_path.name}")
+            script_path = BASE_DIR / "agents" / "auto_slide.py"
+            if not script_path.exists():
+                log(f"  ⚠️ 找不到自動總結腳本：{script_path}")
+                return
+            
+            # 使用 Popen 非同步執行，不阻塞主流程
+            try:
+                subprocess.Popen(
+                    [sys.executable, str(script_path), str(file_path)],
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                    cwd=str(BASE_DIR)
+                )
+            except Exception as e:
+                log(f"  ❌ 啟動自動總結失敗：{e}")
 
     def archive_text(self, text: str, mode: str, person: str = "", date_str: str = "") -> str:
         dest_dir = self._today_dir(mode, person, date_str)

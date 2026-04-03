@@ -24,6 +24,22 @@ webhook = load_module("line_webhook_full_validation", "agents/06_line_webhook.py
 
 class _FakeCalendarModule:
     @staticmethod
+    def upcoming_events():
+        return [{"id": "EVT-1", "date": "2026-04-02", "time": "19:30", "title": "今天會議"}]
+
+    @staticmethod
+    def past_events():
+        return [{"id": "EVT-0", "date": "2026-03-20", "time": "19:30", "title": "過往會議"}]
+
+    @staticmethod
+    def events_between():
+        return _FakeCalendarModule.upcoming_events() + _FakeCalendarModule.past_events()
+
+    @staticmethod
+    def format_events(events, limit=12, title="行事曆："):
+        return title + "\\n" + "\\n".join(f"- {e['date']} {e['title']}" for e in events[:limit])
+
+    @staticmethod
     def handle_calendar_command(cmd):
         prefixes = (
             "查詢行事曆",
@@ -68,9 +84,14 @@ class _FakeClassifierAgent:
         return self.pending.get(scope)
 
     def submit_pending_folder_name(self, scope, text):
-        return None
+        pending = self.pending.get(scope)
+        if not pending or pending.get("status") != "awaiting_folder_name":
+            return None
+        self.pending.pop(scope, None)
+        return f"FOLDER:{scope}:{text}"
 
     def execute_pending_option(self, scope, choice):
+        self.pending[scope] = {"status": "awaiting_folder_name"}
         return f"PENDING:{scope}:{choice}"
 
     def format_pending_menu(self, scope):
@@ -211,6 +232,13 @@ class _FakeCourseInviteModule:
             "meeting": {"id": "COURSE-1", "title": "台南OPP", "date": "2026-04-18", "time": "13:30"},
         }]
 
+    @staticmethod
+    def list_promos():
+        return [
+            {"id": "PROMO-1234", "title": "四月 OPP 邀約", "content": "歡迎參加", "optimized": ""},
+            {"id": "PROMO-5678", "title": "五月 OPP 邀約", "content": "歡迎再來", "optimized": ""},
+        ]
+
 
 class _FakeDailyReportAgent:
     @staticmethod
@@ -260,6 +288,31 @@ class _FakeTrainingAgent:
 class _FakeTrainingAgentModule:
     def TrainingAgent(self):
         return _FakeTrainingAgent()
+
+
+class _FakeTrainingSystemAgent:
+    @staticmethod
+    def handle_command(cmd):
+        return f"TRAINING_SYSTEM:{cmd}"
+
+
+class _FakeTrainingSystemModule:
+    def TrainingSystemAgent(self):
+        return _FakeTrainingSystemAgent()
+
+    @staticmethod
+    def list_module_options():
+        return [
+            {"id": "TM-FOUR-COURAGE", "title": "四個勇於", "category": "領導人特質"},
+            {"id": "TM-SEVEN-DAY", "title": "七天法則", "category": "新人守則"},
+        ]
+
+    @staticmethod
+    def list_session_options():
+        return [
+            {"id": "TS-20260410-001", "title": "領導人特質｜四個勇於", "date": "2026-04-10", "module_id": "TM-FOUR-COURAGE"},
+            {"id": "TS-20260412-001", "title": "新人七天法則", "date": "2026-04-12", "module_id": "TM-SEVEN-DAY"},
+        ]
 
 
 class _FakeFollowupAgent:
@@ -331,7 +384,18 @@ FORM_SAMPLES = {
     "新增潛在家人": "新增潛在家人 王小美|老師|朋友介紹|備註",
     "加入潛在家人資訊": "潛在家人資料 王小美",
     "修改潛在家人資訊": "更新潛在家人 王小美|地區:台中西屯|地址:民生路123號|電話:0912345678",
-    "查詢培訓進度": "培訓 建德",
+    "新增培訓模組": "新增培訓模組 四個勇於 | 領導人特質 | 建立領導人思維 | 勇於學習、勇於認錯、勇於改變、勇於承擔",
+    "查詢培訓模組": "查詢培訓模組 四個勇於",
+    "新增培訓課程": "新增培訓課程 領導人特質｜四個勇於 | 四個勇於 | 2026-04-10 | 19:30 | 台南教室 | 鐘老師 | 夥伴",
+    "查詢培訓課程": "查詢培訓課程 四個勇於",
+    "新增培訓反思": "新增培訓反思 建德 | 領導人特質｜四個勇於 | 願意認錯 | 學到四個勇於 | 每天回報市場 | 建立帶線節奏",
+    "查詢培訓進度": "查詢培訓進度 建德",
+    "啟動七天法則": "啟動七天法則 建德 | 2026-04-12 | 先陪跑",
+    "七天法則回報": "七天法則回報 建德 | 第1天 | 聽 OPP、進教室 | 已完成 | 有回報感想",
+    "查詢七天法則": "查詢七天法則 建德",
+    "新增課後行動": "新增課後行動 建德 | 領導人特質｜四個勇於 | 本週邀約 2 位朋友 | 2026-04-18",
+    "回報課後行動": "回報課後行動 建德 | TA-建德-001 | 進行中 | 已完成第一步",
+    "查詢課後行動": "查詢課後行動 建德",
     "激勵夥伴": "激勵 建德 最近需要鼓勵",
     "里程碑記錄": "里程碑 建德 首次達成目標",
     "新增夥伴": "新增夥伴 建德 | 月入三萬 | 2026-04-05 | 持續跟進 | A",
@@ -354,7 +418,6 @@ FORM_SAMPLES = {
     "刪除課程會議": "刪除課程會議 COURSE-1234",
     "新增課程文宣": "新增課程文宣 四月OPP邀約|歡迎參加",
     "優化課程文宣（AI）": "優化課程文宣 PROMO-1234",
-    "邀約文宣－潛在家人（AI）": "邀約文宣 潛在家人 Amy",
     "邀約文宣－跟進夥伴（AI）": "邀約文宣 跟進夥伴",
     "修改已產生的邀約文宣": "修改已產生的今日之後會議邀約文宣 COURSE-1234 | 建德 | 新內容",
     "查詢營養素標準": "查詢營養素標準 男 30 午餐",
@@ -380,10 +443,12 @@ class FullLineWebValidationTest(unittest.TestCase):
         webhook._web_partner_invite_state.clear()
         webhook._web_invite_manage_state.clear()
         webhook._web_promo_optimize_state.clear()
+        self.fake_classifier_module = _FakeClassifierModule()
+        self.fake_classifier_agent = self.fake_classifier_module._agent
         self.stack = ExitStack()
         self.stack.enter_context(patch.object(webhook, "_load_calendar", return_value=_FakeCalendarModule()))
         self.stack.enter_context(patch.object(webhook, "_load_partner", return_value=_FakePartnerModule()))
-        self.stack.enter_context(patch.object(webhook, "_load_classifier", return_value=_FakeClassifierModule()))
+        self.stack.enter_context(patch.object(webhook, "_load_classifier", return_value=self.fake_classifier_module))
         self.stack.enter_context(patch.object(webhook, "_load_market_dev", return_value=_FakeMarketDevModule()))
         self.stack.enter_context(patch.object(webhook, "_load_course_invite", return_value=_FakeCourseInviteModule()))
         self.stack.enter_context(patch.object(webhook, "_load_daily_report", return_value=_FakeDailyReportModule()))
@@ -391,6 +456,7 @@ class FullLineWebValidationTest(unittest.TestCase):
         self.stack.enter_context(patch.object(webhook, "_load_nutrition_assessment", return_value=_FakeNutritionAssessmentModule()))
         self.stack.enter_context(patch.object(webhook, "_load_followup_suggestion", return_value=_FakeFollowupSuggestionModule()))
         self.stack.enter_context(patch.object(webhook, "_load_training_agent", return_value=_FakeTrainingAgentModule()))
+        self.stack.enter_context(patch.object(webhook, "_load_training_system", return_value=_FakeTrainingSystemModule()))
         self.stack.enter_context(patch.object(webhook, "_load_followup", return_value=_FakeFollowupModule()))
         self.stack.enter_context(patch.object(webhook, "_load_motivation", return_value=_FakeMotivationModule()))
         self.stack.enter_context(patch.object(webhook, "_load_training", return_value=_FakeTrainingLogModule()))
@@ -412,6 +478,9 @@ class FullLineWebValidationTest(unittest.TestCase):
             "awaiting_partner_invite_category": {},
             "awaiting_partner_invite_person": {},
             "awaiting_partner_invite_meeting": {},
+            "awaiting_prospect_invite_category": {},
+            "awaiting_prospect_invite_person": {},
+            "awaiting_prospect_invite_meeting": {},
             "awaiting_invite_manage_select": {},
             "awaiting_invite_manage_action": {},
             "awaiting_invite_manage_edit": {},
@@ -462,6 +531,9 @@ class FullLineWebValidationTest(unittest.TestCase):
                     awaiting_partner_invite_category=state["awaiting_partner_invite_category"],
                     awaiting_partner_invite_person=state["awaiting_partner_invite_person"],
                     awaiting_partner_invite_meeting=state["awaiting_partner_invite_meeting"],
+                    awaiting_prospect_invite_category=state["awaiting_prospect_invite_category"],
+                    awaiting_prospect_invite_person=state["awaiting_prospect_invite_person"],
+                    awaiting_prospect_invite_meeting=state["awaiting_prospect_invite_meeting"],
                     awaiting_invite_manage_select=state["awaiting_invite_manage_select"],
                     awaiting_invite_manage_action=state["awaiting_invite_manage_action"],
                     awaiting_invite_manage_edit=state["awaiting_invite_manage_edit"],
@@ -470,7 +542,10 @@ class FullLineWebValidationTest(unittest.TestCase):
                     looks_like_explicit_command=webhook._looks_like_explicit_command,
                     normalize_partner_category_choice=webhook._normalize_partner_category_choice,
                     partners_by_category=webhook._partners_by_category,
+                    prospect_category_menu=webhook._prospect_category_menu,
+                    prospects_by_category=webhook._prospects_by_category,
                     format_partner_choice_menu=webhook._format_partner_choice_menu,
+                    format_prospect_choice_menu=webhook._format_prospect_choice_menu,
                     format_meeting_choice_menu=webhook._format_meeting_choice_menu,
                     format_invite_manage_list=webhook._format_invite_manage_list,
                     format_invite_manage_actions=webhook._format_invite_manage_actions,
@@ -573,6 +648,17 @@ class FullLineWebValidationTest(unittest.TestCase):
             result = webhook.process_web_command("1")
             self.assertEqual(result, "PARTNER_INVITE:建德:COURSE-1")
 
+    def test_web_prospect_invite_uses_category_then_person_then_meeting(self):
+        with patch.object(webhook, "_prospects_by_category", return_value=[{"name": "Amy", "job": "護理師", "status": "新接觸", "tag": "健康", "category": "A"}]):
+            result = webhook.process_web_command("邀約文宣 潛在家人")
+            self.assertIn("請先選擇潛在家人分類屬性", result)
+            result = webhook.process_web_command("1")
+            self.assertIn("A 類潛在家人清單", result)
+            result = webhook.process_web_command("1")
+            self.assertIn("Amy 的可邀約會議", result)
+            result = webhook.process_web_command("1")
+            self.assertEqual(result, "PROSPECT_INVITE:Amy:COURSE-1")
+
     def test_line_partner_invite_uses_category_then_person_then_meeting(self):
         with patch.object(webhook, "_partners_by_category", return_value=[{"name": "建德", "level": "1", "stage": "積極跟進"}]):
             replies, pushes = self._run_line_sequence(["邀約文宣 跟進夥伴", "1", "1", "1"])
@@ -580,6 +666,14 @@ class FullLineWebValidationTest(unittest.TestCase):
         self.assertTrue(any("A 類夥伴清單" in x for x in replies))
         self.assertTrue(any("建德 的可邀約會議" in x for x in replies))
         self.assertTrue(any("PARTNER_INVITE:建德:COURSE-1" in x for x in replies + pushes))
+
+    def test_line_prospect_invite_uses_category_then_person_then_meeting(self):
+        with patch.object(webhook, "_prospects_by_category", return_value=[{"name": "Amy", "job": "護理師", "status": "新接觸", "tag": "健康", "category": "A"}]):
+            replies, pushes = self._run_line_sequence(["邀約文宣 潛在家人", "1", "1", "1"])
+        self.assertIn("請先選擇潛在家人分類屬性", replies[0])
+        self.assertTrue(any("A 類潛在家人清單" in x for x in replies))
+        self.assertTrue(any("Amy 的可邀約會議" in x for x in replies))
+        self.assertTrue(any("PROSPECT_INVITE:Amy:COURSE-1" in x for x in replies + pushes))
 
     def test_line_invite_query_can_view_then_modify(self):
         replies, pushes = self._run_line_sequence(["查詢已產生的今日之後會議邀約文宣", "1", "1", "1"])
@@ -616,6 +710,52 @@ class FullLineWebValidationTest(unittest.TestCase):
         self.assertIn("/api/partner-statuses", html)
         self.assertIn("查詢夥伴狀態定義", html)
 
+    def test_web_html_contains_story_people_and_promo_select_sources(self):
+        html = webhook._render_dashboard_html_v2()
+        self.assertIn('pick:"people"', html)
+        self.assertIn('pick:"promo"', html)
+        self.assertIn("/api/course-promos", html)
+
+    def test_web_html_contains_training_module_and_session_sources(self):
+        html = webhook._render_dashboard_html_v2()
+        self.assertIn("新增培訓模組", html)
+        self.assertIn("新增培訓課程", html)
+        self.assertIn("新增培訓反思", html)
+        self.assertIn("啟動七天法則", html)
+        self.assertIn("新增課後行動", html)
+        self.assertIn("/api/training-modules", html)
+        self.assertIn("/api/training-sessions", html)
+
+
+    def test_training_progress_form_uses_partner_select(self):
+        html = webhook._render_dashboard_html_v2()
+        self.assertIn("查詢培訓進度", html)
+        self.assertIn("_isTrainingProgressForm", html)
+        self.assertIn("_isMilestoneForm", html)
+        self.assertIn("_isPartnerLookupForm", html)
+
+    def test_web_calendar_alias_commands_use_router(self):
+        result = webhook.process_web_command("查詢過往行事曆")
+        self.assertNotIn("意圖：其他", result)
+        result = webhook.process_web_command("查詢全部行事曆")
+        self.assertNotIn("意圖：其他", result)
+
+    def test_line_pending_folder_name_is_consumed_before_intent(self):
+        self.fake_classifier_agent.pending["U-test"] = {
+            "status": "awaiting_folder_name",
+            "items": [{"type": "image", "name": "test.jpg"}],
+        }
+        replies, pushes = self._run_line_sequence(["health-report 20260401"])
+        all_msgs = replies + pushes
+        self.assertTrue(any("FOLDER:U-test:health-report 20260401" in x for x in all_msgs))
+
+    def test_web_pending_folder_name_is_consumed_before_intent(self):
+        self.fake_classifier_agent.pending["web_user"] = {
+            "status": "awaiting_folder_name",
+            "items": [{"type": "image", "name": "test.jpg"}],
+        }
+        result = webhook.process_web_command("health-report 20260401")
+        self.assertEqual(result, "FOLDER:web_user:health-report 20260401")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -22,6 +22,7 @@ partner = load_module("partner_engagement", "agents/09_partner_engagement.py")
 motivation = load_module("motivation_agent", "agents/14_motivation_agent.py")
 classifier = load_module("classifier_agent", "agents/15_classifier_agent.py")
 course = load_module("course_invite_agent", "agents/16_course_invite_agent.py")
+training_system = load_module("training_system_agent", "agents/23_training_system_agent.py")
 
 
 class AllFeaturesSmokeTest(unittest.TestCase):
@@ -48,6 +49,7 @@ class AllFeaturesSmokeTest(unittest.TestCase):
 
         self.csv_dir = self.root / "csv_data"
         self.csv_dir.mkdir(parents=True, exist_ok=True)
+        self.training_system_dir = self.root / "training_system"
         self.meetings_file = self.csv_dir / "course_meetings.json"
         self.promos_file = self.csv_dir / "course_promos.json"
         self.invites_file = self.csv_dir / "course_invites.json"
@@ -82,6 +84,13 @@ class AllFeaturesSmokeTest(unittest.TestCase):
             patch.object(course, "CAL_DB", self.calendar_db),
             patch.object(course, "PARTNERS_JSON", self.partner_file),
             patch.object(course, "LOG_FILE", self.logs / "course_log.txt"),
+            patch.object(training_system, "TRAINING_DIR", self.training_system_dir),
+            patch.object(training_system, "MODULES_FILE", self.training_system_dir / "modules.json"),
+            patch.object(training_system, "SESSIONS_FILE", self.training_system_dir / "sessions.json"),
+            patch.object(training_system, "REFLECTIONS_FILE", self.training_system_dir / "reflections.json"),
+            patch.object(training_system, "PROGRESS_FILE", self.training_system_dir / "progress.json"),
+            patch.object(training_system, "SEVEN_DAY_FILE", self.training_system_dir / "seven_day.json"),
+            patch.object(training_system, "ACTIONS_FILE", self.training_system_dir / "actions.json"),
         ]
         for p in self.patches:
             p.start()
@@ -278,6 +287,52 @@ class AllFeaturesSmokeTest(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["content"], "更新後邀約文宣內容")
 
+
+    def test_classifier_folder_name_with_date_suffix_ascii(self):
+        agent = classifier.ClassifierAgent()
+        agent.stage_text("test archive text", "scope-date")
+        option_index = next(
+            idx for idx, opt in enumerate(agent._build_pending_options(), start=1)
+            if opt["label"] == "421故事歸檔"
+        )
+        agent.execute_pending_option("scope-date", option_index)
+        submit_msg = agent.submit_pending_folder_name("scope-date", "health-report 20260401")
+        self.assertIn("20260401", submit_msg)
+
+    def test_classifier_menu_sent_does_not_override_folder_name_state(self):
+        agent = classifier.ClassifierAgent()
+        agent.stage_text("test archive text", "scope-race")
+        token = agent.mark_pending_menu("scope-race")
+        option_index = next(
+            idx for idx, opt in enumerate(agent._build_pending_options(), start=1)
+            if opt["label"] == "421故事歸檔"
+        )
+        agent.execute_pending_option("scope-race", option_index)
+        agent.mark_menu_sent("scope-race", token)
+        pending = agent.get_pending("scope-race")
+        self.assertEqual(pending["status"], "awaiting_folder_name")
+
+    def test_classifier_late_file_does_not_reset_folder_name_state(self):
+        agent = classifier.ClassifierAgent()
+        agent.stage_text("test archive text", "scope-late-file")
+        agent.execute_pending_option("scope-late-file", 7)
+        initial_label = agent.get_pending("scope-late-file")["selected_option"]["label"]
+        agent.stage_file(b"img", "late.jpg", "image", "scope-late-file", content_type="image/jpeg")
+        pending = agent.get_pending("scope-late-file")
+        self.assertEqual(pending["status"], "awaiting_folder_name")
+        self.assertEqual(pending["selected_option"]["label"], initial_label)
+
+    def test_training_system_phase1_flow(self):
+        agent = training_system.TrainingSystemAgent()
+        self.assertIn("已新增培訓模組", agent.handle_command("新增培訓模組 四個勇於 | 領導人特質 | 建立領導人思維 | 勇於學習、勇於認錯、勇於改變、勇於承擔"))
+        self.assertIn("已新增培訓課程", agent.handle_command("新增培訓課程 領導人特質｜四個勇於 | 四個勇於 | 2026-04-10 | 19:30 | 台南教室 | 鐘老師 | 夥伴"))
+        self.assertIn("已新增培訓反思", agent.handle_command("新增培訓反思 建德 | 領導人特質｜四個勇於 | 願意認錯 | 學到四個勇於 | 每天回報市場 | 建立帶線節奏"))
+        self.assertIn("建德 的培訓進度", agent.handle_command("查詢培訓進度 建德"))
+        self.assertIn("培訓總表", agent.handle_command("查詢培訓總表"))
+        self.assertIn("已啟動七天法則", agent.handle_command("啟動七天法則 建德 | 2026-04-12 | 先陪跑"))
+        self.assertIn("已回報七天法則", agent.handle_command("七天法則回報 建德 | 第1天 | 聽 OPP | 已完成 | 有回報感想"))
+        self.assertIn("已新增課後行動", agent.handle_command("新增課後行動 建德 | 領導人特質｜四個勇於 | 本週邀約 2 位朋友 | 2026-04-18"))
+        self.assertIn("建德 的課後行動", agent.handle_command("查詢課後行動 建德"))
 
 if __name__ == "__main__":
     unittest.main()

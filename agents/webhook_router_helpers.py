@@ -1,3 +1,4 @@
+import csv
 import json
 from pathlib import Path
 
@@ -11,6 +12,49 @@ def load_partner_rows(base_dir: Path) -> list[dict]:
             return json.load(f)
     except Exception:
         return []
+
+
+def load_prospect_rows(base_dir: Path) -> list[dict]:
+    csv_dir = base_dir / "output" / "csv_data"
+    for filename in ("market_list.csv", "prospects.csv"):
+        path = csv_dir / filename
+        if not path.exists():
+            continue
+        try:
+            with open(path, encoding="utf-8-sig", newline="") as f:
+                return list(csv.DictReader(f))
+        except Exception:
+            continue
+    return []
+
+
+def _pick(row: dict, *keys: str) -> str:
+    for key in keys:
+        value = row.get(key, "")
+        text = str(value).strip() if value is not None else ""
+        if text:
+            return text
+    return ""
+
+
+def prospect_category_from_row(row: dict) -> str:
+    category = _pick(row, "分類", "category", "??")
+    if category.upper() in {"A", "B", "C"}:
+        return category.upper()
+    score = _pick(row, "AI評分", "score", "AI閰?")
+    try:
+        num = int(float(score))
+        if num >= 4:
+            return "A"
+        if num == 3:
+            return "B"
+        return "C"
+    except Exception:
+        pass
+    status = _pick(row, "接觸狀態", "status", "?亥孛???")
+    if any(token in status for token in ("待", "新", "初")):
+        return "C"
+    return "B"
 
 
 def partners_by_category(base_dir: Path, category: str) -> list[dict]:
@@ -120,3 +164,41 @@ def looks_like_explicit_command(msg: str) -> bool:
         "執行選單", "指令集", "課程", "MTG-",
     )
     return any(text.startswith(prefix) for prefix in prefixes)
+
+
+def prospect_category_menu() -> str:
+    return (
+        "📋 請先選擇潛在家人分類屬性\n"
+        "1. A 類：成熟度較高，適合直接帶入課程與環境\n"
+        "2. B 類：有興趣或有需求，適合先暖身再邀約\n"
+        "3. C 類：剛接觸或仍觀望，適合低壓好奇式互動\n\n"
+        "請輸入 1、2、3 或 A、B、C，NA 取消"
+    )
+
+
+def prospects_by_category(base_dir: Path, category: str) -> list[dict]:
+    category = (category or "").strip().upper()
+    rows = []
+    for row in load_prospect_rows(base_dir):
+        name = _pick(row, "姓名", "name", "憪?")
+        if not name or prospect_category_from_row(row) != category:
+            continue
+        rows.append(
+            {
+                "name": name,
+                "job": _pick(row, "職業", "job", "?瑟平"),
+                "status": _pick(row, "接觸狀態", "status", "?亥孛???"),
+                "tag": _pick(row, "需求標籤", "tag", "?瘙?蝐?"),
+                "category": category,
+            }
+        )
+    rows.sort(key=lambda item: (item.get("job", ""), item.get("name", "")))
+    return rows
+
+
+def format_prospect_choice_menu(category: str, people: list[dict]) -> str:
+    lines = [f"📋 {category} 類潛在家人清單（共 {len(people)} 位）", "輸入編號選人，NA 取消", ""]
+    for i, person in enumerate(people[:30], 1):
+        tail = " / ".join([person.get("job", ""), person.get("status", ""), person.get("tag", "")]).strip(" /")
+        lines.append(f"{i}. {person.get('name', '')}" + (f"｜{tail}" if tail else ""))
+    return "\n".join(lines)

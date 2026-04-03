@@ -216,10 +216,71 @@ const GROUPS=[
         if(v.r)parts.push("備註:"+v.r);
         return parts.join("|");}}},
   ]},
-  {label:"📚 培訓系統",items:[
+  {label:"🎓 培訓系統",items:[
+    {label:"新增培訓模組",tag:"表單",form:{title:"新增培訓模組",
+      fields:[{id:"t",lbl:"模組名稱",type:"text",req:1,ph:"例：四個勇於"},
+              {id:"c",lbl:"模組類型",type:"select",req:1,opts:["領導人特質","新人守則","帶線系統","市場實戰","畫畫培訓","產品培訓","事業培訓"]},
+              {id:"g",lbl:"學習目標",type:"textarea",ph:"例：建立領導人思維與承擔能力"},
+              {id:"s",lbl:"核心摘要",type:"textarea",ph:"例：勇於學習、勇於認錯、勇於改變、勇於承擔"}],
+      build:function(v){return "新增培訓模組 "+v.t+" | "+v.c+" | "+v.g+" | "+v.s;}}},
+    {label:"查詢培訓模組",tag:"表單",form:{title:"查詢培訓模組",
+      fields:[{id:"t",lbl:"模組名稱（選填）",type:"text",ph:"空白則查全部"}],
+      build:function(v){return v.t?"查詢培訓模組 "+v.t:"查詢培訓模組";}}},
+    {label:"新增培訓課程",tag:"表單",form:{title:"新增培訓課程",
+      fields:[{id:"t",lbl:"課程名稱",type:"text",req:1,ph:"例：領導人特質｜四個勇於"},
+              {id:"m",lbl:"模組名稱",type:"text",req:1,ph:"請選擇模組"},
+              {id:"d",lbl:"日期",type:"date",req:1},
+              {id:"tm",lbl:"時間",type:"time",req:1},
+              {id:"loc",lbl:"地點",type:"text",req:1,ph:"例：台南教室"},
+              {id:"sp",lbl:"講師",type:"text",ph:"例：鐘老師"},
+              {id:"aud",lbl:"對象",type:"select",req:1,opts:["潛在家人","夥伴","新手夥伴","核心夥伴"]}],
+      build:function(v){return "新增培訓課程 "+v.t+" | "+v.m+" | "+v.d+" | "+v.tm+" | "+v.loc+" | "+v.sp+" | "+v.aud;}}},
+    {label:"查詢培訓課程",tag:"表單",form:{title:"查詢培訓課程",
+      fields:[{id:"d",lbl:"日期（選填）",type:"date"},
+              {id:"m",lbl:"模組名稱（選填）",type:"text",ph:"空白則查全部"}],
+      build:function(v){var q=v.d||v.m||"";return q?"查詢培訓課程 "+q:"查詢培訓課程";}}},
+    {label:"新增培訓反思",tag:"表單",form:{title:"新增培訓反思",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"st",lbl:"課程名稱",type:"text",req:1,ph:"請選擇課程"},
+              {id:"i",lbl:"悟到",type:"textarea",ph:"今天最大的提醒是什麼"},
+              {id:"l",lbl:"學到",type:"textarea",ph:"學到哪個觀念或方法"},
+              {id:"a",lbl:"做到",type:"textarea",ph:"接下來準備採取的行動"},
+              {id:"g",lbl:"目標",type:"textarea",ph:"希望達成的具體目標"}],
+      build:function(v){return "新增培訓反思 "+v.n+" | "+v.st+" | "+v.i+" | "+v.l+" | "+v.a+" | "+v.g;}}},
     {label:"查詢培訓進度",tag:"表單",form:{title:"查詢培訓進度",
-      fields:[{id:"n",lbl:"夥伴名稱",type:"text",req:1,ph:"例：建德"}],
-      build:function(v){return "培訓 "+v.n;}}},
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"}],
+      build:function(v){return "查詢培訓進度 "+v.n;}}},
+    {label:"查詢培訓總表",tag:"執行",cmd:"查詢培訓總表"},
+    {label:"啟動七天法則",tag:"表單",form:{title:"啟動七天法則",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"d",lbl:"開始日期",type:"date",req:1},
+              {id:"note",lbl:"教練備註（選填）",type:"textarea",ph:"例：先陪他完成七天暖身"}],
+      build:function(v){return "啟動七天法則 "+v.n+" | "+v.d+" | "+v.note;}}},
+    {label:"七天法則回報",tag:"表單",form:{title:"七天法則回報",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"day",lbl:"第幾天",type:"select",req:1,opts:["第1天","第2天","第3天","第4天","第5天","第6天","第7天"]},
+              {id:"task",lbl:"任務內容",type:"textarea",req:1,ph:"例：聽 OPP、進教室、回報感想"},
+              {id:"done",lbl:"完成狀態",type:"select",req:1,opts:["已完成","未完成"]},
+              {id:"note",lbl:"備註（選填）",type:"textarea",ph:"例：今天對環境比較有感"}],
+      build:function(v){return "七天法則回報 "+v.n+" | "+v.day+" | "+v.task+" | "+v.done+" | "+v.note;}}},
+    {label:"查詢七天法則",tag:"表單",form:{title:"查詢七天法則",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"}],
+      build:function(v){return "查詢七天法則 "+v.n;}}},
+    {label:"新增課後行動",tag:"表單",form:{title:"新增課後行動",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"st",lbl:"課程名稱",type:"text",req:1,ph:"請選擇課程"},
+              {id:"content",lbl:"行動內容",type:"textarea",req:1,ph:"例：本週邀約 2 位新朋友"},
+              {id:"due",lbl:"截止日期",type:"date",req:1}],
+      build:function(v){return "新增課後行動 "+v.n+" | "+v.st+" | "+v.content+" | "+v.due;}}},
+    {label:"回報課後行動",tag:"表單",form:{title:"回報課後行動",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"},
+              {id:"aid",lbl:"行動 ID",type:"text",req:1,ph:"先查詢課後行動取得 ID"},
+              {id:"status",lbl:"狀態",type:"select",req:1,opts:["待執行","進行中","已完成","延後","需協助"]},
+              {id:"note",lbl:"備註（選填）",type:"textarea",ph:"例：已完成第一步"}],
+      build:function(v){return "回報課後行動 "+v.n+" | "+v.aid+" | "+v.status+" | "+v.note;}}},
+    {label:"查詢課後行動",tag:"表單",form:{title:"查詢課後行動",
+      fields:[{id:"n",lbl:"夥伴姓名",type:"text",req:1,ph:"請選擇夥伴"}],
+      build:function(v){return "查詢課後行動 "+v.n;}}},
   ]},
   {label:"🤝 夥伴陪伴",items:[
     {label:"跟進報告",tag:"執行",cmd:"跟進報告"},
@@ -340,7 +401,7 @@ const GROUPS=[
   ]},
   {label:"📝 故事分類",items:[
     {label:"👤 人物故事歸檔",tag:"表單",form:{title:"人物故事歸檔",
-      fields:[{id:"n",lbl:"人物名稱",type:"text",req:1,ph:"例：建德"}],
+      fields:[{id:"n",lbl:"人物名稱",type:"text",req:1,ph:"例：建德",pick:"people"}],
       build:function(v){return "潛在家人資料 "+v.n;}}},
     {label:"📖 產品故事歸檔",tag:"執行",cmd:"產品故事歸檔"},
   ]},
@@ -392,11 +453,9 @@ const GROUPS=[
               {id:"c",lbl:"內文",type:"textarea",req:1,ph:"輸入文宣內容"}],
       build:function(v){return "新增課程文宣 "+v.ti+"|"+v.c;}}},
     {label:"優化課程文宣（AI）",tag:"表單",form:{title:"優化課程文宣",
-      fields:[{id:"id",lbl:"文宣 ID（PROMO-XXXX）",type:"text",req:1,ph:"先查詢課程文宣取得 ID"}],
+      fields:[{id:"id",lbl:"文宣 ID（PROMO-XXXX）",type:"text",req:1,ph:"先查詢課程文宣取得 ID",pick:"promo"}],
       build:function(v){return "優化課程文宣 "+v.id;}}},
-    {label:"邀約文宣－潛在家人（AI）",tag:"表單",form:{title:"潛在家人邀約文宣",
-      fields:[{id:"n",lbl:"姓名（選填，空白＝通用）",type:"text",ph:"例：Amy"}],
-      build:function(v){return "邀約文宣 潛在家人"+(v.n?" "+v.n:"");}}},
+    {label:"邀約文宣－潛在家人（AI）",tag:"執行",cmd:"邀約文宣 潛在家人"},
     {label:"邀約文宣－跟進夥伴（AI）",tag:"表單",form:{title:"跟進夥伴邀約文宣",
       fields:[{id:"n",lbl:"姓名（選填，空白＝通用）",type:"text",ph:"例：建德"}],
       build:function(v){return "邀約文宣 跟進夥伴"+(v.n?" "+v.n:"");}}},
@@ -485,6 +544,10 @@ function closeMob(){document.getElementById("mobmenu").classList.remove("on");}
 // Modal
 var _build=null;
 var _partnerCache=null;
+var _prospectCache=null;
+var _promoCache=null;
+var _trainingModuleCache=null;
+var _trainingSessionCache=null;
 function _fieldIds(f){return (f.fields||[]).map(function(x){return x.id;});}
 function _isUpdatePartnerForm(f){
   var ids=_fieldIds(f);
@@ -502,6 +565,39 @@ function _isMotivateForm(f){
   var ids=_fieldIds(f);
   return ids.length===2&&ids.includes("n")&&ids.includes("s");
 }
+function _isTrainingProgressForm(f){
+  return !!f && (f.title||"")==="查詢培訓進度";
+}
+function _isTrainingReflectionForm(f){
+  return !!f && (f.title||"")==="新增培訓反思";
+}
+function _isTrainingSessionForm(f){
+  return !!f && (f.title||"")==="新增培訓課程";
+}
+function _isTrainingSessionLookupForm(f){
+  return !!f && (f.title||"")==="查詢培訓課程";
+}
+function _isTrainingModuleLookupForm(f){
+  return !!f && (f.title||"")==="查詢培訓模組";
+}
+function _isSevenDayForm(f){
+  return !!f && ((f.title||"")==="啟動七天法則"||(f.title||"")==="七天法則回報"||(f.title||"")==="查詢七天法則");
+}
+function _isTrainingActionForm(f){
+  return !!f && ((f.title||"")==="新增課後行動"||(f.title||"")==="回報課後行動"||(f.title||"")==="查詢課後行動");
+}
+function _isMilestoneForm(f){
+  return !!f && (f.title||"")==="里程碑記錄";
+}
+function _isPartnerLookupForm(f){
+  return !!f && (f.title||"")==="查詢指定夥伴";
+}
+function _isStoryPersonForm(f){
+  return !!f && (f.title||"")==="人物故事歸檔";
+}
+function _isPromoSelectForm(f){
+  return !!f && (f.title||"")==="優化課程文宣";
+}
 async function _getPartners(){
   if(_partnerCache)return _partnerCache;
   var r=await fetch("/api/partners");
@@ -509,8 +605,55 @@ async function _getPartners(){
   _partnerCache=(d&&d.result)||[];
   return _partnerCache;
 }
+async function _getProspects(){
+  if(_prospectCache)return _prospectCache;
+  var r=await fetch("/api/prospects");
+  var d=await r.json();
+  _prospectCache=(d&&d.result)||[];
+  return _prospectCache;
+}
+async function _getCoursePromos(){
+  if(_promoCache)return _promoCache;
+  var r=await fetch("/api/course-promos");
+  var d=await r.json();
+  _promoCache=(d&&d.result)||[];
+  return _promoCache;
+}
+async function _getTrainingModules(){
+  if(_trainingModuleCache)return _trainingModuleCache;
+  var r=await fetch("/api/training-modules");
+  var d=await r.json();
+  _trainingModuleCache=(d&&d.result)||[];
+  return _trainingModuleCache;
+}
+async function _getTrainingSessions(){
+  if(_trainingSessionCache)return _trainingSessionCache;
+  var r=await fetch("/api/training-sessions");
+  var d=await r.json();
+  _trainingSessionCache=(d&&d.result)||[];
+  return _trainingSessionCache;
+}
+async function _getStoryPeople(){
+  const [partners, prospects] = await Promise.all([_getPartners(), _getProspects()]);
+  var seen={};
+  var people=[];
+  partners.forEach(function(p){
+    var name=(p.name||"").trim();
+    if(!name||seen[name])return;
+    seen[name]=1;
+    people.push({name:name, source:"夥伴", category:p.category||"", stage:p.stage||""});
+  });
+  prospects.forEach(function(p){
+    var name=(p.name||"").trim();
+    if(!name||seen[name])return;
+    seen[name]=1;
+    people.push({name:name, source:"潛在家人", category:p.category||"", stage:p.status||""});
+  });
+  people.sort(function(a,b){return a.name.localeCompare(b.name,"zh-Hant");});
+  return people;
+}
 async function _hydratePartnerSelect(formDef){
-  if(!_isUpdatePartnerForm(formDef)&&!_isFollowupAddForm(formDef)&&!_isFollowupForm(formDef)&&!_isMotivateForm(formDef))return;
+  if(!_isUpdatePartnerForm(formDef)&&!_isFollowupAddForm(formDef)&&!_isFollowupForm(formDef)&&!_isMotivateForm(formDef)&&!_isTrainingProgressForm(formDef)&&!_isTrainingReflectionForm(formDef)&&!_isSevenDayForm(formDef)&&!_isTrainingActionForm(formDef)&&!_isMilestoneForm(formDef)&&!_isPartnerLookupForm(formDef))return;
   var el=document.getElementById("mf_n");
   if(!el)return;
   var partners=await _getPartners();
@@ -543,6 +686,121 @@ async function _hydratePartnerSelect(formDef){
     sel.addEventListener("change", function(){ _prefillPartnerForm(sel.value); });
     if(sel.value)_prefillPartnerForm(sel.value);
   }
+}
+async function _hydrateStoryPeopleSelect(formDef){
+  if(!_isStoryPersonForm(formDef))return;
+  var el=document.getElementById("mf_n");
+  if(!el)return;
+  var people=await _getStoryPeople();
+  var cur=el.value||"";
+  var sel=document.createElement("select");
+  sel.id=el.id;
+  sel.required=true;
+  var first=document.createElement("option");
+  first.value="";
+  first.textContent="請選擇人物";
+  sel.appendChild(first);
+  people.forEach(function(p){
+    var o=document.createElement("option");
+    o.value=p.name;
+    var extra=[];
+    if(p.source)extra.push(p.source);
+    if(p.category)extra.push("分類"+p.category);
+    if(p.stage)extra.push(p.stage);
+    o.textContent=extra.length?(p.name+"｜"+extra.join("｜")):p.name;
+    if(cur&&cur===p.name)o.selected=true;
+    sel.appendChild(o);
+  });
+  el.replaceWith(sel);
+}
+async function _hydrateTrainingModuleSelect(formDef){
+  if(!_isTrainingSessionForm(formDef)&&!_isTrainingSessionLookupForm(formDef)&&!_isTrainingModuleLookupForm(formDef))return;
+  var modules=await _getTrainingModules();
+  if(_isTrainingSessionForm(formDef)||_isTrainingSessionLookupForm(formDef)){
+    var el=document.getElementById("mf_m");
+    if(el){
+      var cur=el.value||"";
+      var sel=document.createElement("select");
+      sel.id=el.id;
+      if(_isTrainingSessionForm(formDef))sel.required=true;
+      var first=document.createElement("option");
+      first.value="";
+      first.textContent=_isTrainingSessionForm(formDef)?"請選擇模組":"（全部模組）";
+      sel.appendChild(first);
+      modules.forEach(function(m){
+        var o=document.createElement("option");
+        o.value=m.title;
+        o.textContent=m.category?(m.title+"｜"+m.category):m.title;
+        if(cur&&cur===m.title)o.selected=true;
+        sel.appendChild(o);
+      });
+      el.replaceWith(sel);
+    }
+  }
+  if(_isTrainingModuleLookupForm(formDef)){
+    var tel=document.getElementById("mf_t");
+    if(tel){
+      var cur2=tel.value||"";
+      var sel2=document.createElement("select");
+      sel2.id=tel.id;
+      var first2=document.createElement("option");
+      first2.value="";
+      first2.textContent="（全部模組）";
+      sel2.appendChild(first2);
+      modules.forEach(function(m){
+        var o2=document.createElement("option");
+        o2.value=m.title;
+        o2.textContent=m.category?(m.title+"｜"+m.category):m.title;
+        if(cur2&&cur2===m.title)o2.selected=true;
+        sel2.appendChild(o2);
+      });
+      tel.replaceWith(sel2);
+    }
+  }
+}
+async function _hydrateTrainingSessionSelect(formDef){
+  if(!_isTrainingReflectionForm(formDef))return;
+  var el=document.getElementById("mf_st");
+  if(!el)return;
+  var sessions=await _getTrainingSessions();
+  var cur=el.value||"";
+  var sel=document.createElement("select");
+  sel.id=el.id;
+  sel.required=true;
+  var first=document.createElement("option");
+  first.value="";
+  first.textContent="請選擇課程";
+  sel.appendChild(first);
+  sessions.forEach(function(s){
+    var o=document.createElement("option");
+    o.value=s.title;
+    o.textContent=s.date?(s.title+"｜"+s.date):s.title;
+    if(cur&&cur===s.title)o.selected=true;
+    sel.appendChild(o);
+  });
+  el.replaceWith(sel);
+}
+async function _hydratePromoSelect(formDef){
+  if(!_isPromoSelectForm(formDef))return;
+  var el=document.getElementById("mf_id");
+  if(!el)return;
+  var promos=await _getCoursePromos();
+  var cur=el.value||"";
+  var sel=document.createElement("select");
+  sel.id=el.id;
+  sel.required=true;
+  var first=document.createElement("option");
+  first.value="";
+  first.textContent="請選擇文宣";
+  sel.appendChild(first);
+  promos.forEach(function(p){
+    var o=document.createElement("option");
+    o.value=p.id;
+    o.textContent=(p.title||"").trim() ? (p.id+"｜"+p.title) : p.id;
+    if(cur&&cur===p.id)o.selected=true;
+    sel.appendChild(o);
+  });
+  el.replaceWith(sel);
 }
 async function _prefillPartnerForm(name){
   if(!name)return;
@@ -612,6 +870,10 @@ function openModal(f){
   });
   document.getElementById("overlay").classList.add("on");
   _hydratePartnerSelect(f);
+  _hydrateStoryPeopleSelect(f);
+  _hydratePromoSelect(f);
+  _hydrateTrainingModuleSelect(f);
+  _hydrateTrainingSessionSelect(f);
   var first=mf.querySelector("input,select,textarea");
   if(first)setTimeout(function(){first.focus();},120);
 }
@@ -1094,6 +1356,188 @@ def render_dashboard_html_v2() -> str:
 }})();
 </script>
 """
+
+    inject += """
+<script>
+(function(){
+  async function fetchJson(url){
+    try {
+      const r = await fetch(url);
+      return await r.json();
+    } catch (e) {
+      return {};
+    }
+  }
+
+  async function loadTrainingData(){
+    const [mods, sessions, partners] = await Promise.all([
+      fetchJson('/api/training-modules'),
+      fetchJson('/api/training-sessions'),
+      fetchJson('/api/partners')
+    ]);
+    return {
+      modules: (mods.result || []).map(x => ({ value: x.title, label: x.title })),
+      sessions: (sessions.result || []).map(x => ({ value: x.title, label: x.title })),
+      partners: (partners.result || []).map(x => ({ value: x.name, label: x.name }))
+    };
+  }
+
+  function makeSidebarItem(label, direct, onclick){
+    const btn = document.createElement('button');
+    btn.className = 'sbtn' + (direct ? ' direct' : ' form-btn');
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="tag">' + (direct ? '直接' : '表單') + '</span>';
+    btn.onclick = onclick;
+    return btn;
+  }
+
+  function makeMobileItem(label, direct, onclick){
+    const btn = document.createElement('button');
+    btn.className = 'mgbtn' + (direct ? ' direct' : ' form-btn');
+    btn.innerHTML = '<span class="lbl">' + label + '</span><span class="mtag">' + (direct ? '直接' : '表單') + '</span>';
+    btn.onclick = onclick;
+    return btn;
+  }
+
+  async function openTrainingForm(kind){
+    const data = await loadTrainingData();
+    const defs = {
+      module_add: {
+        title: '新增培訓模組',
+        fields: [
+          {id:'title', lbl:'模組名稱', type:'text', req:1},
+          {id:'kind', lbl:'模組類型', type:'text', req:1},
+          {id:'goal', lbl:'學習目標', type:'text', req:1},
+          {id:'summary', lbl:'摘要', type:'textarea'}
+        ],
+        build: v => `新增培訓模組 ${v.title} | ${v.kind} | ${v.goal} | ${v.summary || ''}`
+      },
+      session_add: {
+        title: '新增培訓課程',
+        fields: [
+          {id:'title', lbl:'課程名稱', type:'text', req:1},
+          {id:'module', lbl:'模組名稱', type:'select', req:1, options:data.modules},
+          {id:'date', lbl:'日期', type:'text', req:1, ph:'2026-04-10'},
+          {id:'time', lbl:'時間', type:'text', req:1, ph:'19:30'},
+          {id:'location', lbl:'地點', type:'text'},
+          {id:'teacher', lbl:'講師', type:'text'},
+          {id:'audience', lbl:'對象', type:'text'}
+        ],
+        build: v => `新增培訓課程 ${v.title} | ${v.module} | ${v.date} | ${v.time} | ${v.location || ''} | ${v.teacher || ''} | ${v.audience || ''}`
+      },
+      reflection_add: {
+        title: '新增培訓反思',
+        fields: [
+          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'課程', type:'select', req:1, options:data.sessions},
+          {id:'realize', lbl:'悟到', type:'textarea', req:1},
+          {id:'learn', lbl:'學到', type:'textarea', req:1},
+          {id:'doit', lbl:'做到', type:'textarea', req:1},
+          {id:'goal', lbl:'目標', type:'textarea', req:1}
+        ],
+        build: v => `新增培訓反思 ${v.name} | ${v.session} | ${v.realize} | ${v.learn} | ${v.doit} | ${v.goal}`
+      },
+      progress_query: {
+        title: '查詢培訓進度',
+        fields: [{id:'name', lbl:'姓名', type:'select', req:1, options:data.partners}],
+        build: v => `查詢培訓進度 ${v.name}`
+      },
+      seven_start: {
+        title: '啟動七天法則',
+        fields: [
+          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
+          {id:'date', lbl:'開始日期', type:'text', req:1, ph:'2026-04-10'},
+          {id:'note', lbl:'教練備註', type:'textarea'}
+        ],
+        build: v => `啟動七天法則 ${v.name} | ${v.date} | ${v.note || ''}`
+      },
+      seven_report: {
+        title: '七天法則回報',
+        fields: [
+          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
+          {id:'day', lbl:'第幾天', type:'text', req:1, ph:'第1天'},
+          {id:'task', lbl:'任務內容', type:'text', req:1},
+          {id:'status', lbl:'狀態', type:'select', req:1, options:[{value:'已完成',label:'已完成'},{value:'未完成',label:'未完成'}]},
+          {id:'note', lbl:'備註', type:'textarea'}
+        ],
+        build: v => `七天法則回報 ${v.name} | ${v.day} | ${v.task} | ${v.status} | ${v.note || ''}`
+      },
+      seven_query: {
+        title: '查詢七天法則',
+        fields: [{id:'name', lbl:'姓名', type:'select', req:1, options:data.partners}],
+        build: v => `查詢七天法則 ${v.name}`
+      },
+      action_add: {
+        title: '新增課後行動',
+        fields: [
+          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
+          {id:'session', lbl:'課程名稱', type:'select', req:1, options:data.sessions},
+          {id:'action', lbl:'行動內容', type:'textarea', req:1},
+          {id:'deadline', lbl:'截止日期', type:'text', req:1, ph:'2026-04-18'}
+        ],
+        build: v => `新增課後行動 ${v.name} | ${v.session} | ${v.action} | ${v.deadline}`
+      },
+      action_update: {
+        title: '回報課後行動',
+        fields: [
+          {id:'name', lbl:'姓名', type:'select', req:1, options:data.partners},
+          {id:'action_id', lbl:'ACTION-ID', type:'text', req:1},
+          {id:'status', lbl:'狀態', type:'text', req:1},
+          {id:'note', lbl:'備註', type:'textarea'}
+        ],
+        build: v => `回報課後行動 ${v.name} | ${v.action_id} | ${v.status} | ${v.note || ''}`
+      },
+      action_query: {
+        title: '查詢課後行動',
+        fields: [{id:'name', lbl:'姓名', type:'select', req:1, options:data.partners}],
+        build: v => `查詢課後行動 ${v.name}`
+      }
+    };
+    openModal(defs[kind]);
+  }
+
+  function addTrainingButtons(){
+    const sidebar = document.getElementById('sidebar');
+    const mobcont = document.getElementById('mobcont');
+    if (!sidebar || !mobcont || document.getElementById('training-system-clean-group')) return;
+
+    const group = document.createElement('div');
+    group.className = 'sg';
+    group.id = 'training-system-clean-group';
+    group.innerHTML = '<div class="sghdr open"><span>🎓 培訓系統 2.0</span><span class="arr">▸</span></div><div class="sgitems open"></div>';
+    const items = group.querySelector('.sgitems');
+    const defs = [
+      ['新增培訓模組', false, () => openTrainingForm('module_add')],
+      ['查詢培訓模組', true, () => doSend('查詢培訓模組')],
+      ['新增培訓課程', false, () => openTrainingForm('session_add')],
+      ['查詢培訓課程', true, () => doSend('查詢培訓課程')],
+      ['新增培訓反思', false, () => openTrainingForm('reflection_add')],
+      ['查詢培訓進度', false, () => openTrainingForm('progress_query')],
+      ['查詢培訓總表', true, () => doSend('查詢培訓總表')],
+      ['啟動七天法則', false, () => openTrainingForm('seven_start')],
+      ['七天法則回報', false, () => openTrainingForm('seven_report')],
+      ['查詢七天法則', false, () => openTrainingForm('seven_query')],
+      ['新增課後行動', false, () => openTrainingForm('action_add')],
+      ['回報課後行動', false, () => openTrainingForm('action_update')],
+      ['查詢課後行動', false, () => openTrainingForm('action_query')]
+    ];
+    defs.forEach(([label, direct, onclick]) => items.appendChild(makeSidebarItem(label, direct, onclick)));
+    sidebar.appendChild(group);
+
+    const mg = document.createElement('div');
+    mg.className = 'mgg';
+    mg.innerHTML = '<div class="mgghdr">🎓 培訓系統 2.0</div>';
+    defs.forEach(([label, direct, onclick]) => mg.appendChild(makeMobileItem(label, direct, () => { closeMob(); onclick(); })));
+    mobcont.appendChild(mg);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', addTrainingButtons);
+  } else {
+    addTrainingButtons();
+  }
+})();
+</script>
+"""
     return html.replace("</body>", inject + "\n</body>")
 
 
@@ -1182,6 +1626,7 @@ def render_dashboard_html_v2() -> str:
 })();
 </script>
 """
+
     return html.replace("</body>", inject + "\n</body>")
 
 
@@ -1280,6 +1725,7 @@ def render_dashboard_html_v2() -> str:
 })();
 </script>
 """
+
     return html.replace("</body>", inject + "\n</body>")
 
 
@@ -1428,6 +1874,41 @@ def render_dashboard_html_v2() -> str:
     addAISkillButtons();
   }}
 }})();
+</script>
+"""
+
+    return html.replace("</body>", inject + "\n</body>")
+
+
+_RENDER_WITH_CLEAN_MENUS = render_dashboard_html_v2
+
+
+def render_dashboard_html_v2() -> str:
+    html = _RENDER_WITH_CLEAN_MENUS()
+    inject = """
+<script>
+(function(){
+  function normalizeTags(root){
+    root.querySelectorAll('.tag').forEach(function(el){
+      const btn = el.closest('button');
+      el.textContent = btn && btn.classList.contains('direct') ? '直接執行' : '表單';
+    });
+    root.querySelectorAll('.mtag').forEach(function(el){
+      const btn = el.closest('button');
+      el.textContent = btn && btn.classList.contains('direct') ? '直接執行' : '表單';
+    });
+  }
+
+  function cleanMenuLabels(){
+    normalizeTags(document);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', cleanMenuLabels);
+  } else {
+    cleanMenuLabels();
+  }
+})();
 </script>
 """
     return html.replace("</body>", inject + "\n</body>")
