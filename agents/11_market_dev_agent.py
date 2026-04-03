@@ -362,6 +362,56 @@ class MarketDevAgent:
                 return msg
         return f"⚠️ 找不到「{name}」"
 
+    def handle_command(self, msg: str) -> str:
+        """統一指令入口"""
+        msg = msg.strip()
+        if msg.startswith("新增潛在家人"):
+            return self.handle_add_prospect(msg)
+        if msg.startswith("查詢潛在家人"):
+            return self.handle_query_prospect(msg)
+        
+        if msg.startswith("更新潛在家人"):
+            # 格式：更新潛在家人 姓名|欄位1:值|欄位2:值
+            raw = msg.replace("更新潛在家人", "", 1).strip()
+            parts = [p.strip() for p in raw.split("|")]
+            if not parts[0]:
+                return "⚠️ 格式：更新潛在家人 姓名|欄位:值|..."
+            name = parts[0]
+            fields = {}
+            for p in parts[1:]:
+                if ":" in p:
+                    k, v = p.split(":", 1)
+                    fields[k.strip()] = v.strip()
+            return self.update_prospect_fields(name, fields)
+
+        if msg.startswith("潛在家人資料"):
+            name = msg.replace("潛在家人資料", "", 1).strip()
+            row = self.get_prospect_by_name(name)
+            if not row:
+                return f"🔍 找不到「{name}」的資料"
+            return self._format_prospect_detail(row)
+            
+        return ""
+
+    def _format_prospect_detail(self, r: dict) -> str:
+        star = "⭐" * int(r["AI評分"]) if r.get("AI評分", "").isdigit() else ""
+        lines = [
+            f"👤 潛在家人詳情：{r['姓名']} {star}",
+            f"💼 職業：{r.get('職業','')}",
+            f"📍 地區：{r.get('地區','')}",
+            f"🏠 地址：{r.get('地址','')}",
+            f"📞 電話：{r.get('電話','')}",
+            f"📢 管道：{r.get('接觸管道','')}",
+            f"🔄 狀態：{r.get('接觸狀態','')}",
+            f"🏷️ 標籤：{r.get('需求標籤','')}",
+            f"📅 下次跟進：{r.get('下次跟進日','')}",
+            f"📝 備註：{r.get('備註','')}",
+            f"最後更新：{r.get('最後更新','')}"
+        ]
+        if r.get("使用產品"):
+            lines.append(f"💊 使用產品：{r['使用產品']}")
+        return "\n".join(lines)
+
     def handle_query_prospect(self, msg: str) -> str:
         """LINE 指令：查詢潛在家人 [姓名（可省略）]"""
         keyword = msg.replace("查詢潛在家人", "", 1).strip()

@@ -483,6 +483,30 @@ def format_promos(promos: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def update_promo(promo_id: str, title: str, content: str) -> bool:
+    promos = _load_promos()
+    found = False
+    for p in promos:
+        if p["id"] == promo_id:
+            p["title"] = title.strip()
+            p["content"] = content.strip()
+            p["updated_at"] = datetime.now().isoformat()
+            found = True
+            break
+    if found:
+        _save_promos(promos)
+    return found
+
+
+def delete_promo(promo_id: str) -> bool:
+    promos = _load_promos()
+    new_promos = [p for p in promos if p["id"] != promo_id]
+    if len(new_promos) < len(promos):
+        _save_promos(new_promos)
+        return True
+    return False
+
+
 def get_promo_detail(promo_id: str) -> dict | None:
     promos = _load_promos()
     return next((p for p in promos if p["id"] == promo_id), None)
@@ -845,6 +869,24 @@ class CourseInviteAgent:
         # 查詢課程文宣
         if msg in ("查詢課程文宣", "課程文宣"):
             return format_promos(list_promos())
+
+        if msg.startswith("修改課程文宣"):
+            raw = msg.replace("修改課程文宣", "", 1).strip()
+            parts = [p.strip() for p in raw.split("|", 2)]
+            if len(parts) < 3:
+                return "⚠️ 格式：修改課程文宣 PROMO-XXXX | 新標題 | 新內容"
+            pid, title, content = parts
+            if update_promo(pid, title, content):
+                return f"✅ 已更新課程文宣：{pid}｜{title}"
+            return f"⚠️ 找不到課程文宣：{pid}"
+
+        if msg.startswith("刪除課程文宣"):
+            pid = msg.replace("刪除課程文宣", "").strip()
+            if not pid:
+                return "⚠️ 格式：刪除課程文宣 PROMO-XXXX"
+            if delete_promo(pid):
+                return f"✅ 已刪除課程文宣：{pid}"
+            return f"⚠️ 找不到課程文宣：{pid}"
 
         if msg == "查詢已產生的今日之後會議邀約文宣":
             return format_upcoming_invites()

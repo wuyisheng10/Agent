@@ -34,6 +34,8 @@ COURSE_PREFIXES = (
     "刪除課程會議",
     "查詢課程文宣",
     "新增課程文宣",
+    "修改課程文宣",
+    "刪除課程文宣",
     "優化課程文宣",
     "邀約文宣",
     "查詢已產生的今日之後會議邀約文宣",
@@ -72,6 +74,12 @@ TRAINING_SYSTEM_PREFIXES = (
     "新增課後行動",
     "回報課後行動",
     "查詢課後行動",
+)
+MARKET_DEV_PREFIXES = (
+    "新增潛在家人",
+    "查詢潛在家人",
+    "更新潛在家人",
+    "潛在家人資料",
 )
 
 
@@ -315,22 +323,18 @@ def handle_web_command(
     if _starts_with_any(cmd, DAILY_REPORT_PREFIXES):
         return load_daily_report().DailyReportAgent().run()
 
-    cal_result = load_calendar().handle_calendar_command(cmd)
-    if cal_result:
-        return cal_result
-
-    partner_result = _partner_query_text(load_partner, cmd)
-    if partner_result:
-        return partner_result
-
-    if cmd.startswith("新增潛在家人"):
-        return load_market_dev().MarketDevAgent().handle_add_prospect(cmd)
-
-    if cmd.startswith("查詢潛在家人"):
-        return _list_prospects_text(load_market_dev, cmd.replace("查詢潛在家人", "").strip())
-
     if _starts_with_any(cmd, COURSE_PREFIXES):
         return load_course_invite().CourseInviteAgent().handle_command(cmd)
+
+    if _starts_with_any(cmd, MARKET_DEV_PREFIXES):
+        if cmd.startswith("新增潛在家人"):
+            return load_market_dev().MarketDevAgent().handle_add_prospect(cmd)
+        if cmd.startswith("查詢潛在家人"):
+            return _list_prospects_text(load_market_dev, cmd.replace("查詢潛在家人", "").strip())
+        # 處理 更新潛在家人 與 潛在家人資料
+        return load_market_dev().MarketDevAgent().handle_command(cmd)
+
+    cal_result = load_calendar().handle_calendar_command(cmd)
 
     if _starts_with_any(cmd, NUTRITION_DRI_PREFIXES):
         return load_nutrition_dri().NutritionDRIAgent().handle_command(cmd)

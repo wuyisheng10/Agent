@@ -452,6 +452,14 @@ const GROUPS=[
       fields:[{id:"ti",lbl:"標題",type:"text",req:1,ph:"例：四月OPP邀約文宣"},
               {id:"c",lbl:"內文",type:"textarea",req:1,ph:"輸入文宣內容"}],
       build:function(v){return "新增課程文宣 "+v.ti+"|"+v.c;}}},
+    {label:"修改課程文宣",tag:"表單",form:{title:"修改課程文宣",
+      fields:[{id:"id",lbl:"文宣 ID（PROMO-XXXX）",type:"text",req:1,ph:"先查詢課程文宣取得 ID",pick:"promo"},
+              {id:"ti",lbl:"新標題",type:"text",req:1,ph:"自動載入目前標題"},
+              {id:"c",lbl:"新內容",type:"textarea",req:1,ph:"自動載入目前內容"}],
+      build:function(v){return "修改課程文宣 "+v.id+" | "+v.ti+" | "+v.c;}}},
+    {label:"刪除課程文宣",tag:"表單",form:{title:"刪除課程文宣",
+      fields:[{id:"id",lbl:"文宣 ID（PROMO-XXXX）",type:"text",req:1,ph:"先查詢課程文宣取得 ID",pick:"promo"}],
+      build:function(v){return "刪除課程文宣 "+v.id;}}},
     {label:"優化課程文宣（AI）",tag:"表單",form:{title:"優化課程文宣",
       fields:[{id:"id",lbl:"文宣 ID（PROMO-XXXX）",type:"text",req:1,ph:"先查詢課程文宣取得 ID",pick:"promo"}],
       build:function(v){return "優化課程文宣 "+v.id;}}},
@@ -801,6 +809,28 @@ async function _hydratePromoSelect(formDef){
     sel.appendChild(o);
   });
   el.replaceWith(sel);
+
+  async function prefill(){
+    var pid=sel.value; if(!pid)return;
+    var r=await fetch("/api/course-promo/"+encodeURIComponent(pid));
+    if(!r.ok)return;
+    var d=await r.json(); var p=d.result; if(!p)return;
+    
+    // 預覽區塊
+    var prev=document.getElementById("promo-prev");
+    if(!prev){
+      prev=document.createElement("div"); prev.id="promo-prev";
+      prev.style.cssText="font-size:12px;color:#6c6c70;line-height:1.6;background:#f2f2f7;border-radius:10px;padding:10px;white-space:pre-wrap;margin-bottom:10px";
+      sel.parentElement.insertBefore(prev, sel.nextSibling);
+    }
+    prev.innerHTML="<strong>【目前內容預覽】</strong><br>"+(p.title||"")+"<br>"+(p.content||"").split("\\n").join("<br>");
+    
+    // 自動帶入
+    var ti=document.getElementById("mf_ti"); if(ti && !ti.dataset.userEdited) ti.value=p.title||"";
+    var c=document.getElementById("mf_c"); if(c && !c.dataset.userEdited) c.value=p.content||"";
+  }
+  sel.onchange=prefill;
+  if(sel.value)prefill();
 }
 async function _prefillPartnerForm(name){
   if(!name)return;
