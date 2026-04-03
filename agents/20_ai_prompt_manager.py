@@ -118,7 +118,7 @@ DEFAULT_PROMPTS = {
             "3. Micronutrients likely to be sufficient in this meal.\n"
             "4. Micronutrients likely to be lacking in this meal.\n"
             "5. A short note about overall balance and obvious risks.\n"
-            "Be practical and mention when something is only an estimate."
+            "Be practical and mention when something only an estimate."
         ),
     },
     "nutrition_daily_assessment": {
@@ -140,95 +140,119 @@ DEFAULT_PROMPTS = {
             "Be practical and state uncertainty when necessary."
         ),
     },
+    "followup_individual_report": {
+        "label": "個人夥伴跟進報告",
+        "description": "針對單一夥伴產出深度跟進策略與訊息草稿。",
+        "template": (
+            "你是一位擁有 20 年經驗、專精於「陪伴與成長」的事業導師。請針對以下夥伴的現況數據，產出一份「深度跟進建議報告」。\n\n"
+            "### 夥伴原始數據\n"
+            "- 姓名：{target_name}\n"
+            "- 最後聯絡：{last_contact} ({days} 天前)\n"
+            "- 本週動作數：{weekly_actions} 次\n"
+            "- 目前里程碑：{milestone}\n"
+            "- 備註資訊：{note}\n\n"
+            "### 要求\n"
+            "1. 狀態診斷：分析該夥伴目前的心理與執行狀態（如：動力下降、遭遇挫折、或穩定成長中）。\n"
+            "2. 核心切入點：建議導師這次應該以什麼「主題」或「心情」去聯繫他最有效。\n"
+            "3. 具體跟進建議：給出 2-3 點具體行動。\n"
+            "4. LINE 訊息草稿：產出一段約 80-120 字、溫暖、老朋友口吻的草稿。\n\n"
+            "請以繁體中文回傳完整報告，直接顯示內容，不需開場白。"
+        )
+    }
 }
 
 
-def _ensure_file():
-    PROMPT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    if not PROMPT_FILE.exists():
-        with open(PROMPT_FILE, "w", encoding="utf-8") as f:
-            json.dump(DEFAULT_PROMPTS, f, ensure_ascii=False, indent=2)
+class AIPromptManager:
+    def __init__(self):
+        self._ensure_file()
 
+    def _ensure_file(self):
+        PROMPT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        if not PROMPT_FILE.exists():
+            with open(PROMPT_FILE, "w", encoding="utf-8") as f:
+                json.dump(DEFAULT_PROMPTS, f, ensure_ascii=False, indent=2)
 
-def load_prompts() -> dict:
-    _ensure_file()
-    with open(PROMPT_FILE, encoding="utf-8") as f:
-        data = json.load(f)
-    merged = {}
-    for key, default in DEFAULT_PROMPTS.items():
-        item = dict(default)
-        item.update(data.get(key, {}))
-        merged[key] = item
-    for key, item in data.items():
-        if key not in merged:
+    def load_prompts(self) -> dict:
+        self._ensure_file()
+        with open(PROMPT_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        merged = {}
+        for key, default in DEFAULT_PROMPTS.items():
+            item = dict(default)
+            item.update(data.get(key, {}))
             merged[key] = item
-    return merged
+        for key, item in data.items():
+            if key not in merged:
+                merged[key] = item
+        return merged
+
+    def save_prompts(self, data: dict):
+        self._ensure_file()
+        with open(PROMPT_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    def list_prompt_labels(self) -> list[dict]:
+        data = self.load_prompts()
+        return [
+            {"key": key, "label": item.get("label", key), "description": item.get("description", "")}
+            for key, item in data.items()
+        ]
+
+    def get_prompt(self, key: str) -> dict | None:
+        return self.load_prompts().get(key)
+
+    def render_prompt(self, key: str, **kwargs) -> str:
+        item = self.get_prompt(key)
+        if not item:
+            raise KeyError(key)
+        return item["template"].format(**kwargs)
+
+    def update_prompt(self, key: str, content: str) -> str:
+        data = self.load_prompts()
+        if key not in data:
+            return f"找不到提示詞 key：{key}"
+        data[key]["template"] = content.strip()
+        self.save_prompts(data)
+        return f"已更新 AI 提示詞：{key}"
+
+    def format_prompt_list(self) -> str:
+        rows = self.list_prompt_labels()
+        lines = ["AI 提示詞清單："]
+        for item in rows:
+            lines.append(f"- {item['key']}｜{item['label']}")
+        return "\n".join(lines)
+
+    def format_prompt_detail(self, key: str) -> str:
+        item = self.get_prompt(key)
+        if not item:
+            return f"找不到提示詞 key：{key}"
+        return (
+            f"AI 提示詞：{key}\n"
+            f"名稱：{item.get('label', '')}\n"
+            f"說明：{item.get('description', '')}\n\n"
+            f"{item.get('template', '')}"
+        )
+
+    def handle_command(self, command: str) -> str:
+        msg = (command or "").strip()
+        if msg == "查詢AI提示詞":
+            return self.format_prompt_list()
+        if msg.startswith("查詢AI提示詞 "):
+            return self.format_prompt_detail(msg.replace("查詢AI提示詞", "", 1).strip())
+        if msg.startswith("更新AI提示詞 "):
+            raw = msg.replace("更新AI提示詞", "", 1).strip()
+            parts = [p.strip() for p in raw.split("|", 1)]
+            if len(parts) < 2 or not parts[0] or not parts[1]:
+                return "格式：更新AI提示詞 key | 內容"
+            return self.update_prompt(parts[0], parts[1])
+        return ""
 
 
-def save_prompts(data: dict):
-    _ensure_file()
-    with open(PROMPT_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def list_prompt_labels() -> list[dict]:
-    data = load_prompts()
-    return [
-        {"key": key, "label": item.get("label", key), "description": item.get("description", "")}
-        for key, item in data.items()
-    ]
-
-
-def get_prompt(key: str) -> dict | None:
-    return load_prompts().get(key)
-
-
-def render_prompt(key: str, **kwargs) -> str:
-    item = get_prompt(key)
-    if not item:
-        raise KeyError(key)
-    return item["template"].format(**kwargs)
-
-
-def update_prompt(key: str, content: str) -> str:
-    data = load_prompts()
-    if key not in data:
-        return f"找不到提示詞 key：{key}"
-    data[key]["template"] = content.strip()
-    save_prompts(data)
-    return f"已更新 AI 提示詞：{key}"
-
-
-def format_prompt_list() -> str:
-    rows = list_prompt_labels()
-    lines = ["AI 提示詞清單："]
-    for item in rows:
-        lines.append(f"- {item['key']}｜{item['label']}")
-    return "\n".join(lines)
-
-
-def format_prompt_detail(key: str) -> str:
-    item = get_prompt(key)
-    if not item:
-        return f"找不到提示詞 key：{key}"
-    return (
-        f"AI 提示詞：{key}\n"
-        f"名稱：{item.get('label', '')}\n"
-        f"說明：{item.get('description', '')}\n\n"
-        f"{item.get('template', '')}"
-    )
-
-
-def handle_command(command: str) -> str:
-    msg = (command or "").strip()
-    if msg == "查詢AI提示詞":
-        return format_prompt_list()
-    if msg.startswith("查詢AI提示詞 "):
-        return format_prompt_detail(msg.replace("查詢AI提示詞", "", 1).strip())
-    if msg.startswith("更新AI提示詞 "):
-        raw = msg.replace("更新AI提示詞", "", 1).strip()
-        parts = [p.strip() for p in raw.split("|", 1)]
-        if len(parts) < 2 or not parts[0] or not parts[1]:
-            return "格式：更新AI提示詞 key | 內容"
-        return update_prompt(parts[0], parts[1])
-    return ""
+def load_prompts(): return AIPromptManager().load_prompts()
+def list_prompt_labels(): return AIPromptManager().list_prompt_labels()
+def get_prompt(key): return AIPromptManager().get_prompt(key)
+def render_prompt(key, **kwargs): return AIPromptManager().render_prompt(key, **kwargs)
+def update_prompt(key, content): return AIPromptManager().update_prompt(key, content)
+def format_prompt_list(): return AIPromptManager().format_prompt_list()
+def format_prompt_detail(key): return AIPromptManager().format_prompt_detail(key)
+def handle_command(command): return AIPromptManager().handle_command(command)

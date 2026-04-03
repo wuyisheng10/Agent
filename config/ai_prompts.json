@@ -33,5 +33,10 @@
     "label": "飲食評估整體報告",
     "description": "彙整三餐分析與 DRI 後產生整體報告的提示詞。",
     "template": "Create a nutrition assessment report in Traditional Chinese for a {gender_label}, age {age}. The matched Taiwan DRI age group is {dri_group}.\n\nMeal analysis notes:\n{meals_text}\nWater intake today: {water_ml} ml. Target water intake: {water_target} ml.\n\nTaiwan DRI reference values for this person:\n{dri_summary}\n\nWrite a detailed report in Traditional Chinese using Markdown with these sections:\n1. **整體飲食評估**: 1-2 short paragraphs about overall balance.\n2. **可能缺乏的營養素**: bullet list, and for each nutrient explain severity, likely reason, and long-term risk.\n3. **可能足夠的營養素**: bullet list, if any.\n4. **水分與飲食習慣觀察**.\n5. **長期這樣飲食可能出現的身體警訊**: specific symptoms in short-term, mid-term, long-term order.\n6. **改善建議**: 3-5 actionable suggestions.\nBe practical and state uncertainty when necessary."
+  },
+  "followup_individual_report": {
+    "label": "個人夥伴跟進報告",
+    "description": "針對單一夥伴產出深度跟進策略與訊息草稿。",
+    "template": "你是一位擁有 20 年經驗、專精於「陪伴與成長」的事業導師。請針對以下夥伴的現況數據，產出一份「深度跟進建議報告」。\n\n### 夥伴原始數據\n- 姓名：{target_name}\n- 最後聯絡：{last_contact} ({days} 天前)\n- 本週動作數：{weekly_actions} 次\n- 目前里程碑：{milestone}\n- 備註資訊：{note}\n\n### 要求\n1. 狀態診斷：分析該夥伴目前的心理與執行狀態（如：動力下降、遭遇挫折、或穩定成長中）。\n2. 核心切入點：建議導師這次應該以什麼「主題」或「心情」去聯繫他最有效。\n3. 具體跟進建議：給出 2-3 點具體行動。\n4. LINE 訊息草稿：產出一段約 80-120 字、溫暖、老朋友口吻的草稿。\n\n請以繁體中文回傳完整報告，直接顯示內容，不需開場白。"
   }
-}
+  }

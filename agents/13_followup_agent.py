@@ -208,6 +208,22 @@ def generate_followup_draft(partner: dict, days: int) -> str:
         return "（建議先以輕鬆的語氣關心近況，避開事業話題，重建互動溫度。）"
 
 
+def _load_prompt_manager():
+    import importlib.util
+    from pathlib import Path
+    
+    # 處理數字開頭的模組載入
+    mod_name = "ai_prompt_manager"
+    path = Path(__file__).parent / "20_ai_prompt_manager.py"
+    if not path.exists():
+        path = Path(r"C:\Users\user\claude AI_Agent\agents\20_ai_prompt_manager.py")
+        
+    spec = importlib.util.spec_from_file_location(mod_name, str(path))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m.AIPromptManager()
+
+
 class FollowupAgent:
     def __init__(self):
         cfg = load_config()
@@ -234,23 +250,16 @@ class FollowupAgent:
             
             days = days_silent(row.get(FIELD_LAST_CONTACT, ""))
             
-            prompt = f"""你是一位擁有 20 年經驗、專精於「陪伴與成長」的事業導師。
-請針對以下夥伴的現況數據，產出一份「深度跟進建議報告」。
-
-### 夥伴原始數據
-- 姓名：{target_name}
-- 最後聯絡：{row.get(FIELD_LAST_CONTACT, '無記錄')} ({days} 天前)
-- 本週動作數：{row.get(FIELD_WEEKLY_ACTIONS, '0')} 次
-- 目前里程碑：{row.get(FIELD_MILESTONE, '尚無紀錄')}
-- 備註資訊：{row.get(FIELD_NOTE, '無')}
-
-### 要求
-1. 狀態診斷：分析該夥伴目前的心理與執行狀態（如：動力下降、遭遇挫折、或穩定成長中）。
-2. 核心切入點：建議導師這次應該以什麼「主題」或「心情」去聯繫他最有效。
-3. 具體跟進建議：給出 2-3 點具體行動。
-4. LINE 訊息草稿：產出一段約 80-120 字、溫暖、老朋友口吻的草稿。
-
-請以繁體中文回傳完整報告，直接顯示內容，不需開場白。"""
+            pm = _load_prompt_manager()
+            prompt = pm.render_prompt(
+                "followup_individual_report",
+                target_name=target_name,
+                last_contact=row.get(FIELD_LAST_CONTACT, '無記錄'),
+                days=days,
+                weekly_actions=row.get(FIELD_WEEKLY_ACTIONS, '0'),
+                milestone=row.get(FIELD_MILESTONE, '尚無紀錄'),
+                note=row.get(FIELD_NOTE, '無')
+            )
 
             try:
                 log(f"  🚀 正在為 {target_name} 生成 Codex 深度報告...")

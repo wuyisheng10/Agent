@@ -37,92 +37,97 @@ DEFAULT_SKILLS = {
 }
 
 
-def _ensure_file():
-    SKILL_FILE.parent.mkdir(parents=True, exist_ok=True)
-    if not SKILL_FILE.exists():
-        with open(SKILL_FILE, "w", encoding="utf-8") as f:
-            json.dump(DEFAULT_SKILLS, f, ensure_ascii=False, indent=2)
+class AISkillManager:
+    def __init__(self):
+        self._ensure_file()
 
+    def _ensure_file(self):
+        SKILL_FILE.parent.mkdir(parents=True, exist_ok=True)
+        if not SKILL_FILE.exists():
+            with open(SKILL_FILE, "w", encoding="utf-8") as f:
+                json.dump(DEFAULT_SKILLS, f, ensure_ascii=False, indent=2)
 
-def load_skills() -> dict:
-    _ensure_file()
-    with open(SKILL_FILE, encoding="utf-8") as f:
-        data = json.load(f)
-    merged = {}
-    for key, default in DEFAULT_SKILLS.items():
-        item = dict(default)
-        item.update(data.get(key, {}))
-        merged[key] = item
-    for key, item in data.items():
-        if key not in merged:
+    def load_skills(self) -> dict:
+        self._ensure_file()
+        with open(SKILL_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        merged = {}
+        for key, default in DEFAULT_SKILLS.items():
+            item = dict(default)
+            item.update(data.get(key, {}))
             merged[key] = item
-    return merged
+        for key, item in data.items():
+            if key not in merged:
+                merged[key] = item
+        return merged
+
+    def save_skills(self, data: dict):
+        self._ensure_file()
+        with open(SKILL_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    def list_skill_labels(self) -> list[dict]:
+        data = self.load_skills()
+        return [
+            {"key": key, "label": item.get("label", key), "description": item.get("description", "")}
+            for key, item in data.items()
+        ]
+
+    def get_skill(self, key: str) -> dict | None:
+        return self.load_skills().get(key)
+
+    def render_skill(self, key: str) -> str:
+        item = self.get_skill(key)
+        if not item:
+            raise KeyError(key)
+        return item["instruction"]
+
+    def update_skill(self, key: str, content: str) -> str:
+        data = self.load_skills()
+        if key not in data:
+            return f"找不到這組 skill key：{key}"
+        data[key]["instruction"] = content.strip()
+        self.save_skills(data)
+        return f"已更新 AI skill：{key}"
+
+    def format_skill_list(self) -> str:
+        rows = self.list_skill_labels()
+        lines = ["AI skill 清單："]
+        for item in rows:
+            lines.append(f"- {item['key']}｜{item['label']}")
+        return "\n".join(lines)
+
+    def format_skill_detail(self, key: str) -> str:
+        item = self.get_skill(key)
+        if not item:
+            return f"找不到這組 skill key：{key}"
+        return (
+            f"AI skill：{key}\n"
+            f"名稱：{item.get('label', '')}\n"
+            f"說明：{item.get('description', '')}\n\n"
+            f"{item.get('instruction', '')}"
+        )
+
+    def handle_command(self, command: str) -> str:
+        msg = (command or "").strip()
+        if msg == "查詢AI技能":
+            return self.format_skill_list()
+        if msg.startswith("查詢AI技能 "):
+            return self.format_skill_detail(msg.replace("查詢AI技能", "", 1).strip())
+        if msg.startswith("更新AI技能 "):
+            raw = msg.replace("更新AI技能", "", 1).strip()
+            parts = [p.strip() for p in raw.split("|", 1)]
+            if len(parts) < 2 or not parts[0] or not parts[1]:
+                return "格式：更新AI技能 key | 內容"
+            return self.update_skill(parts[0], parts[1])
+        return ""
 
 
-def save_skills(data: dict):
-    _ensure_file()
-    with open(SKILL_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def list_skill_labels() -> list[dict]:
-    data = load_skills()
-    return [
-        {"key": key, "label": item.get("label", key), "description": item.get("description", "")}
-        for key, item in data.items()
-    ]
-
-
-def get_skill(key: str) -> dict | None:
-    return load_skills().get(key)
-
-
-def render_skill(key: str) -> str:
-    item = get_skill(key)
-    if not item:
-        raise KeyError(key)
-    return item["instruction"]
-
-
-def update_skill(key: str, content: str) -> str:
-    data = load_skills()
-    if key not in data:
-        return f"找不到這組 skill key：{key}"
-    data[key]["instruction"] = content.strip()
-    save_skills(data)
-    return f"已更新 AI skill：{key}"
-
-
-def format_skill_list() -> str:
-    rows = list_skill_labels()
-    lines = ["AI skill 清單："]
-    for item in rows:
-        lines.append(f"- {item['key']}｜{item['label']}")
-    return "\n".join(lines)
-
-
-def format_skill_detail(key: str) -> str:
-    item = get_skill(key)
-    if not item:
-        return f"找不到這組 skill key：{key}"
-    return (
-        f"AI skill：{key}\n"
-        f"名稱：{item.get('label', '')}\n"
-        f"說明：{item.get('description', '')}\n\n"
-        f"{item.get('instruction', '')}"
-    )
-
-
-def handle_command(command: str) -> str:
-    msg = (command or "").strip()
-    if msg == "查詢AI技能":
-        return format_skill_list()
-    if msg.startswith("查詢AI技能 "):
-        return format_skill_detail(msg.replace("查詢AI技能", "", 1).strip())
-    if msg.startswith("更新AI技能 "):
-        raw = msg.replace("更新AI技能", "", 1).strip()
-        parts = [p.strip() for p in raw.split("|", 1)]
-        if len(parts) < 2 or not parts[0] or not parts[1]:
-            return "格式：更新AI技能 key | 內容"
-        return update_skill(parts[0], parts[1])
-    return ""
+def load_skills(): return AISkillManager().load_skills()
+def list_skill_labels(): return AISkillManager().list_skill_labels()
+def get_skill(key): return AISkillManager().get_skill(key)
+def render_skill(key): return AISkillManager().render_skill(key)
+def update_skill(key, content): return AISkillManager().update_skill(key, content)
+def format_skill_list(): return AISkillManager().format_skill_list()
+def format_skill_detail(key): return AISkillManager().format_skill_detail(key)
+def handle_command(command): return AISkillManager().handle_command(command)
