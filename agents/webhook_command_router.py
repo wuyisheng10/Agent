@@ -56,6 +56,7 @@ NUTRITION_ASSESSMENT_PREFIXES = (
     "飲食評估狀態",
     "清除飲食評估",
     "設定歸檔對象",
+    "設定評估對象",
 )
 TRAINING_SYSTEM_PREFIXES = (
     "新增培訓模組",
