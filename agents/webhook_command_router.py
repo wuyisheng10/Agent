@@ -50,6 +50,7 @@ NUTRITION_DRI_PREFIXES = (
 NUTRITION_ASSESSMENT_PREFIXES = (
     "開始飲食評估",
     "執行飲食評估",
+    "評估飲食",
     "設定下一張餐別",
     "設定餐別",
     "飲食評估狀態",
@@ -289,7 +290,8 @@ def handle_web_command(
         return load_followup().FollowupAgent().generate_report_text()
 
     if _starts_with_any(cmd, NUTRITION_ASSESSMENT_PREFIXES):
-        return load_nutrition_assessment().handle_command(cmd, sessions, "web", push_fn=None, reply_fn=None)
+        res = load_nutrition_assessment().handle_command(cmd, sessions, "web", push_fn=None, reply_fn=None)
+        return res or "⚠️ 營養評估指令已接收，但無回應內容。"
 
     if cmd in CALENDAR_DIRECT_COMMANDS:
         return _format_direct_calendar(load_calendar, cmd)
