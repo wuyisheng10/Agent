@@ -81,6 +81,15 @@ MARKET_DEV_PREFIXES = (
     "更新潛在家人",
     "潛在家人資料",
 )
+PARTNER_PREFIXES = (
+    "新增夥伴",
+    "更新夥伴",
+    "跟進夥伴",
+    "刪除夥伴",
+    "查詢夥伴",
+    "查詢待跟進夥伴",
+    "新增跟進夥伴",
+)
 
 
 def _starts_with_any(text: str, prefixes: tuple[str, ...]) -> bool:
@@ -334,6 +343,9 @@ def handle_web_command(
         # 處理 更新潛在家人 與 潛在家人資料
         return load_market_dev().MarketDevAgent().handle_command(cmd)
 
+    if _starts_with_any(cmd, PARTNER_PREFIXES):
+        return _partner_query_text(load_partner, cmd)
+
     if cmd.startswith("激勵夥伴") or cmd.startswith("里程碑記錄") or cmd.startswith("里程碑 "):
         return load_motivation().MotivationAgent().handle_realtime(cmd)
 
@@ -345,8 +357,5 @@ def handle_web_command(
     training_system_result = _handle_training_system(cmd, load_training_system)
     if training_system_result:
         return training_system_result
-
-    if cmd.startswith("激勵夥伴") or cmd.startswith("里程碑記錄") or cmd.startswith("里程碑 "):
-        return load_motivation().MotivationAgent().handle_realtime(cmd)
 
     return None
