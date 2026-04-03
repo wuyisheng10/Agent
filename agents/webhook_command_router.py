@@ -307,6 +307,11 @@ def handle_web_command(
     if cmd == "跟進報告":
         return load_followup().FollowupAgent().generate_report_text()
 
+    if cmd.startswith("跟進報告 "):
+        name = cmd.replace("跟進報告 ", "", 1).strip()
+        return load_followup().FollowupAgent().generate_report_text(target_name=name)
+
+
     if _starts_with_any(cmd, NUTRITION_ASSESSMENT_PREFIXES):
         res = load_nutrition_assessment().handle_command(cmd, sessions, "web", push_fn=None, reply_fn=None)
         return res or "⚠️ 營養評估指令已接收，但無回應內容。"

@@ -212,10 +212,36 @@ class FollowupAgent:
         push_line(report)
         log("=== 跟進報告推播完成 ===")
 
-    def generate_report_text(self) -> str:
+    def generate_report_text(self, target_name: str = None) -> str:
         rows = read_csv()
         if not rows:
             return f"📭 夥伴跟進報告\n找不到 {PARTNERS_CSV.name} 或夥伴主資料。"
+
+        if target_name:
+            target_name = target_name.strip()
+            row = next((r for r in rows if r.get(FIELD_NAME, "").strip() == target_name), None)
+            if not row:
+                return f"🔍 找不到夥伴「{target_name}」的跟進資料。"
+            
+            days = days_silent(row.get(FIELD_LAST_CONTACT, ""))
+            risk = classify_risk(row, self.red_days, self.yellow_days)
+            risk_label = {"red": "🔴 高風險", "yellow": "🟡 中風險", "green": "🟢 正常"}[risk]
+            
+            lines = [
+                f"📈 夥伴跟進報告：{target_name}",
+                f"⚠️ 風險等級：{risk_label}",
+                f"📅 最後聯絡：{row.get(FIELD_LAST_CONTACT, '無記錄') or '無記錄'} ({days} 天前)",
+                f"📊 本週動作：{row.get(FIELD_WEEKLY_ACTIONS, '0')} 次",
+                f"🚩 里程碑：{row.get(FIELD_MILESTONE, '尚無') or '尚無'}",
+                f"📝 備註：{row.get(FIELD_NOTE, '') or '無'}",
+                "",
+                "💡 跟進建議：",
+            ]
+            try:
+                lines.append(generate_followup_draft(row, days))
+            except Exception:
+                lines.append("建議先以輕鬆的語氣關心近況，避開事業話題，重建互動溫度。")
+            return "\n".join(lines)
 
         red_list = []
         yellow_list = []

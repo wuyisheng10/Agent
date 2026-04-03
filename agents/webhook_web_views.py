@@ -283,7 +283,9 @@ const GROUPS=[
       build:function(v){return "查詢課後行動 "+v.n;}}},
   ]},
   {label:"🤝 夥伴陪伴",items:[
-    {label:"跟進報告",tag:"執行",cmd:"跟進報告"},
+    {label:"跟進報告",tag:"表單",form:{title:"跟進報告",
+      fields:[{id:"n",lbl:"夥伴名稱",type:"text",req:1,ph:"例：建德",pick:"partner"}],
+      build:function(v){return "跟進報告 "+v.n;}}},
     {label:"激勵夥伴",tag:"表單",form:{title:"激勵夥伴",
       fields:[{id:"n",lbl:"夥伴名稱",type:"text",req:1,ph:"例：建德"},
               {id:"s",lbl:"情境說明（選填）",type:"textarea",ph:"例：最近業績下滑"}],
@@ -597,6 +599,9 @@ function _isTrainingActionForm(f){
 function _isMilestoneForm(f){
   return !!f && (f.title||"")==="里程碑記錄";
 }
+function _isFollowupReportForm(f){
+  return !!f && (f.title||"")==="跟進報告";
+}
 function _isPartnerLookupForm(f){
   return !!f && (f.title||"")==="查詢指定夥伴";
 }
@@ -661,7 +666,7 @@ async function _getStoryPeople(){
   return people;
 }
 async function _hydratePartnerSelect(formDef){
-  if(!_isUpdatePartnerForm(formDef)&&!_isFollowupAddForm(formDef)&&!_isFollowupForm(formDef)&&!_isMotivateForm(formDef)&&!_isTrainingProgressForm(formDef)&&!_isTrainingReflectionForm(formDef)&&!_isSevenDayForm(formDef)&&!_isTrainingActionForm(formDef)&&!_isMilestoneForm(formDef)&&!_isPartnerLookupForm(formDef))return;
+  if(!_isUpdatePartnerForm(formDef)&&!_isFollowupAddForm(formDef)&&!_isFollowupForm(formDef)&&!_isMotivateForm(formDef)&&!_isTrainingProgressForm(formDef)&&!_isTrainingReflectionForm(formDef)&&!_isSevenDayForm(formDef)&&!_isTrainingActionForm(formDef)&&!_isMilestoneForm(formDef)&&!_isPartnerLookupForm(formDef)&&!_isFollowupReportForm(formDef))return;
   var el=document.getElementById("mf_n");
   if(!el)return;
   var partners=await _getPartners();
@@ -962,7 +967,11 @@ async function doSend(forced){
     else if(txt.startsWith("🛠️ 邀約文宣管理")){addInviteManageActionButtons();}
     else if(txt.startsWith("📝 是否修改這份邀約文宣")){addInviteEditConfirmButtons();}
     else if(txt.startsWith("📋 潛在家人名單")){addListButtons(txt,"潛在家人詳情");}
-    else if(txt.startsWith("👤 ")){var nm=txt.split("\\n")[0].replace("👤 ","").split(/[\s　]/)[0];if(nm)addDetailButtons(nm);}
+    else if(txt.startsWith("👤 ") && txt.indexOf("報告") === -1){
+      var nm=txt.split("\\n")[0].replace("👤 ","").split(/[\\s　]/)[0];
+      if(nm)addDetailButtons(nm);
+    }
+
   }catch(e){sp.remove();addMsg("⚠️ 連線失敗："+e.message,"b");}
   finally{setBusy(false);}
 }
