@@ -346,7 +346,7 @@ const GROUPS=[
       build:function(v){return "刪除夥伴 "+v.n;}}},
   ]},
   {label:"🗓️ 行事曆",items:[
-    {label:"查詢今日行事曆",tag:"執行",cmd:"查詢行事曆"},
+    {label:"查詢今日行事曆",tag:"執行",cmd:"查詢今日行事曆"},
     {label:"查詢過往行事曆",tag:"執行",cmd:"查詢過往行事曆"},
     {label:"查詢全部行事曆",tag:"執行",cmd:"查詢全部行事曆"},
     {label:"上傳行事曆圖片",tag:"執行",cmd:"上傳行事曆圖片"},

@@ -4,7 +4,7 @@ AI_PROMPT_PREFIXES = ("查詢AI提示詞", "更新AI提示詞")
 AI_SKILL_PREFIXES = ("查詢AI技能", "更新AI技能")
 FOLLOWUP_SUGGESTION_PREFIXES = ("跟進建議 潛在家人", "跟進建議 夥伴")
 DAILY_REPORT_PREFIXES = ("寄送每日報告",)
-CALENDAR_DIRECT_COMMANDS = ("查詢今日行事曆", "查詢過往行事曆", "查詢全部行事曆")
+CALENDAR_DIRECT_COMMANDS = ("查詢今日行事曆", "查詢過往行事曆", "查詢全部行事曆", "查詢行事曆")
 CALENDAR_UPLOAD_COMMANDS = ("上傳行事曆圖片",)
 ARCHIVE_MODE_COMMANDS = (
     "營養保健歸檔",
