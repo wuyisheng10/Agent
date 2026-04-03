@@ -2,6 +2,7 @@ import google.generativeai as genai
 import os
 import sys
 import re
+import time
 from pptx import Presentation
 from pathlib import Path
 from dotenv import load_dotenv
@@ -10,15 +11,44 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=r"C:\Users\user\claude AI_Agent\.env")
 
 # 1. 設定你的 API Key
-# 優先讀取環境變數，若無則可在此填入預設值
 api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 if not api_key:
-    # 如果使用者沒有設定環境變數，這裡可以填入預設 key (但不建議)
-    # api_key = "你的_API_KEY"
     print("錯誤: 未設定 GOOGLE_API_KEY 或 GEMINI_API_KEY 環境變數。")
     sys.exit(1)
 
 genai.configure(api_key=api_key)
+
+def send_notification(file_path, output_pptx, content):
+    """
+    透過電子郵件通知投影片已完成，並包含內容摘要
+    """
+    try:
+        import importlib.util as _ilu
+        BASE_DIR = Path(r"C:\Users\user\claude AI_Agent")
+        spec = _ilu.spec_from_file_location("email_notify", str(BASE_DIR / "agents" / "email_notify.py"))
+        email_mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(email_mod)
+        
+        # 將內容中的換行轉換為 HTML 換行
+        formatted_content = content.replace("\n", "<br>")
+        
+        subject = f"[Yisheng AI] 媒體總結投影片已完成 - {Path(file_path).name}"
+        body = f"""
+        <h3>🎬 媒體總結報告已產出</h3>
+        <p><b>原始檔案：</b> {file_path}</p>
+        <p><b>產出投影片：</b> {output_pptx}</p>
+        <hr>
+        <h4>內容摘要：</h4>
+        <div style="background:#f4f4f4; padding:15px; border-radius:5px; font-family:serif;">
+            {formatted_content}
+        </div>
+        <hr>
+        <p style="color:#888;font-size:12px;">此郵件由 Yisheng AI 自動發送</p>
+        """
+        email_mod.send_email(subject, body)
+        print(f"電子郵件通知已發送。")
+    except Exception as e:
+        print(f"發送電子郵件通知失敗: {e}")
 
 def process_media_to_slides(file_path):
     file_path = Path(file_path)
@@ -26,15 +56,36 @@ def process_media_to_slides(file_path):
         print(f"錯誤: 找不到檔案 {file_path}")
         return
 
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # 使用您清單中明確存在的模型別名
+    model_name = 'gemini-flash-latest'
+    print(f"正在啟動模型: {model_name}...")
+    
+    try:
+        model = genai.GenerativeModel(model_name)
+    except Exception as e:
+        print(f"模型啟動失敗: {e}")
+        return
     
     # 2. 上傳影片/錄音
-    print(f"正在分析檔案: {file_path}...")
+    print(f"正在上傳並分析檔案: {file_path}...")
     try:
         media_file = genai.upload_file(path=str(file_path))
-        # 註：GenAI 可能需要一點時間處理上傳後的檔案，但在 flash 模式下通常很快
+        print(f"檔案已上傳，正在等待 Google 處理 (ID: {media_file.name})...")
+        
+        # 等待檔案進入 ACTIVE 狀態
+        while media_file.state.name == "PROCESSING":
+            print(".", end="", flush=True)
+            time.sleep(5)
+            media_file = genai.get_file(media_file.name)
+            
+        if media_file.state.name != "ACTIVE":
+            print(f"\n檔案處理異常: {media_file.state.name}")
+            return
+        
+        print(f"\n檔案已準備就緒，開始生成投影片內容...")
+        
     except Exception as e:
-        print(f"上傳失敗: {e}")
+        print(f"\n上傳或處理失敗: {e}")
         return
     
     # 3. 讓 Gemini 生成投影片內容
@@ -58,8 +109,6 @@ def process_media_to_slides(file_path):
     
     # 4. 建立實體投影片檔案
     prs = Presentation()
-    
-    # 解析邏輯：按「第 X 頁」拆分
     pages = re.split(r"第\s*[0-9一二三四五六七八九十]+\s*頁[:：]", content)
     
     slide_count = 0
@@ -72,21 +121,18 @@ def process_media_to_slides(file_path):
         if not lines:
             continue
             
-        # 第一行通常是標題
         title_text = lines[0].replace("[", "").replace("]", "")
         bullet_points = [l for l in lines[1:] if l.startswith('-') or l.startswith('•') or re.match(r'^\d+\.', l)]
         
-        # 如果沒抓到 bullet points，就用剩餘的所有行
         if not bullet_points and len(lines) > 1:
             bullet_points = lines[1:]
 
-        slide = prs.slides.add_slide(prs.slide_layouts[1]) # 使用「標題與內容」版面
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
         slide.shapes.title.text = title_text
         
-        # 填入內文
         if slide.placeholders[1].has_text_frame:
             tf = slide.placeholders[1].text_frame
-            tf.clear() # 清除預設文字
+            tf.clear()
             for bp in bullet_points:
                 p = tf.add_paragraph()
                 p.text = bp.lstrip('- •').strip()
@@ -94,7 +140,6 @@ def process_media_to_slides(file_path):
         
         slide_count += 1
 
-    # 如果解析失敗，至少產生一個包含完整內容的投影片
     if slide_count == 0:
         slide = prs.slides.add_slide(prs.slide_layouts[1])
         slide.shapes.title.text = "重點摘要"
@@ -105,6 +150,10 @@ def process_media_to_slides(file_path):
     try:
         prs.save(str(output_name))
         print(f"完成！投影片已存至: {output_name}")
+        
+        # 寄送通知 (帶上文字摘要)
+        send_notification(str(file_path), str(output_name), content)
+        
     except Exception as e:
         print(f"存檔失敗: {e}")
 
